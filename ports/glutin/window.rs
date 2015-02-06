@@ -15,12 +15,12 @@ use layers::platform::surface::NativeGraphicsMetadata;
 use msg::constellation_msg;
 use msg::constellation_msg::Key;
 use msg::compositor_msg::{PaintState, ReadyState};
-use msg::constellation_msg::LoadData;
 use NestedEventLoopListener;
 use std::rc::Rc;
 use std::sync::mpsc::{channel, Sender};
 use util::cursor::Cursor;
 use util::geometry::ScreenPx;
+use url::Url;
 
 #[cfg(feature = "window")]
 use compositing::windowing::{MouseWindowEvent, WindowNavigateMsg};
@@ -485,7 +485,7 @@ impl WindowMethods for Window {
     fn set_page_title(&self, _: Option<String>) {
     }
 
-    fn set_page_load_data(&self, _: LoadData) {
+    fn set_page_load_data(&self, _: Url) {
     }
 
     fn load_end(&self) {

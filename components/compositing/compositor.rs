@@ -435,7 +435,7 @@ impl<Window: WindowMethods> IOCompositor<Window> {
         self.window.set_page_title(title);
     }
 
-    fn change_page_load_data(&mut self, _: FrameId, load_data: LoadData) {
+    fn change_page_load_data(&mut self, _: FrameId, load_data: Url) {
         self.window.set_page_load_data(load_data);
     }
 

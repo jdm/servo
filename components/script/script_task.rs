@@ -306,7 +306,8 @@ impl ScriptTaskFactory for ScriptTask {
                  storage_task: StorageTask,
                  image_cache_task: ImageCacheTask,
                  devtools_chan: Option<DevtoolsControlChan>,
-                 window_size: WindowSizeData)
+                 window_size: WindowSizeData,
+                 _load_data: LoadData)
                  where C: ScriptListener + Send + 'static {
         let ConstellationChan(const_chan) = constellation_chan.clone();
         let (script_chan, script_port) = channel();
@@ -655,8 +656,10 @@ impl ScriptTask {
             old_pipeline_id,
             new_pipeline_id,
             subpage_id,
-            layout_chan
+            layout_chan,
+            load_data
         } = new_layout_info;
+        let _load_data = load_data;
 
         let page = self.page.borrow_mut();
         let parent_page = page.find(old_pipeline_id).expect("ScriptTask: received a layout

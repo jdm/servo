@@ -20,7 +20,7 @@ use layers::layers::LayerBufferSet;
 use pipeline::CompositionPipeline;
 use msg::compositor_msg::{Epoch, LayerId, LayerMetadata, ReadyState};
 use msg::compositor_msg::{PaintListener, PaintState, ScriptListener, ScrollPolicy};
-use msg::constellation_msg::{ConstellationChan, LoadData, PipelineId};
+use msg::constellation_msg::{ConstellationChan, PipelineId};
 use msg::constellation_msg::{Key, KeyState, KeyModifiers};
 use util::cursor::Cursor;
 use util::geometry::PagePx;
@@ -29,6 +29,7 @@ use util::time::TimeProfilerChan;
 use std::sync::mpsc::{channel, Sender, Receiver};
 use std::fmt::{Error, Formatter, Show};
 use std::rc::Rc;
+use url::Url;
 
 /// Sends messages to the compositor. This is a trait supplied by the port because the method used
 /// to communicate with the compositor may have to kick OS event loops awake, communicate cross-
@@ -201,7 +202,7 @@ pub enum Msg {
     /// Alerts the compositor that the current page has changed its title.
     ChangePageTitle(PipelineId, Option<String>),
     /// Alerts the compositor that the current page has changed its load data (including URL).
-    ChangePageLoadData(FrameId, LoadData),
+    ChangePageLoadData(FrameId, Url),
     /// Alerts the compositor that a `PaintMsg` has been discarded.
     PaintMsgDiscarded,
     /// Replaces the current frame tree, typically called during main frame navigation.
