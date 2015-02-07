@@ -45,11 +45,12 @@ pub mod cors;
 
 #[macro_use]
 pub mod dom;
+pub mod frame;
 pub mod parse;
 
 pub mod layout_interface;
-pub mod page;
 pub mod script_task;
+pub mod sessionhistory;
 mod timers;
 pub mod textinput;
 mod devtools;

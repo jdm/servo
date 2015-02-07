@@ -24,7 +24,7 @@ use dom::element::ElementTypeId;
 use dom::htmlelement::{HTMLElement, HTMLElementTypeId};
 use dom::node::{Node, NodeHelpers, NodeTypeId, window_from_node, CloneChildrenFlag};
 use dom::virtualmethods::VirtualMethods;
-use dom::window::ScriptHelpers;
+use dom::window::{WindowHelpers, ScriptHelpers};
 use script_task::{ScriptMsg, Runnable};
 
 use encoding::all::UTF_8;
@@ -183,8 +183,7 @@ impl<'a> HTMLScriptElementHelpers for JSRef<'a, HTMLScriptElement> {
         // scripts synchronously and execute them immediately.)
         let window = window_from_node(self).root();
         let window = window.r();
-        let page = window.page();
-        let base_url = page.get_url();
+        let base_url = window.get_url();
 
         let (origin, source, url) = match element.get_attribute(ns!(""), &atom!("src")).root() {
             Some(src) => {
@@ -198,7 +197,7 @@ impl<'a> HTMLScriptElementHelpers for JSRef<'a, HTMLScriptElement> {
                         // state of the element's `crossorigin` content attribute, the origin being
                         // the origin of the script element's node document, and the default origin
                         // behaviour set to taint.
-                        match load_whole_resource(&page.resource_task, url) {
+                        match load_whole_resource(&window.resource_task(), url) {
                             Ok((metadata, bytes)) => {
                                 // TODO: use the charset from step 13.
                                 let source = UTF_8.decode(bytes.as_slice(), DecoderTrap::Replace).unwrap();

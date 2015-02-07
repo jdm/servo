@@ -53,11 +53,14 @@ use dom::range::Range;
 use dom::treewalker::TreeWalker;
 use dom::uievent::UIEvent;
 use dom::window::{Window, WindowHelpers};
+use layout_interface::{HitTestResponse, MouseOverResponse};
 use net::resource_task::ControlMsg::{SetCookiesForUrl, GetCookiesForUrl};
 use net::cookie_storage::CookieSource::NonHTTP;
+use script_traits::UntrustedNodeAddress;
 use util::namespace;
 use util::str::{DOMString, split_html_space_chars};
 
+use geom::Point2D;
 use html5ever::tree_builder::{QuirksMode, NoQuirks, LimitedQuirks, Quirks};
 use layout_interface::{LayoutChan, Msg};
 use string_cache::{Atom, QualName};
@@ -184,6 +187,8 @@ pub trait DocumentHelpers<'a> {
     fn register_named_element(self, element: JSRef<Element>, id: Atom);
     fn load_anchor_href(self, href: DOMString);
     fn find_fragment_node(self, fragid: DOMString) -> Option<Temporary<Element>>;
+    fn hit_test(self, point: &Point2D<f32>) -> Option<UntrustedNodeAddress>;
+    fn get_nodes_under_mouse(self, point: &Point2D<f32>) -> Option<Vec<UntrustedNodeAddress>>;
     fn set_ready_state(self, state: DocumentReadyState);
     fn get_focused_element(self) -> Option<Temporary<Element>>;
     fn begin_focus_transaction(self);
@@ -225,7 +230,7 @@ impl<'a> DocumentHelpers<'a> for JSRef<'a, Document> {
             Quirks => {
                 let window = self.window.root();
                 let window = window.r();
-                let LayoutChan(ref layout_chan) = window.page().layout_chan;
+                let LayoutChan(ref layout_chan) = window.layout_chan();
                 layout_chan.send(Msg::SetQuirksMode).unwrap();
             }
             NoQuirks | LimitedQuirks => {}
@@ -338,6 +343,43 @@ impl<'a> DocumentHelpers<'a> for JSRef<'a, Document> {
         })
     }
 
+    fn hit_test(self, point: &Point2D<f32>) -> Option<UntrustedNodeAddress> {
+        let root = match self.GetDocumentElement() {
+            None => return None,
+            Some(root) => root,
+        }.root();
+        let root: JSRef<Node> = NodeCast::from_ref(root.r());
+        let win = self.window().root();
+        let address = match win.r().layout().hit_test(root.to_trusted_node_address(), *point) {
+            Ok(HitTestResponse(node_address)) => {
+                Some(node_address)
+            }
+            Err(()) => {
+                debug!("layout query error");
+                None
+            }
+        };
+        address
+    }
+
+    fn get_nodes_under_mouse(self, point: &Point2D<f32>) -> Option<Vec<UntrustedNodeAddress>> {
+        let root = match self.GetDocumentElement() {
+            None => return None,
+            Some(root) => root,
+        }.root();
+        let root: JSRef<Node> = NodeCast::from_ref(root.r());
+        let win = self.window().root();
+        let address = match win.r().layout().mouse_over(root.to_trusted_node_address(), *point) {
+            Ok(MouseOverResponse(node_address)) => {
+                Some(node_address)
+            }
+            Err(()) => {
+                None
+            }
+        };
+        address
+    }
+
     // https://html.spec.whatwg.org/multipage/dom.html#current-document-readiness
     fn set_ready_state(self, state: DocumentReadyState) {
         self.ready_state.set(state);
@@ -377,7 +419,7 @@ impl<'a> DocumentHelpers<'a> for JSRef<'a, Document> {
     /// Sends this document's title to the compositor.
     fn send_title_to_compositor(self) {
         let window = self.window().root();
-        window.r().page().send_title_to_compositor();
+        window.r().compositor().set_title(window.r().pipeline(), Some(self.Title()));
     }
 
     fn dirty_all_nodes(self) {
@@ -978,7 +1020,7 @@ impl<'a> DocumentMethods for JSRef<'a, Document> {
     fn Location(self) -> Temporary<Location> {
         let window = self.window.root();
         let window = window.r();
-        self.location.or_init(|| Location::new(window, window.page_clone()))
+        self.location.or_init(|| Location::new(window))
     }
 
     // http://dom.spec.whatwg.org/#dom-parentnode-children
@@ -1017,10 +1059,8 @@ impl<'a> DocumentMethods for JSRef<'a, Document> {
             return Err(Security);
         }
         let window = self.window.root();
-        let window = window.r();
-        let page = window.page();
         let (tx, rx) = channel();
-        let _ = page.resource_task.send(GetCookiesForUrl(url, tx, NonHTTP));
+        let _ = window.r().resource_task().send(GetCookiesForUrl(url, tx, NonHTTP));
         let cookies = rx.recv().unwrap();
         Ok(cookies.unwrap_or("".to_owned()))
     }
@@ -1033,9 +1073,7 @@ impl<'a> DocumentMethods for JSRef<'a, Document> {
             return Err(Security);
         }
         let window = self.window.root();
-        let window = window.r();
-        let page = window.page();
-        let _ = page.resource_task.send(SetCookiesForUrl(url, cookie, NonHTTP));
+        let _ = window.r().resource_task().send(SetCookiesForUrl(url, cookie, NonHTTP));
         Ok(())
     }
 

@@ -54,6 +54,10 @@ pub struct NewLayoutInfo {
 
 /// Messages sent from the constellation to the script task
 pub enum ConstellationControlMsg {
+    /// Marks the specified pipeline as active.
+    MakeActive(PipelineId, Option<(PipelineId, SubpageId)>),
+    /// Marks the specified pipeline as inactive.
+    MakeInactive(PipelineId, SubpageId),
     /// Gives a channel and ID to a layout task, as well as the ID of that layout's parent
     AttachLayout(NewLayoutInfo),
     /// Window resized.  Sends a DOM event eventually, but first we combine events.

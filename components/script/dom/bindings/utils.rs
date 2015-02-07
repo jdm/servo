@@ -45,6 +45,8 @@ use js::JSFUN_CONSTRUCTOR;
 use js;
 
 /// Proxy handler for a WindowProxy.
+#[allow(raw_pointer_derive)]
+#[derive(Copy)]
 pub struct WindowProxyHandler(pub *const libc::c_void);
 
 #[allow(raw_pointer_derive)]
@@ -592,7 +594,7 @@ pub extern fn outerize_global(_cx: *mut JSContext, obj: JSHandleObject) -> *mut 
         debug!("outerizing");
         let obj = *obj.unnamed_field1;
         let win: Root<window::Window> = unwrap_jsmanaged(obj).unwrap().root();
-        win.r().browser_context().as_ref().unwrap().window_proxy()
+        win.r().browser_context().window_proxy()
     }
 }
 

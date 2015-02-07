@@ -17,9 +17,9 @@ use net::image_cache_task::ImageCacheTask;
 use net::resource_task::ResourceTask;
 use net::storage_task::StorageTask;
 use util::time::TimeProfilerChan;
+use url::Url;
 use std::rc::Rc;
 use std::sync::mpsc::{Receiver, channel};
-use url::Url;
 
 /// A uniquely-identifiable pipeline of script task, layout task, and paint task.
 pub struct Pipeline {
@@ -31,7 +31,6 @@ pub struct Pipeline {
     pub layout_shutdown_port: Receiver<()>,
     pub paint_shutdown_port: Receiver<()>,
     /// Load data corresponding to the most recently-loaded page.
-    //pub load_data: LoadData,
     pub url: Url,
     /// The title of the most recently-loaded page.
     pub title: Option<String>,
@@ -164,13 +163,10 @@ impl Pipeline {
         }
     }
 
-    /*pub fn load(&self) {
+    pub fn make_active(&self) {
         let ScriptControlChan(ref chan) = self.script_chan;
-        chan.send(ConstellationControlMsg::Load(self.id,
-                                                self.parent,
-                                                self.load_data.clone())).unwrap();
+        chan.send(ConstellationControlMsg::MakeActive(self.id, self.parent)).unwrap();
     }
-    }*/
 
     pub fn grant_paint_permission(&self) {
         let _ = self.paint_chan.send(PaintMsg::PaintPermissionGranted);

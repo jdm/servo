@@ -11,22 +11,16 @@ use dom::bindings::codegen::InheritTypes::{NodeCast, ElementCast};
 use dom::bindings::codegen::Bindings::DocumentBinding::DocumentMethods;
 use dom::bindings::codegen::Bindings::DOMRectBinding::{DOMRectMethods};
 use dom::bindings::codegen::Bindings::ElementBinding::{ElementMethods};
+use dom::browsercontext::BrowserContext;
 use dom::node::{Node, NodeHelpers};
-use dom::window::{ScriptHelpers};
+use dom::window::{ScriptHelpers, WindowHelpers};
 use dom::element::Element;
-use dom::document::DocumentHelpers;
-use page::Page;
-use msg::constellation_msg::PipelineId;
-use script_task::get_page;
 
-use std::sync::mpsc::Sender;
 use std::rc::Rc;
+use std::sync::mpsc::Sender;
 
-
-pub fn handle_evaluate_js(page: &Rc<Page>, pipeline: PipelineId, eval: String, reply: Sender<EvaluateJSReply>){
-    let page = get_page(&*page, pipeline);
-    let frame = page.frame();
-    let window = frame.as_ref().unwrap().window.root();
+pub fn handle_evaluate_js(context: &Rc<BrowserContext>, eval: String, reply: Sender<EvaluateJSReply>){
+    let window = context.active_window().root();
     let cx = window.r().get_cx();
     let rval = window.r().evaluate_js_on_global_with_result(eval.as_slice());
 
@@ -48,29 +42,23 @@ pub fn handle_evaluate_js(page: &Rc<Page>, pipeline: PipelineId, eval: String, r
     }).unwrap();
 }
 
-pub fn handle_get_root_node(page: &Rc<Page>, pipeline: PipelineId, reply: Sender<NodeInfo>) {
-    let page = get_page(&*page, pipeline);
-    let frame = page.frame();
-    let document = frame.as_ref().unwrap().document.root();
+pub fn handle_get_root_node(context: &Rc<BrowserContext>, reply: Sender<NodeInfo>) {
+    let document = context.active_document().root();
 
     let node: JSRef<Node> = NodeCast::from_ref(document.r());
     reply.send(node.summarize()).unwrap();
 }
 
-pub fn handle_get_document_element(page: &Rc<Page>, pipeline: PipelineId, reply: Sender<NodeInfo>) {
-    let page = get_page(&*page, pipeline);
-    let frame = page.frame();
-    let document = frame.as_ref().unwrap().document.root();
+pub fn handle_get_document_element(context: &Rc<BrowserContext>, reply: Sender<NodeInfo>) {
+    let document = context.active_document().root();
     let document_element = document.r().GetDocumentElement().root().unwrap();
 
     let node: JSRef<Node> = NodeCast::from_ref(document_element.r());
     reply.send(node.summarize()).unwrap();
 }
 
-fn find_node_by_unique_id(page: &Rc<Page>, pipeline: PipelineId, node_id: String) -> Temporary<Node> {
-    let page = get_page(&*page, pipeline);
-    let frame = page.frame();
-    let document = frame.as_ref().unwrap().document.root();
+fn find_node_by_unique_id(context: &Rc<BrowserContext>, node_id: String) -> Temporary<Node> {
+    let document = context.active_document().root();
     let node: JSRef<Node> = NodeCast::from_ref(document.r());
 
     for candidate in node.traverse_preorder() {
@@ -82,21 +70,21 @@ fn find_node_by_unique_id(page: &Rc<Page>, pipeline: PipelineId, node_id: String
     panic!("couldn't find node with unique id {}", node_id)
 }
 
-pub fn handle_get_children(page: &Rc<Page>, pipeline: PipelineId, node_id: String, reply: Sender<Vec<NodeInfo>>) {
-    let parent = find_node_by_unique_id(&*page, pipeline, node_id).root();
+pub fn handle_get_children(context: &Rc<BrowserContext>, node_id: String, reply: Sender<Vec<NodeInfo>>) {
+    let parent = find_node_by_unique_id(context, node_id).root();
     let children = parent.r().children().map(|child| child.summarize()).collect();
     reply.send(children).unwrap();
 }
 
-pub fn handle_get_layout(page: &Rc<Page>, pipeline: PipelineId, node_id: String, reply: Sender<(f32, f32)>) {
-    let node = find_node_by_unique_id(&*page, pipeline, node_id).root();
+pub fn handle_get_layout(context: &Rc<BrowserContext>, node_id: String, reply: Sender<(f32, f32)>) {
+    let node = find_node_by_unique_id(context, node_id).root();
     let elem: JSRef<Element> = ElementCast::to_ref(node.r()).expect("should be getting layout of element");
     let rect = elem.GetBoundingClientRect().root();
     reply.send((rect.r().Width(), rect.r().Height())).unwrap();
 }
 
-pub fn handle_modify_attribute(page: &Rc<Page>, pipeline: PipelineId, node_id: String, modifications: Vec<Modification>) {
-    let node = find_node_by_unique_id(&*page, pipeline, node_id).root();
+pub fn handle_modify_attribute(context: &Rc<BrowserContext>, node_id: String, modifications: Vec<Modification>) {
+    let node = find_node_by_unique_id(context, node_id).root();
     let elem: JSRef<Element> = ElementCast::to_ref(node.r()).expect("should be getting layout of element");
 
     for modification in modifications.iter(){
@@ -109,7 +97,7 @@ pub fn handle_modify_attribute(page: &Rc<Page>, pipeline: PipelineId, node_id: S
     }
 }
 
-pub fn handle_wants_live_notifications(page: &Rc<Page>, pipeline_id: PipelineId, send_notifications: bool) {
-    let page = get_page(&*page, pipeline_id);
-    page.devtools_wants_updates.set(send_notifications);
+pub fn handle_wants_live_notifications(context: &Rc<BrowserContext>, send_notifications: bool) {
+    let win = context.active_window().root();
+    win.r().set_devtools_wants_updates(send_notifications);
 }

@@ -871,8 +871,8 @@ impl<LTF: LayoutTaskFactory, STF: ScriptTaskFactory> Constellation<LTF, STF> {
             }
         };
 
-        for _frame in destination_frame.iter() {
-            //frame.pipeline.borrow().load();
+        for frame in destination_frame.iter() {
+            frame.pipeline.borrow().make_active();
         }
         self.send_frame_tree_and_grant_paint_permission(destination_frame);
 

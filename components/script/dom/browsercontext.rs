@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+use dom::bindings::cell::DOMRefCell;
 use dom::bindings::conversions::unwrap_jsmanaged;
 use dom::bindings::conversions::{ToJSValConvertible};
 use dom::bindings::js::{JS, JSRef, Temporary, Root};
@@ -14,6 +15,9 @@ use dom::document::{Document, DocumentHelpers};
 use dom::element::Element;
 use dom::window::Window;
 use dom::window::WindowHelpers;
+use sessionhistory::SessionHistory;
+
+use msg::constellation_msg::{PipelineId, SubpageId};
 
 use js::jsapi::{JSContext, JSObject, jsid, JSPropertyDescriptor};
 use js::jsapi::{JS_AlreadyHasOwnPropertyById, JS_ForwardGetPropertyTo};
@@ -25,32 +29,31 @@ use js::glue::{WrapperNew, CreateWrapperProxyHandler, ProxyTraps};
 use js::rust::with_compartment;
 use js::{JSRESOLVE_QUALIFIED, JSRESOLVE_ASSIGNING};
 
+use std::cell::{Cell, Ref, RefMut};
 use std::ptr;
 
 #[allow(raw_pointer_derive)]
 #[jstraceable]
 #[privatize]
 pub struct BrowserContext {
-    history: Vec<SessionHistoryEntry>,
-    active_index: uint,
-    window_proxy: *mut JSObject,
+    history: DOMRefCell<SessionHistory>,
+    window_proxy: Cell<*mut JSObject>,
     frame_element: Option<JS<Element>>,
 }
 
 impl BrowserContext {
     pub fn new(document: JSRef<Document>, frame_element: Option<JSRef<Element>>) -> BrowserContext {
-        let mut context = BrowserContext {
-            history: vec!(SessionHistoryEntry::new(document)),
-            active_index: 0,
-            window_proxy: ptr::null_mut(),
+        let context = BrowserContext {
+            history: DOMRefCell::new(SessionHistory::new()),
+            window_proxy: Cell::new(ptr::null_mut()),
             frame_element: frame_element.map(JS::from_rooted),
         };
-        context.create_window_proxy();
+        context.push_new_active_document(document);
         context
     }
 
     pub fn active_document(&self) -> Temporary<Document> {
-        Temporary::new(self.history[self.active_index].document.clone())
+        self.history.borrow().active_document()
     }
 
     pub fn active_window(&self) -> Temporary<Window> {
@@ -62,47 +65,56 @@ impl BrowserContext {
         self.frame_element.map(Temporary::new)
     }
 
+    pub fn active_pipeline(&self) -> PipelineId {
+        let win = self.active_window().root();
+        win.r().pipeline()
+    }
+
+    pub fn active_subpage(&self) -> Option<SubpageId> {
+        let win = self.active_window().root();
+        win.r().subpage()
+    }
+
+    pub fn session_history(&self) -> Ref<SessionHistory> {
+        self.history.borrow()
+    }
+
+    pub fn mut_session_history(&self) -> RefMut<SessionHistory> {
+        self.history.borrow_mut()
+    }
+
     pub fn window_proxy(&self) -> *mut JSObject {
-        assert!(!self.window_proxy.is_null());
-        self.window_proxy
+        assert!(!self.window_proxy.get().is_null());
+        self.window_proxy.get()
+    }
+
+    pub fn replace_active_document(&self, doc: JSRef<Document>) {
+        self.history.borrow_mut().replace(doc);
+        self.create_window_proxy();
+        //TODO(jdm) don't leak the old window proxy
+    }
+
+    pub fn push_new_active_document(&self, doc: JSRef<Document>) {
+        self.history.borrow_mut().push(doc);
+        self.create_window_proxy();
+        //TODO(jdm) don't leak the old window proxy
     }
 
     #[allow(unsafe_blocks)]
-    fn create_window_proxy(&mut self) {
+    fn create_window_proxy(&self) {
         let win = self.active_window().root();
         let win = win.r();
-        let page = win.page();
-        let js_info = page.js_info();
 
-        let WindowProxyHandler(handler) = js_info.as_ref().unwrap().dom_static.windowproxy_handler;
+        let WindowProxyHandler(handler) = win.windowproxy_handler();
         assert!(!handler.is_null());
 
         let parent = win.reflector().get_jsobject();
-        let cx = js_info.as_ref().unwrap().js_context.ptr;
+        let cx = win.get_cx();
         let wrapper = with_compartment(cx, parent, || unsafe {
             WrapperNew(cx, parent, handler)
         });
         assert!(!wrapper.is_null());
-        self.window_proxy = wrapper;
-    }
-}
-
-// This isn't a DOM struct, just a convenience struct
-// without a reflector, so we don't mark this as #[dom_struct]
-#[must_root]
-#[privatize]
-#[jstraceable]
-pub struct SessionHistoryEntry {
-    document: JS<Document>,
-    children: Vec<BrowserContext>
-}
-
-impl SessionHistoryEntry {
-    fn new(document: JSRef<Document>) -> SessionHistoryEntry {
-        SessionHistoryEntry {
-            document: JS::from_rooted(document),
-            children: vec!()
-        }
+        self.window_proxy.set(wrapper);
     }
 }
 
