@@ -387,7 +387,6 @@ pub trait WindowHelpers {
     fn clear_js_context(self);
     fn clear_js_context_for_script_deallocation(self);
     fn flush_layout(self, goal: ReflowGoal, query: ReflowQueryType);
-    fn create_browser_context(self, doc: JSRef<Document>, frame_element: Option<JSRef<Element>>);
     fn init_browser_context(self, context: Rc<BrowserContext>);
     fn load_url(self, href: DOMString);
     fn handle_fire_timer(self, timer_id: TimerId);
@@ -572,10 +571,6 @@ impl<'a> WindowHelpers for JSRef<'a, Window> {
         self.join_layout(); //FIXME: is this necessary, or is layout_rpc's mutex good enough?
         let ContentBoxesResponse(rects) = self.layout_rpc.content_boxes();
         rects
-    }
-
-    fn create_browser_context(self, doc: JSRef<Document>, frame_element: Option<JSRef<Element>>) {
-        self.init_browser_context(Rc::new(BrowserContext::new(doc, frame_element)));
     }
 
     fn init_browser_context(self, context: Rc<BrowserContext>) {

@@ -392,7 +392,7 @@ impl<LTF: LayoutTaskFactory, STF: ScriptTaskFactory> Constellation<LTF, STF> {
     /// Helper function for creating a pipeline
     fn new_pipeline(&mut self,
                     id: PipelineId,
-                    parent: Option<(PipelineId, SubpageId)>,
+                    parent: Option<(PipelineId, SubpageId, Option<SubpageId>)>,
                     script_pipeline: Option<Rc<Pipeline>>,
                     load_data: LoadData)
                     -> Rc<Pipeline> {
@@ -569,7 +569,7 @@ impl<LTF: LayoutTaskFactory, STF: ScriptTaskFactory> Constellation<LTF, STF> {
 
         let new_id = self.get_next_pipeline_id();
         let new_frame_id = self.get_next_frame_id();
-        let pipeline = self.new_pipeline(new_id, parent, None,
+        let pipeline = self.new_pipeline(new_id, parent.map(|(a, b)| (a, b, None)), None,
                                          LoadData::new(Url::parse("about:failure").unwrap()));
 
         self.browse(Some(pipeline_id),
@@ -765,9 +765,8 @@ impl<LTF: LayoutTaskFactory, STF: ScriptTaskFactory> Constellation<LTF, STF> {
 
         let source_url = source_pipeline.url.clone();
 
-        let same_script = (source_url.host() == url.host() &&
-                           source_url.port() == url.port()) &&
-                           sandbox == IFrameSandboxState::IFrameUnsandboxed;
+        let same_script = is_same_origin(&source_url, &url) &&
+            sandbox == IFrameSandboxState::IFrameUnsandboxed;
         // FIXME(tkuehn): Need to follow the standardized spec for checking same-origin
         // Reuse the script task if the URL is same-origin
         let script_pipeline = if same_script {
@@ -781,7 +780,7 @@ impl<LTF: LayoutTaskFactory, STF: ScriptTaskFactory> Constellation<LTF, STF> {
         let new_frame_pipeline_id = self.get_next_pipeline_id();
         let pipeline = self.new_pipeline(
             new_frame_pipeline_id,
-            Some((containing_page_pipeline_id, new_subpage_id)),
+            Some((containing_page_pipeline_id, new_subpage_id, old_subpage_id)),
             script_pipeline,
             LoadData::new(url)
         );
@@ -825,10 +824,20 @@ impl<LTF: LayoutTaskFactory, STF: ScriptTaskFactory> Constellation<LTF, STF> {
         // changes would be overridden by changing the subframe associated with source_id.
 
         let parent = source_frame.parent.clone();
-        let parent_id = source_frame.pipeline.borrow().parent;
+        let old_subpage = source_frame.pipeline.borrow().subpage_id();
+        let parent_id = source_frame.pipeline.borrow().parent.map(|(a, b)| (a, b, old_subpage));
         let next_pipeline_id = self.get_next_pipeline_id();
         let next_frame_id = self.get_next_frame_id();
-        let pipeline = self.new_pipeline(next_pipeline_id, parent_id, None, load_data);
+        //TODO: should we be retaining the existing script task for top-level
+        //      same-origin navigations? is the difference observable?
+        let same_script = parent_id.is_some() && is_same_origin(&source_frame.pipeline.borrow().url,
+                                                                &load_data.url);
+        let script_chan = if same_script {
+            Some(source_frame.pipeline.borrow().clone())
+        } else {
+            None
+        };
+        let pipeline = self.new_pipeline(next_pipeline_id, parent_id, script_chan, load_data);
         self.browse(Some(source_id),
                     Rc::new(FrameTree::new(next_frame_id,
                                            pipeline.clone(),
@@ -1141,4 +1150,8 @@ impl<LTF: LayoutTaskFactory, STF: ScriptTaskFactory> Constellation<LTF, STF> {
             Err(_) => {} // The message has been discarded, we are probably shutting down.
         }
     }
+}
+
+fn is_same_origin(a: &Url, b: &Url) -> bool {
+    a.scheme == b.scheme && a.host() == b.host() && a.port() == b.port()
 }

@@ -2,10 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use dom::bindings::cell::DOMRefCell;
 use dom::bindings::conversions::unwrap_jsmanaged;
 use dom::bindings::conversions::{ToJSValConvertible};
-use dom::bindings::js::{JS, JSRef, Temporary, Root};
+use dom::bindings::js::{JS, JSRef, Temporary, Root, MutHeap};
 use dom::bindings::js::{OptionalRootable, OptionalRootedRootable, ResultRootable};
 use dom::bindings::js::{OptionalRootedReference, OptionalOptionalRootedRootable};
 use dom::bindings::proxyhandler::{get_property_descriptor, fill_property_descriptor};
@@ -15,45 +14,49 @@ use dom::document::{Document, DocumentHelpers};
 use dom::element::Element;
 use dom::window::Window;
 use dom::window::WindowHelpers;
-use sessionhistory::SessionHistory;
 
 use msg::constellation_msg::{PipelineId, SubpageId};
 
 use js::jsapi::{JSContext, JSObject, jsid, JSPropertyDescriptor};
 use js::jsapi::{JS_AlreadyHasOwnPropertyById, JS_ForwardGetPropertyTo};
 use js::jsapi::{JS_GetPropertyDescriptorById, JS_DefinePropertyById};
-use js::jsapi::{JS_SetPropertyById};
-use js::jsval::JSVal;
+use js::jsapi::{JS_SetPropertyById, JS_SetReservedSlot};
+use js::jsval::{JSVal, ObjectValue};
 use js::glue::{GetProxyPrivate};
 use js::glue::{WrapperNew, CreateWrapperProxyHandler, ProxyTraps};
 use js::rust::with_compartment;
-use js::{JSRESOLVE_QUALIFIED, JSRESOLVE_ASSIGNING};
+use js::{JSRESOLVE_QUALIFIED, JSRESOLVE_ASSIGNING, JSSLOT_PROXY_PRIVATE};
 
-use std::cell::{Cell, Ref, RefMut};
+use std::cell::Cell;
 use std::ptr;
 
 #[allow(raw_pointer_derive)]
 #[jstraceable]
 #[privatize]
+#[must_root]
 pub struct BrowserContext {
-    history: DOMRefCell<SessionHistory>,
-    window_proxy: Cell<*mut JSObject>,
+    active_document: MutHeap<JS<Document>>,
+    pipeline: Cell<PipelineId>,
+    subpage: Cell<Option<SubpageId>>,
+    window_proxy: *mut JSObject,
     frame_element: Option<JS<Element>>,
 }
 
 impl BrowserContext {
+    #[allow(unrooted_must_root)]
     pub fn new(document: JSRef<Document>, frame_element: Option<JSRef<Element>>) -> BrowserContext {
-        let context = BrowserContext {
-            history: DOMRefCell::new(SessionHistory::new()),
-            window_proxy: Cell::new(ptr::null_mut()),
+        let win = document.window().root();
+        BrowserContext {
+            active_document: MutHeap::new(JS::from_rooted(document)),
+            window_proxy: create_window_proxy(win.r()),
             frame_element: frame_element.map(JS::from_rooted),
-        };
-        context.push_new_active_document(document);
-        context
+            pipeline: Cell::new(win.r().pipeline()),
+            subpage: Cell::new(win.r().subpage()),
+        }
     }
 
     pub fn active_document(&self) -> Temporary<Document> {
-        self.history.borrow().active_document()
+        Temporary::new(self.active_document.get())
     }
 
     pub fn active_window(&self) -> Temporary<Window> {
@@ -66,56 +69,47 @@ impl BrowserContext {
     }
 
     pub fn active_pipeline(&self) -> PipelineId {
-        let win = self.active_window().root();
-        win.r().pipeline()
+        self.pipeline.get()
     }
 
     pub fn active_subpage(&self) -> Option<SubpageId> {
-        let win = self.active_window().root();
-        win.r().subpage()
-    }
-
-    pub fn session_history(&self) -> Ref<SessionHistory> {
-        self.history.borrow()
-    }
-
-    pub fn mut_session_history(&self) -> RefMut<SessionHistory> {
-        self.history.borrow_mut()
+        self.subpage.get()
     }
 
     pub fn window_proxy(&self) -> *mut JSObject {
-        assert!(!self.window_proxy.get().is_null());
-        self.window_proxy.get()
+        assert!(!self.window_proxy.is_null());
+        self.window_proxy
     }
 
     pub fn replace_active_document(&self, doc: JSRef<Document>) {
-        self.history.borrow_mut().replace(doc);
-        self.create_window_proxy();
-        //TODO(jdm) don't leak the old window proxy
-    }
-
-    pub fn push_new_active_document(&self, doc: JSRef<Document>) {
-        self.history.borrow_mut().push(doc);
-        self.create_window_proxy();
-        //TODO(jdm) don't leak the old window proxy
+        self.active_document.set(JS::from_rooted(doc));
+        let win = doc.window().root();
+        self.pipeline.set(win.r().pipeline());
+        self.subpage.set(win.r().subpage());
+        self.update_window_proxy(win.r());
     }
 
     #[allow(unsafe_blocks)]
-    fn create_window_proxy(&self) {
-        let win = self.active_window().root();
-        let win = win.r();
-
-        let WindowProxyHandler(handler) = win.windowproxy_handler();
-        assert!(!handler.is_null());
-
-        let parent = win.reflector().get_jsobject();
-        let cx = win.get_cx();
-        let wrapper = with_compartment(cx, parent, || unsafe {
-            WrapperNew(cx, parent, handler)
-        });
-        assert!(!wrapper.is_null());
-        self.window_proxy.set(wrapper);
+    fn update_window_proxy(&self, win: JSRef<Window>) {
+        unsafe {
+            let reflector = ObjectValue(&*win.reflector().get_jsobject());
+            JS_SetReservedSlot(self.window_proxy, JSSLOT_PROXY_PRIVATE, reflector);
+        }
     }
+}
+
+#[allow(unsafe_blocks)]
+fn create_window_proxy(win: JSRef<Window>) -> *mut JSObject {
+    let WindowProxyHandler(handler) = win.windowproxy_handler();
+    assert!(!handler.is_null());
+
+    let parent = win.reflector().get_jsobject();
+    let cx = win.get_cx();
+    let wrapper = with_compartment(cx, parent, || unsafe {
+        WrapperNew(cx, parent, handler)
+    });
+    assert!(!wrapper.is_null());
+    wrapper
 }
 
 unsafe fn GetSubframeWindow(cx: *mut JSContext, proxy: *mut JSObject, id: jsid) -> Option<Temporary<Window>> {

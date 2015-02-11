@@ -11,7 +11,6 @@ use dom::bindings::cell::DOMRefCell;
 use dom::bindings::codegen::Bindings::DocumentBinding::{DocumentMethods, DocumentReadyState};
 use dom::bindings::codegen::Bindings::EventBinding::EventMethods;
 use dom::bindings::codegen::Bindings::EventTargetBinding::EventTargetMethods;
-use dom::bindings::codegen::Bindings::WindowBinding::WindowMethods;
 use dom::bindings::codegen::InheritTypes::{ElementCast, EventTargetCast, HTMLIFrameElementCast, NodeCast, EventCast};
 use dom::bindings::conversions::FromJSValConvertible;
 use dom::bindings::conversions::StringificationBehavior;
@@ -22,6 +21,7 @@ use dom::bindings::refcounted::{LiveDOMReferences, Trusted, TrustedReference};
 use dom::bindings::structuredclone::StructuredCloneData;
 use dom::bindings::trace::JSTraceable;
 use dom::bindings::utils::{wrap_for_same_compartment, pre_wrap};
+use dom::browsercontext::BrowserContext;
 use dom::document::{Document, IsHTMLDocument, DocumentHelpers, DocumentSource};
 use dom::element::{Element, ElementTypeId, ActivationElementHelpers};
 use dom::event::{Event, EventHelpers, EventBubbles, EventCancelable};
@@ -97,7 +97,7 @@ thread_local!(pub static SCRIPT_TASK: Rc<RefCell<Option<*const ScriptTask>>> = R
 
 struct InProgressLoad {
     pipeline_id: PipelineId,
-    subpage_id: Option<(PipelineId, SubpageId)>,
+    subpage_id: Option<(PipelineId, (SubpageId, Option<SubpageId>))>,
     window_size: WindowSizeData,
     layout_chan: LayoutChan,
     clip_rect: Option<Rect<f32>>,
@@ -106,7 +106,7 @@ struct InProgressLoad {
 
 impl InProgressLoad {
     fn new(id: PipelineId,
-           subpage_id: Option<(PipelineId, SubpageId)>,
+           subpage_id: Option<(PipelineId, (SubpageId, Option<SubpageId>))>,
            layout_chan: LayoutChan,
            window_size: WindowSizeData,
            url: Url) -> InProgressLoad {
@@ -290,16 +290,15 @@ impl<'a> Drop for ScriptMemoryFailsafe<'a> {
         match self.owner {
             Some(owner) => {
                 unsafe {
+                    let mut clear = |&:win: JSRef<Window>| {
+                        win.clear_js_context_for_script_deallocation();
+                    };
                     owner.frame_cache
                          .borrow_for_script_deallocation()
-                         .for_all_windows(&mut |win| {
-                        win.clear_js_context_for_script_deallocation();
-                    });
+                         .for_all_windows(&mut clear);
                     owner.frame_tree
                          .borrow_for_script_deallocation()
-                         .for_all_windows(&mut |win| {
-                        win.clear_js_context_for_script_deallocation();
-                    });
+                         .for_all_windows(clear);
                     *owner.js_context.borrow_for_script_deallocation() = None;
                 }
             }
@@ -444,7 +443,6 @@ impl ScriptTask {
 
         let (devtools_sender, devtools_receiver) = channel();
         ScriptTask {
-            //session_history: DOMRefCell::new(SessionHistory::new()),
             frame_tree: DOMRefCell::new(FrameTree::new()),
             frame_cache: DOMRefCell::new(FrameCache::new()),
             incomplete_loads: DOMRefCell::new(vec!()),
@@ -520,8 +518,8 @@ impl ScriptTask {
         }
     }
 
-    fn for_all_known_windows<F>(&self, f: &mut F) where F: FnMut(JSRef<Window>) {
-        self.frame_cache.borrow().for_all_windows(f);
+    fn for_all_known_windows<F>(&self, mut f: F) where F: FnMut(JSRef<Window>) {
+        self.frame_cache.borrow().for_all_windows(&mut f);
         self.frame_tree.borrow().for_all_windows(f);
     }
 
@@ -536,14 +534,9 @@ impl ScriptTask {
         if doc.is_some() {
             return doc;
         }
-        self.frame_cache.borrow().find(pipeline, None).map(|frame| {
-            frame.context.active_document()
+        self.frame_cache.borrow().find(pipeline).map(|frame| {
+            Temporary::new(frame.document.clone())
         })
-    }
-
-    fn remove_any_matching_pipeline(&self, pipeline: PipelineId) {
-        self.frame_tree.borrow_mut().remove(pipeline, None);
-        self.frame_cache.borrow_mut().remove(pipeline, None);
     }
 
     /// Handle incoming control messages.
@@ -556,7 +549,7 @@ impl ScriptTask {
         let mut resizes = vec!();
 
         {
-            self.for_all_known_windows(&mut |&mut :win| {
+            self.for_all_known_windows(|win| {
                 // Only process a resize if layout is idle.
                 if win.layout_is_idle() {
                     if let Some(size) = win.steal_resize_event() {
@@ -662,8 +655,8 @@ impl ScriptTask {
                 panic!("should have handled AttachLayout already"),
             ConstellationControlMsg::MakeActive(id, parent) =>
                 self.handle_make_active(id, parent),
-            ConstellationControlMsg::MakeInactive(id, subpage_id) =>
-                self.handle_make_inactive(id, subpage_id),
+            ConstellationControlMsg::MakeInactive(id) =>
+                self.handle_make_inactive(id),
             ConstellationControlMsg::SendEvent(id, event) =>
                 self.handle_event(id, event),
             ConstellationControlMsg::ReflowComplete(id, reflow_id) =>
@@ -712,31 +705,31 @@ impl ScriptTask {
         let frame_tree = self.frame_tree.borrow();
         match msg {
             EvaluateJS(id, s, reply) => {
-                let context = &frame_tree.get(id, None).context;
+                let context = &frame_tree.get(id).context;
                 devtools::handle_evaluate_js(context, s, reply)
             }
             GetRootNode(id, reply) => {
-                let context = &frame_tree.get(id, None).context;
+                let context = &frame_tree.get(id).context;
                 devtools::handle_get_root_node(context, reply)
             }
             GetDocumentElement(id, reply) => {
-                let context = &frame_tree.get(id, None).context;
+                let context = &frame_tree.get(id).context;
                 devtools::handle_get_document_element(context, reply)
             }
             GetChildren(id, node_id, reply) => {
-                let context = &frame_tree.get(id, None).context;
+                let context = &frame_tree.get(id).context;
                 devtools::handle_get_children(context, node_id, reply)
             }
             GetLayout(id, node_id, reply) => {
-                let context = &frame_tree.get(id, None).context;
+                let context = &frame_tree.get(id).context;
                 devtools::handle_get_layout(context, node_id, reply)
             }
             ModifyAttribute(id, node_id, modifications) => {
-                let context = &frame_tree.get(id, None).context;
+                let context = &frame_tree.get(id).context;
                 devtools::handle_modify_attribute(context, node_id, modifications)
             }
             WantsLiveNotifications(id, to_send) => {
-                let context = &frame_tree.get(id, None).context;
+                let context = &frame_tree.get(id).context;
                 devtools::handle_wants_live_notifications(context, to_send)
             }
         }
@@ -777,24 +770,18 @@ impl ScriptTask {
 
     fn handle_new_layout(&self, new_layout_info: NewLayoutInfo) {
         let NewLayoutInfo {
-            old_pipeline_id,
             new_pipeline_id,
             subpage_id,
             layout_chan,
+            window_size,
             load_data
         } = new_layout_info;
 
-        let parent_doc = self.find_active_pipeline(old_pipeline_id)
-                             .expect("ScriptTask: received a layout \
-            whose parent has a PipelineId which does not correspond to a pipeline in the script \
-            task's page tree. This is a bug.").root();
-
         let chan = layout_chan.downcast_ref::<Sender<layout_interface::Msg>>().unwrap();
         let layout_chan = LayoutChan(chan.clone());
-        let parent_window = parent_doc.r().window().root();
-        let new_load = InProgressLoad::new(new_pipeline_id, Some((old_pipeline_id, subpage_id)),
-                                           layout_chan, parent_window.r().window_size(),
-                                           load_data.url.clone());
+        let subpage_id = (subpage_id.0, (subpage_id.1, subpage_id.2));
+        let new_load = InProgressLoad::new(new_pipeline_id, Some(subpage_id), layout_chan,
+                                           window_size, load_data.url.clone());
         self.start_page_load(new_load, load_data);
     }
 
@@ -852,7 +839,7 @@ impl ScriptTask {
     fn handle_page_fetch_complete(&self, id: PipelineId, subpage: Option<SubpageId>,
                                   response: LoadResponse) {
         let idx = self.incomplete_loads.borrow().iter().position(|&:load| {
-            load.pipeline_id == id && load.subpage_id.map(|sub| sub.1) == subpage
+            load.pipeline_id == id && load.subpage_id.map(|sub| (sub.1).0) == subpage
         }).unwrap();
         let load = self.incomplete_loads.borrow_mut().remove(idx);
         self.load(response, load);
@@ -868,19 +855,20 @@ impl ScriptTask {
     /// Returns true if the script task should shut down and false otherwise.
     fn handle_exit_pipeline_msg(&self, id: PipelineId, exit_type: PipelineExitType) -> bool {
         // If root is being exited, shut down all pages
-        let win = self.frame_tree.borrow().root_window().root();
+        let win = self.frame_tree.borrow().root_window().unwrap().root();
         if win.r().pipeline() == id {
             debug!("shutting down layout for root page {:?}", id);
             *self.js_context.borrow_mut() = None;
-            shut_down_layout(win.r(), (*self.js_runtime).ptr, exit_type);
+            self.shut_down_layout(id, (*self.js_runtime).ptr, exit_type);
             return true
         }
 
         // otherwise find just the matching page and exit all sub-pages
-        let doc = self.find_any_matching_pipeline(id).unwrap().root();
-        let win = doc.r().window().root();
-        self.remove_any_matching_pipeline(id);
-        shut_down_layout(win.r(), (*self.js_runtime).ptr, exit_type);
+        //if let Some(ref doc) = self.find_any_matching_pipeline(id).root() {
+            //let win = doc.r().window().root();
+            //self.remove_any_matching_pipeline(id);
+        self.shut_down_layout(id, (*self.js_runtime).ptr, exit_type);
+        //}
         return false;
     }
 
@@ -894,8 +882,7 @@ impl ScriptTask {
 
         assert!(incomplete.subpage_id.is_none() || self.frame_tree.borrow().has_root());
 
-        let parent_id = incomplete.subpage_id;
-        let frame_element = incomplete.subpage_id.and_then(|(parent_id, subpage_id)| {
+        let frame_element = incomplete.subpage_id.and_then(|(parent_id, (subpage_id, _))| {
           // In the case a parent id exists but the matching page
           // cannot be found, this means the page exists in a different
           // script task (due to origin) so it shouldn't be returned.
@@ -941,7 +928,7 @@ impl ScriptTask {
                                  self.constellation_chan.clone(),
                                  incomplete.layout_chan,
                                  incomplete.pipeline_id,
-                                 incomplete.subpage_id.map(|p| p.1),
+                                 incomplete.subpage_id.map(|p| (p.1).0),
                                  incomplete.window_size).root();
 
         let document = Document::new(window.r(), Some(final_url.clone()),
@@ -951,36 +938,32 @@ impl ScriptTask {
             document.r().set_last_modified(dom_last_modified(&tm));
         }
 
-        // Associate the new window with a browser context. If this is replacing
-        // an existing document, we get a new session history entry in the existing
-        // context unless we're reloading.
-        let existing_doc = self.find_active_pipeline(incomplete.pipeline_id).root();
-
-        if let Some(existing_doc) = existing_doc.r() {
-            let reloading = existing_doc.url() == incomplete.url;
-
-            let existing_win = existing_doc.window().root();
-            let existing_win = existing_win.r();
-            let browser_context = existing_win.browser_context();
-
-            let context_frame = browser_context.frame_element().root();
-            assert!(context_frame.r() == frame_element.r());
-
-            if reloading {
-                browser_context.replace_active_document(document.r());
-            } else {
-                browser_context.push_new_active_document(document.r());
+        let root_context = self.frame_tree.borrow().root_context();
+        let context = match (incomplete.subpage_id, root_context) {
+            // We're replacing an existing subframe.
+            (Some((parent_pipeline, (_, Some(old_subpage)))), Some(_)) => {
+                let frame_tree = self.frame_tree.borrow();
+                let frame = frame_tree.find(parent_pipeline, Some(old_subpage)).unwrap();
+                frame.context.replace_active_document(document.r());
+                frame.context.clone()
             }
-            // No need to update the frame tree, since the browser context
-            // is now aware of the updated session history entry.
-            window.r().init_browser_context(browser_context.clone());
-        } else {
-            window.r().create_browser_context(document.r(), frame_element.r());
-
-            // Add the new browser context to the frame tree
-            let frame = Frame::new(window.r().browser_context());
-            self.frame_tree.borrow_mut().add(frame, parent_id);
-        }
+            // Either we're attaching a new subframe or there's no root frame,
+            // so we need a new browsing context.
+            (Some(_), Some(_)) | (None, None) => {
+                let context = Rc::new(BrowserContext::new(document.r(), frame_element.r()));
+                self.frame_tree.borrow_mut().add(Frame::new(context.clone()),
+                                                 incomplete.subpage_id.map(|(a, _)| a));
+                context
+            }
+            // We're replacing the content in the root browsing context.
+            (None, Some(context)) => {
+                context.replace_active_document(document.r());
+                context
+            }
+            (Some(_), None) =>
+                panic!("We should never end up with a subframe replacement and no root frame."),
+        };
+        window.r().init_browser_context(context);
 
         let parse_input = if is_javascript {
             assert!(final_url.serialize() == "about:blank");
@@ -1063,28 +1046,36 @@ impl ScriptTask {
                        ReflowQueryType::NoQuery);
     }
 
-    fn handle_make_active(&self, pipeline_id: PipelineId, parent: Option<(PipelineId, SubpageId)>) {
-        // We should never attempt to make an active frame active.
-        let subpage_id = parent.map(|p| p.1);
-        assert!(self.frame_tree.borrow().find(pipeline_id, subpage_id).is_none());
+    #[allow(unrooted_must_root)]
+    fn handle_make_active(&self, pipeline_id: PipelineId, parent: Option<PipelineId>) {
+        if self.frame_tree.borrow().find(pipeline_id, None).is_some() {
+            // In all likelihood we're navigating through session history, so we're trying
+            // to activate a frame which is already active.
+            return;
+        }
 
-        if subpage_id.is_none() {
-            let active = self.frame_tree.borrow().root_window().root();
+        if parent.is_none() {
+            let active = self.frame_tree.borrow().root_window().unwrap().root();
             let old_frame = self.frame_tree.borrow_mut().remove(active.r().pipeline(), None);
             self.frame_cache.borrow_mut().add(old_frame);
         }
 
         // We do not throw away frames yet, so there's no reason it should not be found.
-        let new_frame = self.frame_cache.borrow_mut().remove(pipeline_id, subpage_id).unwrap();
+        let new_frame = self.frame_cache.borrow_mut().remove(pipeline_id).unwrap();
 
-        self.frame_tree.borrow_mut().add(Frame::new(new_frame.context), parent);
+        let new_doc = new_frame.document.root();
+        let new_win = new_doc.r().window().root();
+        let new_context = new_win.r().browser_context();
+        self.frame_tree.borrow_mut().add(Frame::new(new_context), parent);
     }
 
-    fn handle_make_inactive(&self, pipeline_id: PipelineId, subpage_id: SubpageId) {
+    #[allow(unrooted_must_root)]
+    fn handle_make_inactive(&self, pipeline_id: PipelineId) {
         // We should never attempt to make an inactive frame active.
-        assert!(self.frame_tree.borrow().find(pipeline_id, Some(subpage_id)).is_some());
+        assert!(self.frame_tree.borrow().find(pipeline_id, None).is_some());
 
-        let old_frame = self.frame_tree.borrow_mut().remove(pipeline_id, Some(subpage_id));
+        let old_frame = self.frame_tree.borrow_mut().remove(pipeline_id, None);
+        assert!(self.frame_tree.borrow().has_root());
         self.frame_cache.borrow_mut().add(old_frame);
     }
 
@@ -1400,7 +1391,7 @@ impl ScriptTask {
 
     fn start_page_load(&self, incomplete: InProgressLoad, mut load_data: LoadData) {
         let id = incomplete.pipeline_id.clone();
-        let subpage = incomplete.subpage_id.clone().map(|p| p.1);
+        let subpage = incomplete.subpage_id.clone().map(|p| (p.1).0);
         let script_chan = self.chan.clone();
         let resource_task = self.resource_task.clone();
 
@@ -1426,46 +1417,52 @@ impl ScriptTask {
 
         self.incomplete_loads.borrow_mut().push(incomplete);
     }
-}
 
-/// Shuts down layout for the given page tree.
-fn shut_down_layout(win: JSRef<Window>, rt: *mut JSRuntime, exit_type: PipelineExitType) {
-    let mut channels = vec!();
-
-    {
-        let mut shut_down_window = |&mut:win: JSRef<Window>| {
-            // Tell the layout task to begin shutting down, and wait until it
-            // processed this message.
-            let (response_chan, response_port) = channel();
-            let LayoutChan(chan) = win.layout_chan();
-            if chan.send(layout_interface::Msg::PrepareToExit(response_chan)).is_ok() {
-                channels.push(chan);
-                response_port.recv().unwrap();
-            }
-
-            win.clear_js_context();
-        };
+    /// Shuts down layout for the given page tree.
+    fn shut_down_layout(&self, pipeline: PipelineId, rt: *mut JSRuntime,
+                        exit_type: PipelineExitType) {
+        let mut channels = vec!();
 
         {
-            // Scoped to ensure the browser context reference is dropped before continuing.
-            let browser_context = win.browser_context();
-            browser_context.mut_session_history().for_all_windows(&mut shut_down_window);
-            //shut_down_window(win);
+            fn shut_down_window(win: JSRef<Window>) -> LayoutChan {
+                // Tell the layout task to begin shutting down, and wait until it
+                // processed this message.
+                let (response_chan, response_port) = channel();
+                let LayoutChan(ref chan) = win.layout_chan();
+                if chan.send(layout_interface::Msg::PrepareToExit(response_chan)).is_ok() {
+                    response_port.recv().unwrap();
+                }
+
+                win.clear_js_context();
+                win.layout_chan()
+            }
+
+            if let Some(frame) = self.frame_tree.borrow().find(pipeline, None) {
+                let mut f = |&mut :win: JSRef<Window>| { channels.push(shut_down_window(win)); };
+                frame.for_all_windows(&mut f);
+            }
+            let _ = self.frame_tree.borrow_mut().maybe_remove(pipeline, None);
+
+            //XXXjdm need to handle cached children, too
+            if let Some(frame) = self.frame_cache.borrow_mut().remove(pipeline) {
+                let doc = frame.document.root();
+                let win = doc.r().window().root();
+                channels.push(shut_down_window(win.r()));
+            }
+        }
+
+        // Force a GC to make sure that our DOM reflectors are released before we tell
+        // layout to exit.
+        unsafe {
+            JS_GC(rt);
+        }
+
+        // Destroy the layout task. If there were node leaks, layout will now crash safely.
+        for LayoutChan(chan) in channels.into_iter() {
+            chan.send(layout_interface::Msg::ExitNow(exit_type)).ok();
         }
     }
-
-    // Force a GC to make sure that our DOM reflectors are released before we tell
-    // layout to exit.
-    unsafe {
-        JS_GC(rt);
-    }
-
-    // Destroy the layout task. If there were node leaks, layout will now crash safely.
-    for chan in channels.iter() {
-        chan.send(layout_interface::Msg::ExitNow(exit_type)).ok();
-    }
 }
-
 
 //FIXME(seanmonstar): uplift to Hyper
 #[derive(Clone)]

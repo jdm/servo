@@ -45,9 +45,9 @@ pub struct UntrustedNodeAddress(pub *const c_void);
 unsafe impl Send for UntrustedNodeAddress {}
 
 pub struct NewLayoutInfo {
-    pub old_pipeline_id: PipelineId,
     pub new_pipeline_id: PipelineId,
-    pub subpage_id: SubpageId,
+    pub subpage_id: (PipelineId, SubpageId, Option<SubpageId>),
+    pub window_size: WindowSizeData,
     pub layout_chan: Box<Any+Send>, // opaque reference to a LayoutChannel
     pub load_data: LoadData,
 }
@@ -55,9 +55,9 @@ pub struct NewLayoutInfo {
 /// Messages sent from the constellation to the script task
 pub enum ConstellationControlMsg {
     /// Marks the specified pipeline as active.
-    MakeActive(PipelineId, Option<(PipelineId, SubpageId)>),
+    MakeActive(PipelineId, Option<PipelineId>),
     /// Marks the specified pipeline as inactive.
-    MakeInactive(PipelineId, SubpageId),
+    MakeInactive(PipelineId),
     /// Gives a channel and ID to a layout task, as well as the ID of that layout's parent
     AttachLayout(NewLayoutInfo),
     /// Window resized.  Sends a DOM event eventually, but first we combine events.

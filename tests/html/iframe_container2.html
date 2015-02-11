@@ -1,0 +1,8 @@
+<div><a href="test_iframe_container.html">prev container</a></div>
+<iframe id="iframe" src="iframe_with_same_origin_link.html"></iframe>
+<script>
+var iframe = document.getElementById('iframe');
+setInterval(function() {
+  console.log(iframe.contentWindow.location.href);
+}, 1000);
+</script>

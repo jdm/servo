@@ -49,7 +49,7 @@ impl Pipeline {
     /// Returns the channels wrapped in a struct.
     /// If script_pipeline is not None, then subpage_id must also be not None.
     pub fn create<LTF,STF>(id: PipelineId,
-                           parent: Option<(PipelineId, SubpageId)>,
+                           parent: Option<(PipelineId, SubpageId, Option<SubpageId>)>,
                            constellation_chan: ConstellationChan,
                            compositor_proxy: Box<CompositorProxy+'static+Send>,
                            devtools_chan: Option<DevtoolsControlChan>,
@@ -71,7 +71,7 @@ impl Pipeline {
 
         let failure = Failure {
             pipeline_id: id,
-            parent: parent,
+            parent: parent.map(|(a, b, _)| (a, b)),
         };
 
         let script_chan = match script_pipeline {
@@ -95,10 +95,10 @@ impl Pipeline {
             }
             Some(spipe) => {
                 let new_layout_info = NewLayoutInfo {
-                    old_pipeline_id: spipe.id.clone(),
                     new_pipeline_id: id,
-                    subpage_id: parent.expect("script_pipeline != None but subpage_id == None").1,
+                    subpage_id: parent.expect("script_pipeline != None but subpage_id == None"),
                     layout_chan: ScriptTaskFactory::clone_layout_channel(None::<&mut STF>, &layout_pair),
+                    window_size: window_size,
                     load_data: load_data.clone(),
                 };
 
@@ -132,7 +132,7 @@ impl Pipeline {
                                   layout_shutdown_chan);
 
         Pipeline::new(id,
-                      parent,
+                      parent.map(|(a, b, _)| (a, b)),
                       script_chan,
                       LayoutControlChan(pipeline_chan),
                       paint_chan,
@@ -165,7 +165,8 @@ impl Pipeline {
 
     pub fn make_active(&self) {
         let ScriptControlChan(ref chan) = self.script_chan;
-        chan.send(ConstellationControlMsg::MakeActive(self.id, self.parent)).unwrap();
+        let parent = self.parent.map(|p| p.0);
+        chan.send(ConstellationControlMsg::MakeActive(self.id, parent)).unwrap();
     }
 
     pub fn grant_paint_permission(&self) {
