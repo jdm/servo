@@ -351,10 +351,11 @@ impl LayoutTask {
 
         match port_to_read {
             PortToRead::Pipeline => {
-                match self.pipeline_port.recv().unwrap() {
-                    LayoutControlMsg::ExitNowMsg(exit_type) => {
+                match self.pipeline_port.recv() {
+                    Ok(LayoutControlMsg::ExitNowMsg(exit_type)) => {
                         self.handle_script_request(Msg::ExitNow(exit_type), possibly_locked_rw_data)
                     }
+                    Err(_) => false,
                 }
             },
             PortToRead::Script => {

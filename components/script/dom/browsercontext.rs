@@ -4,7 +4,7 @@
 
 use dom::bindings::conversions::unwrap_jsmanaged;
 use dom::bindings::conversions::{ToJSValConvertible};
-use dom::bindings::js::{JS, JSRef, Temporary, Root, MutHeap};
+use dom::bindings::js::{JS, JSRef, Temporary, Root, MutNullableJS};
 use dom::bindings::js::{OptionalRootable, OptionalRootedRootable, ResultRootable};
 use dom::bindings::js::{OptionalRootedReference, OptionalOptionalRootedRootable};
 use dom::bindings::proxyhandler::{get_property_descriptor, fill_property_descriptor};
@@ -35,11 +35,17 @@ use std::ptr;
 #[privatize]
 #[must_root]
 pub struct BrowserContext {
-    active_document: MutHeap<JS<Document>>,
+    active_document: MutNullableJS<Document>,
     pipeline: Cell<PipelineId>,
     subpage: Cell<Option<SubpageId>>,
     window_proxy: *mut JSObject,
-    frame_element: Option<JS<Element>>,
+    frame_element: MutNullableJS<Element>,
+}
+
+impl Drop for BrowserContext {
+    fn drop(&mut self) {
+        debug!("browser context for {:?} destroyed", self.pipeline.get());
+    }
 }
 
 impl BrowserContext {
@@ -47,16 +53,22 @@ impl BrowserContext {
     pub fn new(document: JSRef<Document>, frame_element: Option<JSRef<Element>>) -> BrowserContext {
         let win = document.window().root();
         BrowserContext {
-            active_document: MutHeap::new(JS::from_rooted(document)),
+            active_document: MutNullableJS::new(Some(document)),
             window_proxy: create_window_proxy(win.r()),
-            frame_element: frame_element.map(JS::from_rooted),
+            frame_element: MutNullableJS::new(frame_element),
             pipeline: Cell::new(win.r().pipeline()),
             subpage: Cell::new(win.r().subpage()),
         }
     }
 
+    pub fn clear(&self) {
+        debug!("clearing browser context for {:?}", self.pipeline.get());
+        self.active_document.clear();
+        self.frame_element.clear();
+    }
+
     pub fn active_document(&self) -> Temporary<Document> {
-        Temporary::new(self.active_document.get())
+        self.active_document.get().unwrap()
     }
 
     pub fn active_window(&self) -> Temporary<Window> {
@@ -65,7 +77,7 @@ impl BrowserContext {
     }
 
     pub fn frame_element(&self) -> Option<Temporary<Element>> {
-        self.frame_element.map(Temporary::new)
+        self.frame_element.get()
     }
 
     pub fn active_pipeline(&self) -> PipelineId {
@@ -82,7 +94,7 @@ impl BrowserContext {
     }
 
     pub fn replace_active_document(&self, doc: JSRef<Document>) {
-        self.active_document.set(JS::from_rooted(doc));
+        self.active_document.assign(Some(doc));
         let win = doc.window().root();
         self.pipeline.set(win.r().pipeline());
         self.subpage.set(win.r().subpage());

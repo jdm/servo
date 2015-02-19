@@ -198,6 +198,12 @@ pub trait DocumentHelpers<'a> {
     fn dirty_all_nodes(self);
 }
 
+impl Drop for Document {
+    fn drop(&mut self) {
+        debug!("dropping document for {:?}", self.url.serialize());
+    }
+}
+
 impl<'a> DocumentHelpers<'a> for JSRef<'a, Document> {
     #[inline]
     fn window(self) -> Temporary<Window> {

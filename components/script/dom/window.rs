@@ -387,7 +387,7 @@ pub trait WindowHelpers {
     fn clear_js_context(self);
     fn clear_js_context_for_script_deallocation(self);
     fn flush_layout(self, goal: ReflowGoal, query: ReflowQueryType);
-    fn init_browser_context(self, context: Rc<BrowserContext>);
+    fn init_browser_context(self, context: Option<Rc<BrowserContext>>);
     fn load_url(self, href: DOMString);
     fn handle_fire_timer(self, timer_id: TimerId);
     fn reflow(self, goal: ReflowGoal, query_type: ReflowQueryType);
@@ -450,8 +450,12 @@ impl<'a, T: Reflectable> ScriptHelpers for JSRef<'a, T> {
 
 impl<'a> WindowHelpers for JSRef<'a, Window> {
     fn clear_js_context(self) {
-        *self.js_context.borrow_mut() = None;
         *self.browser_context.borrow_mut() = None;
+
+        {
+            let c = self.js_context.borrow_mut().take();
+            drop(c);
+        }
     }
 
     #[allow(unsafe_blocks)]
@@ -573,8 +577,8 @@ impl<'a> WindowHelpers for JSRef<'a, Window> {
         rects
     }
 
-    fn init_browser_context(self, context: Rc<BrowserContext>) {
-        *self.browser_context.borrow_mut() = Some(context);
+    fn init_browser_context(self, context: Option<Rc<BrowserContext>>) {
+        *self.browser_context.borrow_mut() = context;
     }
 
     fn handle_reflow_complete_msg(self, reflow_id: uint) {

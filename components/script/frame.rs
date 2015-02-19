@@ -3,12 +3,17 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 //! A frame is either active and in the root frame tree, or inactive and cached, isolated
-//! from any other frame tree. Cached frames can be retrieved by their pipeline and subpage
-//! id combo, when a particular frame is required. The constellation dictates the frame
-//! tree and changes thereof; the script task does not discard cached frames until the
-//! pipeline is explicitly exited.
+//! from any other frame tree. Cached frames can be retrieved by their pipeline, when a
+//! particular frame is required. The constellation dictates the frame tree and changes
+//! thereof; the script task does not discard cached frames until the pipeline is explicitly
+//! exited.
+//!
+//! Active frames contain browsing contexts, from which the current document for that
+//! frame can be obtained. Cached frames, on the other hand, refer only to documents.
+//! There is no deduplication of cached frames, currently - multiple loads of the same
+//! document will yield different cached frames containing different documents.
 
-use dom::bindings::js::{JS, JSRef, Temporary};
+use dom::bindings::js::{JS, JSRef};
 use dom::browsercontext::BrowserContext;
 use dom::document::{Document, DocumentHelpers};
 use dom::window::Window;
@@ -21,6 +26,7 @@ use std::rc::Rc;
 #[must_root]
 pub struct CachedFrame {
     pipeline: PipelineId,
+    pub children: Vec<PipelineId>,
     pub document: JS<Document>,
 }
 
@@ -39,15 +45,23 @@ impl FrameCache {
         }
     }
 
+    pub fn empty(&self) -> bool {
+        self.cache.is_empty()
+    }
+
     /// Recursively cache this frame all of its descendant frames.
     #[allow(unrooted_must_root)]
     pub fn add(&mut self, frame: Frame) {
         let Frame { context, children } = frame;
+        let win = context.active_window().root();
+        win.r().init_browser_context(None);
         let cached = CachedFrame {
             pipeline: context.active_pipeline(),
+            children: children.iter().map(|c| c.context.active_pipeline()).collect(),
             document: JS::from_rooted(context.active_document()),
         };
         self.cache.push(cached);
+        debug!("adding cached frame with id {:?}", context.active_pipeline());
 
         for child in children.into_iter() {
             self.add(child);
@@ -57,6 +71,7 @@ impl FrameCache {
     /// Remove the matching inactive frame from the cache and return it.
     pub fn remove(&mut self, pipeline: PipelineId) -> Option<CachedFrame> {
         self.cache.iter().position(|frame| frame.pipeline == pipeline).map(|index| {
+            debug!("removing cached frame with id {:?}", pipeline);
             self.cache.remove(index)
         })
     }
@@ -101,12 +116,6 @@ impl FrameTree {
         self.root_frame.as_ref().map(|frame| frame.context.clone())
     }
 
-    /// Retrieve the window at the root of the tree, if it exists.
-    pub fn root_window(&self) -> Option<Temporary<Window>> {
-        let frame = self.root_frame.as_ref();
-        frame.map(|frame| frame.context.active_window())
-    }
-
     /// Execute a callback for every window object in the frame tree, including in the
     /// session history.
     pub fn for_all_windows<F>(&self, mut f: F) where F: FnMut(JSRef<Window>) {
@@ -142,6 +151,7 @@ impl FrameTree {
     pub fn add(&mut self, frame: Frame, parent: Option<PipelineId>) {
         if self.root_frame.is_none() {
             assert!(parent.is_none());
+            debug!("assigning root frame with id {:?}", frame.context.active_pipeline());
             self.root_frame = Some(frame);
             return;
         }
@@ -151,6 +161,7 @@ impl FrameTree {
         let parent_id = parent.unwrap();
 
         let parent_frame = self.find_mut(parent_id).unwrap();
+        debug!("adding child frame with id {:?}", frame.context.active_pipeline());
         parent_frame.children.push(frame);
     }
 
@@ -166,6 +177,7 @@ impl FrameTree {
             (false, None)
         };
         if clear_root {
+            debug!("removing root frame with id {:?}", id);
             removed = self.root_frame.take();
         }
         removed
@@ -256,6 +268,7 @@ impl Frame {
         for child in self.children.iter_mut() {
             let removed = child.remove_child(id);
             if removed.is_some() {
+                debug!("removing child frame with id {:?}", id);
                 return removed;
             }
         }

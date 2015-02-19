@@ -549,6 +549,7 @@ impl<LTF: LayoutTaskFactory, STF: ScriptTaskFactory> Constellation<LTF, STF> {
 
         old_pipeline.force_exit();
         self.compositor_proxy.send(CompositorMsg::PaintTaskExited(old_pipeline.id));
+            println!("removing pipeline {:?}", pipeline_id);
         self.pipelines.remove(&pipeline_id);
 
         loop {
@@ -576,6 +577,7 @@ impl<LTF: LayoutTaskFactory, STF: ScriptTaskFactory> Constellation<LTF, STF> {
                     Rc::new(FrameTree::new(new_frame_id, pipeline.clone(), None)),
                     NavigationType::Load);
 
+        println!("inserting pipeline {:?}", new_id);
         self.pipelines.insert(new_id, pipeline);
     }
 
@@ -600,6 +602,7 @@ impl<LTF: LayoutTaskFactory, STF: ScriptTaskFactory> Constellation<LTF, STF> {
         self.browse(None,
                     Rc::new(FrameTree::new(next_frame_id, pipeline.clone(), None)),
                     NavigationType::Load);
+        println!("inserting pipeline {:?}", pipeline.id);
         self.pipelines.insert(pipeline.id, pipeline);
     }
 
@@ -792,6 +795,7 @@ impl<LTF: LayoutTaskFactory, STF: ScriptTaskFactory> Constellation<LTF, STF> {
                                                  rect,
                                                  old_subpage_id);
         }
+        println!("inserting pipeline {:?}", pipeline.id);
         self.pipelines.insert(pipeline.id, pipeline);
     }
 
@@ -843,6 +847,7 @@ impl<LTF: LayoutTaskFactory, STF: ScriptTaskFactory> Constellation<LTF, STF> {
                                            pipeline.clone(),
                                            parent.borrow().clone())),
                     NavigationType::Load);
+        println!("inserting pipeline {:?}", pipeline.id);
         self.pipelines.insert(pipeline.id, pipeline);
     }
 
@@ -1047,6 +1052,7 @@ impl<LTF: LayoutTaskFactory, STF: ScriptTaskFactory> Constellation<LTF, STF> {
         for frame_tree in frame_tree.iter() {
             frame_tree.pipeline.borrow().exit(PipelineExitType::PipelineOnly);
             self.compositor_proxy.send(CompositorMsg::PaintTaskExited(frame_tree.pipeline.borrow().id));
+            println!("removing pipeline {:?}", frame_tree.pipeline.borrow().id);
             self.pipelines.remove(&frame_tree.pipeline.borrow().id);
         }
     }

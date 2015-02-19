@@ -74,8 +74,8 @@ use geom::point::{Point2D};
 use hyper::header::{Header, Headers, HeaderFormat};
 use hyper::header::shared::util as header_util;
 use js::jsapi::{JS_SetWrapObjectCallbacks, JS_SetGCZeal, JS_DEFAULT_ZEAL_FREQ, JS_GC};
-use js::jsapi::{JSContext, JSRuntime, JSObject};
-use js::jsapi::{JS_SetGCParameter, JSGC_MAX_BYTES};
+use js::jsapi::{JSContext, JSRuntime, JSObject, JS_SetExtraGCRootsTracer};
+use js::jsapi::{JS_SetGCParameter, JSGC_MAX_BYTES, JSTracer};
 use js::jsapi::{JS_SetGCCallback, JSGCStatus, JSGC_BEGIN, JSGC_END};
 use js::rust::{Cx, RtUtils};
 use js;
@@ -87,6 +87,7 @@ use std::borrow::ToOwned;
 use std::cell::{RefCell, Cell};
 use std::fmt::{self, Show};
 use std::num::ToPrimitive;
+use std::ptr;
 use std::rc::Rc;
 use std::sync::mpsc::{channel, Sender, Receiver, Select};
 use std::u32;
@@ -178,7 +179,7 @@ pub struct NonWorkerScriptChan(pub Sender<ScriptMsg>);
 impl ScriptChan for NonWorkerScriptChan {
     fn send(&self, msg: ScriptMsg) {
         let NonWorkerScriptChan(ref chan) = *self;
-        chan.send(msg).unwrap();
+        chan.send(msg)/*.unwrap()*/.ok();
     }
 
     fn clone(&self) -> Box<ScriptChan+Send> {
@@ -474,6 +475,12 @@ impl ScriptTask {
             let ptr: *mut JSRuntime = (*js_runtime).ptr;
             !ptr.is_null()
         });
+
+        unsafe {
+            JS_SetExtraGCRootsTracer((*js_runtime).ptr,
+                                     Some(trace_frames as unsafe extern "C" fn(*mut js::jsapi::JSTracer, *mut libc::types::common::c95::c_void)),
+                                     ptr::null_mut());
+        }
 
         // Unconstrain the runtime's threshold on nominal heap size, to avoid
         // triggering GC too often if operating continuously near an arbitrary
@@ -855,21 +862,15 @@ impl ScriptTask {
     /// Returns true if the script task should shut down and false otherwise.
     fn handle_exit_pipeline_msg(&self, id: PipelineId, exit_type: PipelineExitType) -> bool {
         // If root is being exited, shut down all pages
-        let win = self.frame_tree.borrow().root_window().unwrap().root();
-        if win.r().pipeline() == id {
+        let root_id = self.frame_tree.borrow().root_context().map(|c| c.active_pipeline());
+        if root_id == Some(id) {
             debug!("shutting down layout for root page {:?}", id);
             *self.js_context.borrow_mut() = None;
-            self.shut_down_layout(id, (*self.js_runtime).ptr, exit_type);
-            return true
         }
 
         // otherwise find just the matching page and exit all sub-pages
-        //if let Some(ref doc) = self.find_any_matching_pipeline(id).root() {
-            //let win = doc.r().window().root();
-            //self.remove_any_matching_pipeline(id);
         self.shut_down_layout(id, (*self.js_runtime).ptr, exit_type);
-        //}
-        return false;
+        return !self.frame_tree.borrow().has_root() && self.frame_cache.borrow().empty();
     }
 
     /// The entry point to document loading. Defines bindings, sets up the window and document
@@ -942,10 +943,16 @@ impl ScriptTask {
         let context = match (incomplete.subpage_id, root_context) {
             // We're replacing an existing subframe.
             (Some((parent_pipeline, (_, Some(old_subpage)))), Some(_)) => {
-                let frame_tree = self.frame_tree.borrow();
-                let frame = frame_tree.find(parent_pipeline, Some(old_subpage)).unwrap();
-                frame.context.replace_active_document(document.r());
-                frame.context.clone()
+                let mut frame_tree = self.frame_tree.borrow_mut();
+                let mut frame_cache = self.frame_cache.borrow_mut();
+                let context = {
+                    let frame = frame_tree.find(parent_pipeline, Some(old_subpage)).unwrap();
+                    frame.context.clone()
+                };
+                frame_cache.add(frame_tree.remove(context.active_pipeline()));
+                context.replace_active_document(document.r());
+                frame_tree.add(Frame::new(context.clone()), Some(parent_pipeline));
+                context
             }
             // Either we're attaching a new subframe or there's no root frame,
             // so we need a new browsing context.
@@ -957,13 +964,17 @@ impl ScriptTask {
             }
             // We're replacing the content in the root browsing context.
             (None, Some(context)) => {
+                let mut frame_tree = self.frame_tree.borrow_mut();
+                let mut frame_cache = self.frame_cache.borrow_mut();
+                frame_cache.add(frame_tree.remove(context.active_pipeline()));
                 context.replace_active_document(document.r());
+                frame_tree.add(Frame::new(context.clone()), None);
                 context
             }
             (Some(_), None) =>
                 panic!("We should never end up with a subframe replacement and no root frame."),
         };
-        window.r().init_browser_context(context);
+        window.r().init_browser_context(Some(context));
 
         let parse_input = if is_javascript {
             assert!(final_url.serialize() == "about:blank");
@@ -1054,11 +1065,16 @@ impl ScriptTask {
             return;
         }
 
+        // If we're changing the active root frame, just stash the current active frame.
         if parent.is_none() {
-            let active = self.frame_tree.borrow().root_window().unwrap().root();
-            let old_frame = self.frame_tree.borrow_mut().remove(active.r().pipeline(), None);
+            let active = self.frame_tree.borrow().root_context().unwrap().active_pipeline();
+            let old_frame = self.frame_tree.borrow_mut().remove(active);
             self.frame_cache.borrow_mut().add(old_frame);
         }
+
+        // TODO: Since we lack subframe session history, this currently only supports
+        //       recreating a subframe tree under the assumption that there are no
+        //       existing subframes to replace.
 
         // We do not throw away frames yet, so there's no reason it should not be found.
         let new_frame = self.frame_cache.borrow_mut().remove(pipeline_id).unwrap();
@@ -1074,7 +1090,7 @@ impl ScriptTask {
         // We should never attempt to make an inactive frame active.
         assert!(self.frame_tree.borrow().find(pipeline_id, None).is_some());
 
-        let old_frame = self.frame_tree.borrow_mut().remove(pipeline_id, None);
+        let old_frame = self.frame_tree.borrow_mut().remove(pipeline_id);
         assert!(self.frame_tree.borrow().has_root());
         self.frame_cache.borrow_mut().add(old_frame);
     }
@@ -1419,35 +1435,70 @@ impl ScriptTask {
     }
 
     /// Shuts down layout for the given page tree.
+    #[allow(unrooted_must_root)]
     fn shut_down_layout(&self, pipeline: PipelineId, rt: *mut JSRuntime,
                         exit_type: PipelineExitType) {
         let mut channels = vec!();
 
         {
-            fn shut_down_window(win: JSRef<Window>) -> LayoutChan {
+            fn shut_down_window(win: JSRef<Window>, clear_context: bool) -> Option<LayoutChan> {
                 // Tell the layout task to begin shutting down, and wait until it
                 // processed this message.
                 let (response_chan, response_port) = channel();
                 let LayoutChan(ref chan) = win.layout_chan();
-                if chan.send(layout_interface::Msg::PrepareToExit(response_chan)).is_ok() {
+                debug!("sending prepare to exit");
+                let task_present = chan.send(layout_interface::Msg::PrepareToExit(response_chan)).is_ok();
+                if task_present {
                     response_port.recv().unwrap();
                 }
 
+                if clear_context {
+                    win.browser_context().clear();
+                }
                 win.clear_js_context();
-                win.layout_chan()
+                if task_present {
+                    Some(win.layout_chan())
+                } else {
+                    None
+                }
             }
 
-            if let Some(frame) = self.frame_tree.borrow().find(pipeline, None) {
-                let mut f = |&mut :win: JSRef<Window>| { channels.push(shut_down_window(win)); };
+            /*let root_pipeline_matches = self.frame_tree.borrow()
+                                                       .root_context()
+                                                       .map(|c| c.active_pipeline() == pipeline)
+                                                       .unwrap_or(false);*/
+            if let Some(frame) = self.frame_tree.borrow_mut().maybe_remove(pipeline) {
+                //let frame = self.frame_tree.borrow_mut().remove(pipeline);
+                debug!("shutting down all child windows in frame tree for pipeline {:?}", pipeline);
+                let mut f = |&mut :win: JSRef<Window>| {
+                    if let Some(chan) = shut_down_window(win, true) {
+                        channels.push(chan);
+                    }
+                };
                 frame.for_all_windows(&mut f);
             }
-            let _ = self.frame_tree.borrow_mut().maybe_remove(pipeline, None);
 
-            //XXXjdm need to handle cached children, too
-            if let Some(frame) = self.frame_cache.borrow_mut().remove(pipeline) {
+            let mut frame_cache = self.frame_cache.borrow_mut();
+            if let Some(frame) = frame_cache.remove(pipeline) {
+                fn shut_down_doc(doc: JSRef<Document>, channels: &mut Vec<LayoutChan>) {
+                    let win = doc.window().root();
+                    if let Some(chan) = shut_down_window(win.r(), false) {
+                        channels.push(chan);
+                    }
+                }
+
+                debug!("shutting down window for cached pipeline {:?}", pipeline);
                 let doc = frame.document.root();
-                let win = doc.r().window().root();
-                channels.push(shut_down_window(win.r()));
+                shut_down_doc(doc.r(), &mut channels);
+
+                let mut children = frame.children;
+                while let Some(child) = children.pop() {
+                    debug!("shutting down child window for cached pipeline {:?}", child);
+                    let frame = frame_cache.remove(child).unwrap();
+                    let doc = frame.document.root();
+                    shut_down_doc(doc.r(), &mut channels);
+                    children.extend(frame.children.into_iter());
+                }
             }
         }
 
@@ -1459,6 +1510,7 @@ impl ScriptTask {
 
         // Destroy the layout task. If there were node leaks, layout will now crash safely.
         for LayoutChan(chan) in channels.into_iter() {
+            debug!("shutting down a layout task");
             chan.send(layout_interface::Msg::ExitNow(exit_type)).ok();
         }
     }
@@ -1554,4 +1606,10 @@ impl Runnable for DocumentProgressHandler {
             }
         }
     }
+}
+
+pub unsafe extern fn trace_frames(tracer: *mut JSTracer, _data: *mut libc::c_void) {
+    let script_task = &*ScriptTask::get();
+    script_task.frame_tree.borrow_for_gc_trace().trace(tracer);
+    script_task.frame_cache.borrow_for_gc_trace().trace(tracer);
 }

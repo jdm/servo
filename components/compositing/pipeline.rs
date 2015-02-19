@@ -190,7 +190,6 @@ impl Pipeline {
             let _ = self.paint_shutdown_port.recv();
             let _ = self.layout_shutdown_port.recv();
         }
-
     }
 
     pub fn force_exit(&self) {
