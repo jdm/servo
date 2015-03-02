@@ -343,7 +343,7 @@ impl<'a> DocumentHelpers<'a> for JSRef<'a, Document> {
 
     fn load_anchor_href(self, href: DOMString) {
         let window = self.window.root();
-        window.r().load_url(href);
+        window.r().load_href(href);
     }
 
     /// Attempt to find a named element in this page's document.

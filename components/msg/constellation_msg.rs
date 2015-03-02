@@ -13,6 +13,7 @@ use hyper::method::Method;
 use layers::geometry::DevicePixel;
 use util::cursor::Cursor;
 use util::geometry::{PagePx, ViewportPx};
+use std::any::Any;
 use std::sync::mpsc::{channel, Sender, Receiver};
 use url::Url;
 
@@ -194,6 +195,14 @@ bitflags! {
     }
 }
 
+pub struct NewLayoutInfo {
+    pub old_pipeline_id: PipelineId,
+    pub new_pipeline_id: PipelineId,
+    pub subpage_id: SubpageId,
+    pub layout_chan: Box<Any+Send>, // opaque reference to a LayoutChannel
+    pub load_data: LoadData,
+}
+
 /// Messages from the compositor and script to the constellation.
 pub enum Msg {
     Exit,
@@ -202,7 +211,8 @@ pub enum Msg {
     LoadComplete,
     FrameRect(PipelineId, SubpageId, Rect<f32>),
     LoadUrl(PipelineId, LoadData),
-    ScriptLoadedURLInIFrame(Url, PipelineId, SubpageId, Option<SubpageId>, IFrameSandboxState),
+    ScriptLoadedURLInIFrame(Url, PipelineId, SubpageId, Option<SubpageId>, IFrameSandboxState,
+                            Option<Sender<NewLayoutInfo>>),
     Navigate(NavigationDirection),
     PainterReady(PipelineId),
     ResizedWindow(WindowSizeData),

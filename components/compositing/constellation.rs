@@ -16,7 +16,7 @@ use libc;
 use script_traits::{CompositorEvent, ConstellationControlMsg};
 use script_traits::{ScriptControlChan, ScriptTaskFactory};
 use msg::compositor_msg::LayerId;
-use msg::constellation_msg::{self, ConstellationChan, Failure};
+use msg::constellation_msg::{self, ConstellationChan, Failure, NewLayoutInfo};
 use msg::constellation_msg::{IFrameSandboxState, NavigationDirection};
 use msg::constellation_msg::{Key, KeyState, KeyModifiers};
 use msg::constellation_msg::{LoadData, NavigationType};
@@ -38,7 +38,7 @@ use std::collections::{HashMap, HashSet};
 use std::old_io as io;
 use std::mem::replace;
 use std::rc::Rc;
-use std::sync::mpsc::{Receiver, channel};
+use std::sync::mpsc::{Sender, Receiver, channel};
 use url::Url;
 
 /// Maintains the pipelines and navigation context and grants permission to composite.
@@ -393,7 +393,8 @@ impl<LTF: LayoutTaskFactory, STF: ScriptTaskFactory> Constellation<LTF, STF> {
                     id: PipelineId,
                     parent: Option<(PipelineId, SubpageId)>,
                     script_pipeline: Option<Rc<Pipeline>>,
-                    load_data: LoadData)
+                    load_data: LoadData,
+                    sync_sender: Option<Sender<NewLayoutInfo>>)
                     -> Rc<Pipeline> {
         let pipe = Pipeline::create::<LTF, STF>(id,
                                                 parent,
@@ -407,7 +408,8 @@ impl<LTF: LayoutTaskFactory, STF: ScriptTaskFactory> Constellation<LTF, STF> {
                                                 self.time_profiler_chan.clone(),
                                                 self.window_size,
                                                 script_pipeline,
-                                                load_data);
+                                                load_data,
+                                                sync_sender);
         Rc::new(pipe)
     }
 
@@ -464,13 +466,15 @@ impl<LTF: LayoutTaskFactory, STF: ScriptTaskFactory> Constellation<LTF, STF> {
                 debug!("constellation got frame rect message");
                 self.handle_frame_rect_msg(pipeline_id, subpage_id, Rect::from_untyped(&rect));
             }
-            ConstellationMsg::ScriptLoadedURLInIFrame(url, source_pipeline_id, new_subpage_id, old_subpage_id, sandbox) => {
+            ConstellationMsg::ScriptLoadedURLInIFrame(url, source_pipeline_id, new_subpage_id,
+                                                      old_subpage_id, sandbox, sync_sender) => {
                 debug!("constellation got iframe URL load message");
                 self.handle_script_loaded_url_in_iframe_msg(url,
                                                             source_pipeline_id,
                                                             new_subpage_id,
                                                             old_subpage_id,
-                                                            sandbox);
+                                                            sandbox,
+                                                            sync_sender);
             }
             ConstellationMsg::SetCursor(cursor) => self.handle_set_cursor_msg(cursor),
             // Load a new page, usually -- but not always -- from a mouse click or typed url
@@ -569,7 +573,8 @@ impl<LTF: LayoutTaskFactory, STF: ScriptTaskFactory> Constellation<LTF, STF> {
         let new_id = self.get_next_pipeline_id();
         let new_frame_id = self.get_next_frame_id();
         let pipeline = self.new_pipeline(new_id, parent, None,
-                                         LoadData::new(Url::parse("about:failure").unwrap()));
+                                         LoadData::new(Url::parse("about:failure").unwrap()),
+                                         None);
 
         self.browse(Some(pipeline_id),
                     Rc::new(FrameTree::new(new_frame_id, pipeline.clone(), None)),
@@ -595,7 +600,7 @@ impl<LTF: LayoutTaskFactory, STF: ScriptTaskFactory> Constellation<LTF, STF> {
     fn handle_init_load(&mut self, url: Url) {
         let next_pipeline_id = self.get_next_pipeline_id();
         let next_frame_id = self.get_next_frame_id();
-        let pipeline = self.new_pipeline(next_pipeline_id, None, None, LoadData::new(url));
+        let pipeline = self.new_pipeline(next_pipeline_id, None, None, LoadData::new(url), None);
         self.browse(None,
                     Rc::new(FrameTree::new(next_frame_id, pipeline.clone(), None)),
                     NavigationType::Load);
@@ -746,7 +751,8 @@ impl<LTF: LayoutTaskFactory, STF: ScriptTaskFactory> Constellation<LTF, STF> {
                                               containing_page_pipeline_id: PipelineId,
                                               new_subpage_id: SubpageId,
                                               old_subpage_id: Option<SubpageId>,
-                                              sandbox: IFrameSandboxState) {
+                                              sandbox: IFrameSandboxState,
+                                              sync_sender: Option<Sender<NewLayoutInfo>>) {
         // Start by finding the frame trees matching the pipeline id,
         // and add the new pipeline to their sub frames.
         let frame_trees = self.find_all(containing_page_pipeline_id);
@@ -764,8 +770,11 @@ impl<LTF: LayoutTaskFactory, STF: ScriptTaskFactory> Constellation<LTF, STF> {
 
         let source_url = source_pipeline.url.clone();
 
-        let same_script = (source_url.host() == url.host() &&
-                           source_url.port() == url.port()) &&
+        let is_same_origin =
+            source_url.host() == url.host() &&
+            source_url.port() == url.port();
+        let about_blank = Url::parse("about:blank").unwrap();
+        let same_script = (is_same_origin || source_url == about_blank || url == about_blank) &&
                            sandbox == IFrameSandboxState::IFrameUnsandboxed;
         // FIXME(tkuehn): Need to follow the standardized spec for checking same-origin
         // Reuse the script task if the URL is same-origin
@@ -782,7 +791,8 @@ impl<LTF: LayoutTaskFactory, STF: ScriptTaskFactory> Constellation<LTF, STF> {
             new_frame_pipeline_id,
             Some((containing_page_pipeline_id, new_subpage_id)),
             script_pipeline,
-            LoadData::new(url)
+            LoadData::new(url),
+            sync_sender
         );
 
         let rect = self.pending_sizes.remove(&(containing_page_pipeline_id, new_subpage_id));
@@ -827,7 +837,22 @@ impl<LTF: LayoutTaskFactory, STF: ScriptTaskFactory> Constellation<LTF, STF> {
         let parent_id = source_frame.pipeline.borrow().parent;
         let next_pipeline_id = self.get_next_pipeline_id();
         let next_frame_id = self.get_next_frame_id();
-        let pipeline = self.new_pipeline(next_pipeline_id, parent_id, None, load_data);
+
+        let about_blank = Url::parse("about:blank").unwrap();
+
+        //TODO: should we be retaining the existing script task for top-level
+        //      same-origin navigations? is the difference observable?
+        let same_script = parent_id.is_some() &&
+            (is_same_origin(&source_frame.pipeline.borrow().url, &load_data.url) ||
+             source_frame.pipeline.borrow().url == about_blank ||
+             load_data.url == about_blank);
+        let script_chan = if same_script {
+            Some(source_frame.pipeline.borrow().clone())
+        } else {
+            None
+        };
+        //TODO: should about:blank be available synchronously on navigation?
+        let pipeline = self.new_pipeline(next_pipeline_id, parent_id, script_chan, load_data, None);
         self.browse(Some(source_id),
                     Rc::new(FrameTree::new(next_frame_id,
                                            pipeline.clone(),
@@ -1145,4 +1170,8 @@ impl<LTF: LayoutTaskFactory, STF: ScriptTaskFactory> Constellation<LTF, STF> {
             Err(_) => {} // The message has been discarded, we are probably shutting down.
         }
     }
+}
+
+fn is_same_origin(a: &Url, b: &Url) -> bool {
+    a.scheme == b.scheme && a.host() == b.host() && a.port() == b.port()
 }

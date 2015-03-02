@@ -23,7 +23,7 @@ extern crate url;
 use devtools_traits::DevtoolsControlChan;
 use libc::c_void;
 use msg::constellation_msg::{ConstellationChan, PipelineId, Failure, WindowSizeData};
-use msg::constellation_msg::{LoadData, SubpageId, Key, KeyState, KeyModifiers};
+use msg::constellation_msg::{LoadData, SubpageId, Key, KeyState, KeyModifiers, NewLayoutInfo};
 use msg::constellation_msg::PipelineExitType;
 use msg::compositor_msg::ScriptListener;
 use net::image_cache_task::ImageCacheTask;
@@ -42,14 +42,6 @@ use geom::rect::Rect;
 #[derive(Copy, Clone)]
 pub struct UntrustedNodeAddress(pub *const c_void);
 unsafe impl Send for UntrustedNodeAddress {}
-
-pub struct NewLayoutInfo {
-    pub old_pipeline_id: PipelineId,
-    pub new_pipeline_id: PipelineId,
-    pub subpage_id: SubpageId,
-    pub layout_chan: Box<Any+Send>, // opaque reference to a LayoutChannel
-    pub load_data: LoadData,
-}
 
 /// Messages sent from the constellation to the script task
 pub enum ConstellationControlMsg {

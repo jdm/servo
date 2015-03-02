@@ -10,7 +10,7 @@ use dom::bindings::codegen::Bindings::HTMLIFrameElementBinding::HTMLIFrameElemen
 use dom::bindings::codegen::Bindings::WindowBinding::WindowMethods;
 use dom::bindings::codegen::InheritTypes::{NodeCast, ElementCast};
 use dom::bindings::codegen::InheritTypes::{HTMLElementCast, HTMLIFrameElementDerived};
-use dom::bindings::js::{JSRef, Temporary, OptionalRootable};
+use dom::bindings::js::{JSRef, Temporary, OptionalRootable, RootedReference};
 use dom::document::Document;
 use dom::element::Element;
 use dom::element::AttributeHandlers;
@@ -22,6 +22,7 @@ use dom::urlhelper::UrlHelper;
 use dom::virtualmethods::VirtualMethods;
 use dom::window::{Window, WindowHelpers};
 use page::IterablePage;
+use script_task::ScriptTask;
 
 use msg::constellation_msg::{PipelineId, SubpageId, ConstellationChan};
 use msg::constellation_msg::IFrameSandboxState::{IFrameSandboxed, IFrameUnsandboxed};
@@ -31,6 +32,7 @@ use string_cache::Atom;
 
 use std::ascii::AsciiExt;
 use std::cell::Cell;
+use std::sync::mpsc::channel;
 use url::{Url, UrlParser};
 
 enum SandboxAllowance {
@@ -63,11 +65,16 @@ pub trait HTMLIFrameElementHelpers {
     /// http://www.whatwg.org/html/#process-the-iframe-attributes
     fn process_the_iframe_attributes(self);
     fn generate_new_subpage_id(self) -> (SubpageId, Option<SubpageId>);
+    fn url_or_fallback(self) -> Url;
 }
 
 impl<'a> HTMLIFrameElementHelpers for JSRef<'a, HTMLIFrameElement> {
     fn is_sandboxed(self) -> bool {
         self.sandbox.get().is_some()
+    }
+
+    fn url_or_fallback(self) -> Url {
+        self.get_url().unwrap_or_else(|| Url::parse("about:blank").unwrap())
     }
 
     fn get_url(self) -> Option<Url> {
@@ -93,10 +100,7 @@ impl<'a> HTMLIFrameElementHelpers for JSRef<'a, HTMLIFrameElement> {
     }
 
     fn process_the_iframe_attributes(self) {
-        let url = match self.get_url() {
-            Some(url) => url.clone(),
-            None => Url::parse("about:blank").unwrap(),
-        };
+        let url = self.url_or_fallback();
 
         let sandboxed = if self.is_sandboxed() {
             IFrameSandboxed
@@ -106,16 +110,41 @@ impl<'a> HTMLIFrameElementHelpers for JSRef<'a, HTMLIFrameElement> {
 
         let window = window_from_node(self).root();
         let window = window.r();
+        self.containing_page_pipeline_id.set(Some(window.pipeline()));
         let (new_subpage_id, old_subpage_id) = self.generate_new_subpage_id();
 
-        self.containing_page_pipeline_id.set(Some(window.pipeline()));
+        let about_blank = Url::parse("about:blank").unwrap();
+
+        let subsequent_load = old_subpage_id.is_none() && url != about_blank;
+
+        let initial_url = if subsequent_load {
+            about_blank.clone()
+        } else {
+            url.clone()
+        };
+
+        let (sync_layout_sender, sync_layout_receiver) = if initial_url == about_blank {
+            let (tx, rx) = channel();
+            (Some(tx), Some(rx))
+        } else {
+            (None, None)
+        };
 
         let ConstellationChan(ref chan) = window.constellation_chan();
-    chan.send(ConstellationMsg::ScriptLoadedURLInIFrame(url,
-                                                        window.pipeline(),
-                                                        new_subpage_id,
-                                                        old_subpage_id,
-                                                        sandboxed)).unwrap();
+        chan.send(ConstellationMsg::ScriptLoadedURLInIFrame(initial_url,
+                                                            window.pipeline(),
+                                                            new_subpage_id,
+                                                            old_subpage_id,
+                                                            sandboxed,
+                                                            sync_layout_sender)).unwrap();
+        if let Some(receiver) = sync_layout_receiver {
+            ScriptTask::add_blank_frame(receiver.recv().unwrap());
+
+            if subsequent_load {
+                let content_window = self.GetContentWindow().unwrap().root();
+                content_window.r().load_url(url);
+            }
+        }
     }
 }
 
@@ -181,13 +210,11 @@ impl<'a> HTMLIFrameElementMethods for JSRef<'a, HTMLIFrameElement> {
 
     fn GetContentDocument(self) -> Option<Temporary<Document>> {
         self.GetContentWindow().root().and_then(|window| {
-            let self_url = match self.get_url() {
-                Some(self_url) => self_url,
-                None => return None,
-            };
+            let self_url = self.url_or_fallback();
             let win_url = window_from_node(self).root().r().get_url();
 
-            if UrlHelper::SameOrigin(&self_url, &win_url) {
+            if UrlHelper::SameOrigin(&self_url, &win_url) ||
+               self_url == Url::parse("about:blank").unwrap() {
                 Some(window.r().Document())
             } else {
                 None

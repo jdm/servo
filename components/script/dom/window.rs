@@ -396,7 +396,8 @@ pub trait WindowHelpers {
     fn clear_js_context_for_script_deallocation(self);
     fn flush_layout(self, goal: ReflowGoal, query: ReflowQueryType);
     fn init_browser_context(self, doc: JSRef<Document>, frame_element: Option<JSRef<Element>>);
-    fn load_url(self, href: DOMString);
+    fn load_href(self, href: DOMString);
+    fn load_url(self, url: Url);
     fn handle_fire_timer(self, timer_id: TimerId);
     fn reflow(self, goal: ReflowGoal, query_type: ReflowQueryType);
     fn join_layout(self);
@@ -596,14 +597,18 @@ impl<'a> WindowHelpers for JSRef<'a, Window> {
     }
 
     /// Commence a new URL load which will either replace this window or scroll to a fragment.
-    fn load_url(self, href: DOMString) {
+    fn load_href(self, href: DOMString) {
         let base_url = self.get_url();
         debug!("current page url is {}", base_url);
         let url = UrlParser::new().base_url(&base_url).parse(href.as_slice());
         // FIXME: handle URL parse errors more gracefully.
-        let url = url.unwrap();
+        self.load_url(url.unwrap())
+    }
+
+    fn load_url(self, url: Url) {
         match url.fragment {
             Some(fragment) => {
+                //FIXME: This assumes that the fragment is a new addition to the active document URL
                 self.script_chan.send(ScriptMsg::TriggerFragment(self.id, fragment)).unwrap();
             },
             None => {

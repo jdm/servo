@@ -5,21 +5,21 @@
 use CompositorProxy;
 use layout_traits::{LayoutControlMsg, LayoutTaskFactory, LayoutControlChan};
 use script_traits::{ScriptControlChan, ScriptTaskFactory};
-use script_traits::{NewLayoutInfo, ConstellationControlMsg};
+use script_traits::{ConstellationControlMsg};
 
 use devtools_traits::DevtoolsControlChan;
 use gfx::paint_task::Msg as PaintMsg;
 use gfx::paint_task::{PaintChan, PaintTask};
 use gfx::font_cache_task::FontCacheTask;
 use msg::constellation_msg::{ConstellationChan, Failure, PipelineId, SubpageId};
-use msg::constellation_msg::{LoadData, WindowSizeData, PipelineExitType};
+use msg::constellation_msg::{LoadData, WindowSizeData, PipelineExitType, NewLayoutInfo};
 use net::image_cache_task::ImageCacheTask;
 use net::resource_task::ResourceTask;
 use net::storage_task::StorageTask;
 use url::Url;
 use util::time::TimeProfilerChan;
 use std::rc::Rc;
-use std::sync::mpsc::{Receiver, channel};
+use std::sync::mpsc::{Sender, Receiver, channel};
 
 /// A uniquely-identifiable pipeline of script task, layout task, and paint task.
 pub struct Pipeline {
@@ -60,7 +60,8 @@ impl Pipeline {
                            time_profiler_chan: TimeProfilerChan,
                            window_size: WindowSizeData,
                            script_pipeline: Option<Rc<Pipeline>>,
-                           load_data: LoadData)
+                           load_data: LoadData,
+                           sync_sender: Option<Sender<NewLayoutInfo>>)
                            -> Pipeline
                            where LTF: LayoutTaskFactory, STF:ScriptTaskFactory {
         let layout_pair = ScriptTaskFactory::create_layout_channel(None::<&mut STF>);
@@ -102,8 +103,12 @@ impl Pipeline {
                     load_data: load_data.clone(),
                 };
 
-                let ScriptControlChan(ref chan) = spipe.script_chan;
-                chan.send(ConstellationControlMsg::AttachLayout(new_layout_info)).unwrap();
+                if let Some(sender) = sync_sender {
+                    sender.send(new_layout_info).unwrap();
+                } else {
+                    let ScriptControlChan(ref chan) = spipe.script_chan;
+                    chan.send(ConstellationControlMsg::AttachLayout(new_layout_info)).unwrap();
+                }
                 spipe.script_chan.clone()
             }
         };

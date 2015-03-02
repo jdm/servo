@@ -51,12 +51,12 @@ use script_traits::CompositorEvent;
 use script_traits::CompositorEvent::{ResizeEvent, ReflowEvent, ClickEvent};
 use script_traits::CompositorEvent::{MouseDownEvent, MouseUpEvent};
 use script_traits::CompositorEvent::{MouseMoveEvent, KeyEvent};
-use script_traits::{NewLayoutInfo, OpaqueScriptLayoutChannel};
+use script_traits::{OpaqueScriptLayoutChannel};
 use script_traits::{ConstellationControlMsg, ScriptControlChan};
 use script_traits::ScriptTaskFactory;
 use msg::compositor_msg::ReadyState::{FinishedLoading, Loading, PerformingLayout};
 use msg::compositor_msg::{LayerId, ScriptListener};
-use msg::constellation_msg::{ConstellationChan};
+use msg::constellation_msg::{ConstellationChan, NewLayoutInfo};
 use msg::constellation_msg::{LoadData, PipelineId, SubpageId};
 use msg::constellation_msg::{Failure, Msg, WindowSizeData, PipelineExitType};
 use msg::constellation_msg::Msg as ConstellationMsg;
@@ -94,6 +94,7 @@ use std::u32;
 use time::Tm;
 
 thread_local!(pub static STACK_ROOTS: Cell<Option<RootCollectionPtr>> = Cell::new(None));
+thread_local!(pub static SCRIPT_TASK: Cell<Option<*const ScriptTask>> = Cell::new(None));
 
 /// A document load that is in the process of fetching the requested resource. Contains
 /// data that will need to be present when the document and frame tree entry are created,
@@ -353,7 +354,9 @@ impl ScriptTaskFactory for ScriptTask {
                                                load_data.url.clone());
             script_task.start_page_load(new_load, load_data);
 
+            SCRIPT_TASK.with(|ref r| r.set(Some(&script_task)));
             script_task.start();
+            SCRIPT_TASK.with(|ref r| r.set(None));
 
             // This must always be the very last operation performed before the task completes
             failsafe.neuter();
@@ -370,6 +373,16 @@ unsafe extern "C" fn debug_gc_callback(_rt: *mut JSRuntime, status: JSGCStatus) 
 }
 
 impl ScriptTask {
+    fn get() -> &'static ScriptTask {
+        SCRIPT_TASK.with(|ref r| {
+            unsafe { &*r.get().unwrap() }
+        })
+    }
+
+    pub fn add_blank_frame(layout_info: NewLayoutInfo) {
+        ScriptTask::get().handle_add_blank_page(layout_info)
+    }
+
     /// Creates a new script task.
     pub fn new(compositor: Box<ScriptListener+'static>,
                port: Receiver<ScriptMsg>,
@@ -712,26 +725,9 @@ impl ScriptTask {
 
     /// Handle a request to load a page in a new child frame of an existing page.
     fn handle_new_layout(&self, new_layout_info: NewLayoutInfo) {
-        let NewLayoutInfo {
-            old_pipeline_id,
-            new_pipeline_id,
-            subpage_id,
-            layout_chan,
-            load_data,
-        } = new_layout_info;
-
-        let page = self.root_page();
-        let parent_page = page.find(old_pipeline_id).expect("ScriptTask: received a layout
-            whose parent has a PipelineId which does not correspond to a pipeline in the script
-            task's page tree. This is a bug.");
-
-        let parent_window = parent_page.window().root();
-        let chan = layout_chan.downcast_ref::<Sender<layout_interface::Msg>>().unwrap();
-        let layout_chan = LayoutChan(chan.clone());
+        let load_data = new_layout_info.load_data.clone();
+        let new_load = self.create_load_for_layout_info(new_layout_info);
         // Kick off the fetch for the new resource.
-        let new_load = InProgressLoad::new(new_pipeline_id, Some((old_pipeline_id, subpage_id)),
-                                           layout_chan, parent_window.r().window_size(),
-                                           load_data.url.clone());
         self.start_page_load(new_load, load_data);
     }
 
@@ -830,6 +826,35 @@ impl ScriptTask {
         self.load(response, load);
     }
 
+    fn create_load_for_layout_info(&self, new_layout_info: NewLayoutInfo) -> InProgressLoad {
+        let NewLayoutInfo {
+            old_pipeline_id,
+            new_pipeline_id,
+            subpage_id,
+            layout_chan,
+            load_data,
+        } = new_layout_info;
+
+        let page = self.root_page();
+        let parent_page = page.find(old_pipeline_id).expect("ScriptTask: received a layout
+            whose parent has a PipelineId which does not correspond to a pipeline in the script
+            task's page tree. This is a bug.");
+
+        let parent_window = parent_page.window().root();
+        let chan = layout_chan.downcast_ref::<Sender<layout_interface::Msg>>().unwrap();
+        let layout_chan = LayoutChan(chan.clone());
+        InProgressLoad::new(new_pipeline_id, Some((old_pipeline_id, subpage_id)),
+                            layout_chan, parent_window.r().window_size(),
+                            load_data.url.clone())
+    }
+
+    fn handle_add_blank_page(&self, layout_info: NewLayoutInfo) {
+        let load_data = layout_info.load_data.clone();
+        let new_load = self.create_load_for_layout_info(layout_info);
+        let load_response = sync_page_load(self.resource_task.clone(), load_data);
+        self.load(load_response, new_load);
+    }
+
     /// Handles a request for the window title.
     fn handle_get_title_msg(&self, pipeline_id: PipelineId) {
         let page = get_page(&self.root_page(), pipeline_id);
@@ -896,18 +921,38 @@ impl ScriptTask {
         let cx = self.js_context.borrow();
         let cx = cx.as_ref().unwrap();
 
-        // Create a new frame tree entry.
-        let page = Rc::new(Page::new(incomplete.pipeline_id, incomplete.subpage_id.map(|p| p.1),
-                                     final_url.clone()));
-        if !root_page_exists {
-            // We have a new root frame tree.
-            *self.page.borrow_mut() = Some(page.clone());
-        } else if let Some((parent, _)) = incomplete.subpage_id {
-            // We have a new child frame.
-            let parent_page = self.root_page();
-            parent_page.find(parent).expect("received load for subpage with missing parent");
-            parent_page.children.borrow_mut().push(page.clone());
-        }
+        let page = match incomplete.subpage_id {
+            Some((parent, subpage)) => {
+                // We have a new child frame.
+                let root_page = self.root_page();
+                let parent_page = root_page.find(parent)
+                                           .expect("received load for subpage with missing parent");
+                let existing_child = parent_page.children.borrow().iter().find(|page| {
+                    let win = page.window().root();
+                    win.r().subpage() == Some(subpage)
+                }).map(|page| (*page).clone());
+                if let Some(child_page) = existing_child {
+                    child_page
+                } else {
+                    // Create a new frame tree entry.
+                    let new_page = Rc::new(Page::new(incomplete.pipeline_id,
+                                                     incomplete.subpage_id.map(|p| p.1),
+                                                     final_url.clone()));
+                    parent_page.children.borrow_mut().push(new_page.clone());
+                    new_page
+                }
+            }
+
+            None => {
+                // Create a new frame tree entry.
+                let new_page = Rc::new(Page::new(incomplete.pipeline_id,
+                                                 incomplete.subpage_id.map(|p| p.1),
+                                                 final_url.clone()));
+                // We have a new root frame tree.
+                *self.page.borrow_mut() = Some(new_page.clone());
+                new_page
+            }
+        };
 
         enum PageToRemove {
             Root,
@@ -1185,7 +1230,7 @@ impl ScriptTask {
 
     /// Initiate a non-blocking fetch for a specified resource. Stores the InProgressLoad
     /// argument until a notification is received that the fetch is complete.
-    fn start_page_load(&self, incomplete: InProgressLoad, mut load_data: LoadData) {
+    fn start_page_load(&self, incomplete: InProgressLoad, load_data: LoadData) {
         let id = incomplete.pipeline_id.clone();
         let subpage = incomplete.subpage_id.clone().map(|p| p.1);
 
@@ -1193,22 +1238,7 @@ impl ScriptTask {
         let resource_task = self.resource_task.clone();
 
         spawn_named(format!("fetch for {:?}", load_data.url), move || {
-            if load_data.url.scheme.as_slice() == "javascript" {
-                load_data.url = Url::parse("about:blank").unwrap();
-            }
-
-            let (input_chan, input_port) = channel();
-            resource_task.send(ControlMsg::Load(NetLoadData {
-                url: load_data.url,
-                method: load_data.method,
-                headers: Headers::new(),
-                preserved_headers: load_data.headers,
-                data: load_data.data,
-                cors: None,
-                consumer: input_chan,
-            })).unwrap();
-
-            let load_response = input_port.recv().unwrap();
+            let load_response = sync_page_load(resource_task, load_data);
             script_chan.send(ScriptMsg::PageFetchComplete(id, subpage, load_response)).unwrap();
         });
 
@@ -1251,6 +1281,25 @@ pub fn get_page(page: &Rc<Page>, pipeline_id: PipelineId) -> Rc<Page> {
     page.find(pipeline_id).expect("ScriptTask: received an event \
         message for a layout channel that is not associated with this script task.\
          This is a bug.")
+}
+
+fn sync_page_load(resource_task: ResourceTask, mut load_data: LoadData) -> LoadResponse {
+    if load_data.url.scheme.as_slice() == "javascript" {
+        load_data.url = Url::parse("about:blank").unwrap();
+    }
+
+    let (input_chan, input_port) = channel();
+    resource_task.send(ControlMsg::Load(NetLoadData {
+        url: load_data.url,
+        method: load_data.method,
+        headers: Headers::new(),
+        preserved_headers: load_data.headers,
+        data: load_data.data,
+        cors: None,
+        consumer: input_chan,
+    })).unwrap();
+
+    input_port.recv().unwrap()
 }
 
 fn dom_last_modified(tm: &Tm) -> String {
