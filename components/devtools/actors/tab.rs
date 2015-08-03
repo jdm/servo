@@ -71,6 +71,7 @@ pub struct TabActor {
     pub console: String,
     pub inspector: String,
     pub timeline: String,
+    pub thread: String,
 }
 
 impl Actor for TabActor {
@@ -95,7 +96,7 @@ impl Actor for TabActor {
                 let msg = TabAttachedReply {
                     from: self.name(),
                     __type__: "tabAttached".to_string(),
-                    threadActor: self.name(),
+                    threadActor: self.thread.clone(),
                     cacheDisabled: false,
                     javascriptEnabled: true,
                     traits: TabTraits,
