@@ -110,7 +110,8 @@ partial /*sealed*/ interface Document {
   // Document open(optional DOMString type = "text/html", optional DOMString replace = "");
   // WindowProxy open(DOMString url, DOMString name, DOMString features, optional boolean replace = false);
   // void close();
-  // void write(DOMString... text);
+  [Throws]
+  void write(DOMString... text);
   // void writeln(DOMString... text);
 
   // user interaction

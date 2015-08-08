@@ -33,6 +33,7 @@ use dom::servohtmlparser::ServoHTMLParserHelpers;
 use dom::virtualmethods::VirtualMethods;
 use dom::window::{WindowHelpers, ScriptHelpers};
 use network_listener::{NetworkListener, PreInvoke};
+use parse::html::execute_blocking_script_element;
 use script_task::{ScriptChan, ScriptMsg, Runnable};
 use js::jsapi::RootedValue;
 use js::jsval::UndefinedValue;
@@ -67,9 +68,7 @@ pub struct HTMLScriptElement {
     non_blocking: Cell<bool>,
 
     /// https://html.spec.whatwg.org/multipage/#ready-to-be-parser-executed
-    ///
-    /// (currently unused)
-    ready_to_be_parser_executed: Cell<bool>,
+    ready_to_be_parser_executed: DOMRefCell<Option<Result<(Metadata, Vec<u8>), String>>>,
 
     /// Document of the parser that created this element
     parser_document: JS<Document>,
@@ -95,7 +94,7 @@ impl HTMLScriptElement {
             already_started: Cell::new(false),
             parser_inserted: Cell::new(creator == ElementCreator::ParserCreated),
             non_blocking: Cell::new(creator != ElementCreator::ParserCreated),
-            ready_to_be_parser_executed: Cell::new(false),
+            ready_to_be_parser_executed: DOMRefCell::new(None),
             parser_document: JS::from_ref(document),
             block_character_encoding: DOMRefCell::new(UTF_8 as EncodingRef),
         }
@@ -117,6 +116,9 @@ pub trait HTMLScriptElementHelpers {
     /// (https://html.spec.whatwg.org/multipage/#execute-the-script-block)
     fn execute(self, load: ScriptOrigin);
 
+    /// Execute a script block that was previously marked ready for execution.
+    fn execute_via_parser(self);
+
     /// Prepare a script, steps 6 and 7.
     fn is_javascript(self) -> bool;
 
@@ -137,6 +139,9 @@ pub trait HTMLScriptElementHelpers {
 
     /// Dispatch error event.
     fn dispatch_error_event(self);
+
+    /// True if this element has been marked ready for parser execution.
+    fn ready_to_be_parser_executed(self) -> bool;
 }
 
 /// Supported script types as defined by
@@ -197,9 +202,15 @@ impl AsyncResponseListener for ScriptContext {
         });
         let elem = self.elem.root();
 
-        elem.r().execute(ScriptOrigin::External(load));
-
         let document = document_from_node(elem.r());
+
+        if document.r().pending_parser_blocking_script().as_ref() != Some(&elem) {
+            elem.r().execute(ScriptOrigin::External(load));
+        } else {
+            *elem.r().ready_to_be_parser_executed.borrow_mut() = Some(load);
+            execute_blocking_script_element(&*document, &*elem);
+        }
+
         document.r().finish_load(LoadType::Script(self.url.clone()));
 
         if self.resume_on_completion {
@@ -346,7 +357,12 @@ impl<'a> HTMLScriptElementHelpers for &'a HTMLScriptElement {
 
                         doc.r().load_async(LoadType::Script(url), response_target);
 
+                        // Step 15
                         if self.parser_inserted.get() {
+                            //TODO further checks about `async` and script-blocking
+                            //     style sheet loads
+                            doc.r().set_pending_parser_blocking_script(Some(self));
+
                             doc.r().get_current_parser().unwrap().r().suspend();
                         }
                         return NextParserState::Suspend;
@@ -361,6 +377,12 @@ impl<'a> HTMLScriptElementHelpers for &'a HTMLScriptElement {
         // scripts synchronously and execute them immediately.)
         self.execute(load);
         NextParserState::Continue
+    }
+
+    fn execute_via_parser(self) {
+        let load = self.ready_to_be_parser_executed.borrow_mut().take();
+        let load = load.expect("executing a script that isn't marked ready for execution??");
+        self.execute(ScriptOrigin::External(load));
     }
 
     fn execute(self, load: ScriptOrigin) {
@@ -531,6 +553,10 @@ impl<'a> HTMLScriptElementHelpers for &'a HTMLScriptElement {
 
     fn mark_already_started(self) {
         self.already_started.set(true);
+    }
+
+    fn ready_to_be_parser_executed(self) -> bool {
+        self.ready_to_be_parser_executed.borrow().is_some()
     }
 }
 

@@ -25,7 +25,7 @@ use dom::bindings::codegen::InheritTypes::{HTMLScriptElementDerived, HTMLTitleEl
 use dom::bindings::codegen::InheritTypes::ElementDerived;
 use dom::bindings::codegen::UnionTypes::NodeOrString;
 use dom::bindings::error::{ErrorResult, Fallible};
-use dom::bindings::error::Error::{NotSupported, InvalidCharacter, Security};
+use dom::bindings::error::Error::{NotSupported, InvalidCharacter, Security, InvalidState};
 use dom::bindings::error::Error::HierarchyRequest;
 use dom::bindings::global::GlobalRef;
 use dom::bindings::js::{JS, Root, LayoutJS, MutNullableHeap};
@@ -153,6 +153,15 @@ pub struct Document {
     current_parser: MutNullableHeap<JS<ServoHTMLParser>>,
     /// When we should kick off a reflow. This happens during parsing.
     reflow_timeout: Cell<Option<u64>>,
+    /// https://html.spec.whatwg.org/multipage/#ignore-opens-during-unload-counter
+    ignore_opens_during_unload: Cell<u32>,
+    /// https://html.spec.whatwg.org/multipage/#ignore-destructive-writes-counter
+    ignore_destructive_writes: Cell<u32>,
+    /// https://html.spec.whatwg.org/multipage/#pending-parsing-blocking-script
+    pending_parser_blocking_script: MutNullableHeap<JS<HTMLScriptElement>>,
+    /// https://html.spec.whatwg.org/multipage/#reload-override-flag
+    /// https://html.spec.whatwg.org/multipage/#reload-override-buffer
+    reload_override_buffer: DOMRefCell<Option<DOMString>>,
 }
 
 impl PartialEq for Document {
@@ -293,6 +302,8 @@ pub trait DocumentHelpers<'a> {
     fn set_current_parser(self, script: Option<&ServoHTMLParser>);
     fn get_current_parser(self) -> Option<Root<ServoHTMLParser>>;
     fn find_iframe(self, subpage_id: SubpageId) -> Option<Root<HTMLIFrameElement>>;
+    fn set_pending_parser_blocking_script(self, script: Option<&HTMLScriptElement>);
+    fn pending_parser_blocking_script(self) -> Option<Root<HTMLScriptElement>>;
 }
 
 impl<'a> DocumentHelpers<'a> for &'a Document {
@@ -1011,6 +1022,14 @@ impl<'a> DocumentHelpers<'a> for &'a Document {
             .filter_map(HTMLIFrameElementCast::to_root)
             .find(|node| node.r().subpage_id() == Some(subpage_id))
     }
+
+    fn set_pending_parser_blocking_script(self, script: Option<&HTMLScriptElement>) {
+        self.pending_parser_blocking_script.set(script.map(JS::from_ref));
+    }
+
+    fn pending_parser_blocking_script(self) -> Option<Root<HTMLScriptElement>> {
+        self.pending_parser_blocking_script.get_rooted()
+    }
 }
 
 pub enum MouseEventType {
@@ -1095,6 +1114,10 @@ impl Document {
             loader: DOMRefCell::new(doc_loader),
             current_parser: Default::default(),
             reflow_timeout: Cell::new(None),
+            ignore_opens_during_unload: Cell::new(0),
+            ignore_destructive_writes: Cell::new(0),
+            pending_parser_blocking_script: Default::default(),
+            reload_override_buffer: DOMRefCell::new(None),
         }
     }
 
@@ -1760,6 +1783,53 @@ impl<'a> DocumentMethods for &'a Document {
     // https://html.spec.whatwg.org/multipage/#dom-document-bgcolor
     fn SetBgColor(self, value: DOMString) {
         self.set_body_attribute(&atom!("bgcolor"), value)
+    }
+
+    // https://html.spec.whatwg.org/multipage/webappapis.html#dom-document-write
+    fn Write(self, text: Vec<DOMString>) -> ErrorResult {
+        // Step 1
+        if self.is_html_document() {
+            return Err(InvalidState);
+        }
+
+        // Step 2
+        //TODO is this document active?
+
+        // Step 3
+        let mut parser = self.current_parser.get_rooted();
+        let insertion_point_undefined = parser.map(|p| p.insertion_point().is_none()).unwrap_or(true);
+        if insertion_point_undefined &&
+           (self.ignore_opens_during_unload.get() > 0 ||
+            self.ignore_destructive_writes.get() > 0) {
+            return Ok(());
+        }
+
+        // Step 4
+        if insertion_point_undefined {
+            //TODO call Document::Open()
+            //TODO if document can't be unloaded return Ok(())
+            // We either already have a parser or Document::Open created a new one.
+            let parser = self.current_parser.get_rooted().unwrap();
+            parser.set_insertion_point(Some(0)); //XXXjdm
+        }
+
+        // Step 5
+        let parser = self.current_parser.get_rooted().unwrap();
+        parser.insert(text.join(""));
+
+        // Step 6
+        let mut reload_override = self.reload_override_buffer.borrow_mut();
+        if let Some(ref mut reload_override) = *reload_override {
+            reload_override.push_str(&text.join(""));
+        }
+
+        // Step 7
+        if self.pending_parser_blocking_script.get_rooted().is_none() {
+            parser.run_to_insertion_point();
+        }
+
+        // Step 8
+        Ok(())
     }
 
     // https://html.spec.whatwg.org/multipage/#dom-tree-accessors:dom-document-nameditem-filter

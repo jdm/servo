@@ -9,9 +9,9 @@ use document_loader::LoadType;
 use dom::bindings::cell::DOMRefCell;
 use dom::bindings::codegen::Bindings::ServoHTMLParserBinding;
 use dom::bindings::global::GlobalRef;
-use dom::bindings::trace::JSTraceable;
 use dom::bindings::js::{JS, Root};
 use dom::bindings::refcounted::Trusted;
+use dom::bindings::trace::JSTraceable;
 use dom::bindings::utils::{Reflector, reflect_dom_object};
 use dom::document::{Document, DocumentHelpers};
 use dom::node::{window_from_node, Node};
@@ -22,6 +22,7 @@ use script_task::{ScriptTask, ScriptChan};
 
 use msg::constellation_msg::{PipelineId, SubpageId};
 use net_traits::{Metadata, AsyncResponseListener};
+use util::str::DOMString;
 
 use encoding::all::UTF_8;
 use encoding::types::{Encoding, DecoderTrap};
@@ -171,6 +172,9 @@ pub struct ServoHTMLParser {
     /// The pipeline associated with this parse, unavailable if this parse does not
     /// correspond to a page load.
     pipeline: Option<PipelineId>,
+    /// https://html.spec.whatwg.org/multipage/#script-nesting-level
+    script_nesting_level: Cell<u32>,
+    insertion_point: Cell<Option<u32>>,
 }
 
 impl<'a> Parser for &'a ServoHTMLParser {
@@ -221,6 +225,8 @@ impl ServoHTMLParser {
             suspended: Cell::new(false),
             last_chunk_received: Cell::new(false),
             pipeline: pipeline,
+            script_nesting_level: Cell::new(0),
+            insertion_point: Cell::new(None),
         };
 
         reflect_dom_object(box parser, GlobalRef::Window(window.r()),
@@ -259,6 +265,8 @@ impl ServoHTMLParser {
             suspended: Cell::new(false),
             last_chunk_received: Cell::new(true),
             pipeline: None,
+            script_nesting_level: Cell::new(0),
+            insertion_point: Cell::new(None),
         };
 
         reflect_dom_object(box parser, GlobalRef::Window(window.r()),
@@ -268,6 +276,35 @@ impl ServoHTMLParser {
     #[inline]
     pub fn tokenizer<'a>(&'a self) -> &'a DOMRefCell<Tokenizer> {
         &self.tokenizer
+    }
+
+    pub fn insert(&self, tokens: DOMString) {
+        self.tokenizer.borrow_mut().insert(tokens.into());
+    }
+
+    pub fn run_to_insertion_point(&self) {
+        self.tokenizer.borrow_mut().run_to_insertion_point();
+    }
+
+    pub fn increase_script_nesting_level(&self) {
+        self.script_nesting_level.set(self.script_nesting_level.get() + 1);
+    }
+
+    pub fn decrease_script_nesting_level(&self) {
+        self.script_nesting_level.set(self.script_nesting_level.get() - 1);
+    }
+
+    pub fn script_nesting_level(&self) -> u32 {
+        self.script_nesting_level.get()
+    }
+
+    pub fn insertion_point(&self) -> Option<u32> {
+        self.tokenizer.borrow().insertion_point()
+    }
+
+    pub fn set_insertion_point(&self, point: Option<u32>) {
+        //TODO
+        self.tokenizer.borrow_mut().set_insertion_point(point);
     }
 }
 

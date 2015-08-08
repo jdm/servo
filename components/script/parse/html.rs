@@ -25,8 +25,7 @@ use dom::htmlscriptelement::HTMLScriptElementHelpers;
 use dom::node::{Node, NodeHelpers, NodeTypeId};
 use dom::node::{document_from_node, window_from_node};
 use dom::processinginstruction::ProcessingInstructionHelpers;
-use dom::servohtmlparser;
-use dom::servohtmlparser::{ServoHTMLParser, FragmentContext};
+use dom::servohtmlparser::{self, ServoHTMLParser, ServoHTMLParserHelpers, FragmentContext};
 use dom::text::Text;
 use parse::Parser;
 
@@ -174,7 +173,24 @@ impl<'a> TreeSink for servohtmlparser::Sink {
         let node: Root<Node> = node.root();
         let script: Option<&HTMLScriptElement> = HTMLScriptElementCast::to_ref(node.r());
         if let Some(script) = script {
-            return script.prepare();
+            let doc = self.document.root();
+            let parser = doc.get_current_parser().unwrap();
+
+            let old_insertion_point = parser.insertion_point();
+            parser.increase_script_nesting_level();
+
+            let next_state = script.prepare();
+
+            parser.decrease_script_nesting_level();
+            parser.set_insertion_point(old_insertion_point);
+
+            if let Some(script) = doc.pending_parser_blocking_script() {
+                if parser.script_nesting_level() > 0 {
+                    return NextParserState::Suspend;
+                } else {
+                    process_parser_blocking_script_element(&*doc, &*script);
+                }
+            }
         }
         NextParserState::Continue
     }
@@ -315,4 +331,58 @@ pub fn parse_html_fragment(context_node: &Node,
     for child in root_node.children() {
         output.AppendChild(child.r()).unwrap();
     }
+}
+
+/// https://html.spec.whatwg.org/multipage/#scriptTagParserResumes
+fn process_parser_blocking_script_element(doc: &Document, script: &HTMLScriptElement)
+                                          -> NextParserState {
+    // Step 1
+    doc.set_pending_parser_blocking_script(None);
+
+    // Step 2
+    let parser = doc.get_current_parser().unwrap();
+    parser.suspend();
+
+    // Step 3
+    let doc_has_style_sheet_blocking_scripts = false; //TODO
+    if doc_has_style_sheet_blocking_scripts ||
+       !script.ready_to_be_parser_executed() {
+        return NextParserState::Suspend;
+    }
+
+    execute_blocking_script_element(doc, script)
+}
+
+pub fn execute_blocking_script_element(doc: &Document, script: &HTMLScriptElement)
+                                       -> NextParserState {
+    // Step 4
+    //TODO check if parser has been aborted
+
+    // Step 5
+    let parser = doc.get_current_parser().unwrap();
+    parser.resume();
+
+    // Step 6
+    let old_insertion_point = parser.insertion_point();
+    parser.set_insertion_point(Some(0));
+
+    // Step 7
+    parser.increase_script_nesting_level();
+
+    // Step 8
+    script.execute_via_parser();
+
+    // Step 9
+    parser.decrease_script_nesting_level();
+    assert_eq!(parser.script_nesting_level(), 0);
+
+    // Step 10
+    parser.set_insertion_point(old_insertion_point);
+
+    // Step 11
+    if let Some(script) = doc.pending_parser_blocking_script() {
+        return process_parser_blocking_script_element(doc, &*script);
+    }
+
+    NextParserState::Continue
 }

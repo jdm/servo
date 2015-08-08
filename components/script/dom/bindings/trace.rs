@@ -53,6 +53,7 @@ use js::rust::Runtime;
 use layout_interface::{LayoutRPC, LayoutChan};
 use libc;
 use msg::constellation_msg::{PipelineId, SubpageId, WindowSizeData, WorkerId};
+use net_traits::Metadata;
 use net_traits::image_cache_task::{ImageCacheChan, ImageCacheTask};
 use net_traits::storage_task::StorageType;
 use script_traits::ScriptControlChan;
@@ -306,6 +307,7 @@ no_jsmanaged_fields!(RepetitionStyle);
 no_jsmanaged_fields!(WebGLError);
 no_jsmanaged_fields!(ProfilerChan);
 no_jsmanaged_fields!(PseudoElement);
+no_jsmanaged_fields!(Metadata);
 
 impl JSTraceable for Box<ScriptChan+Send> {
     #[inline]
