@@ -46,11 +46,11 @@ use js::glue::{RUST_JSID_IS_STRING, RUST_JSID_TO_STRING, UnwrapObject};
 use js::rust::{ToUint64, ToInt64};
 use js::rust::{ToUint32, ToInt32};
 use js::rust::{ToUint16, ToNumber, ToBoolean, ToString};
-use js::jsapi::{HandleId, HandleObject, HandleValue, JS_GetClass};
-use js::jsapi::{JS_GetLatin1StringCharsAndLength, JS_GetReservedSlot};
+use js::rust::{HandleId, HandleObject, HandleValue, MutableHandleValue};
+use js::jsapi::{JS_GetLatin1StringCharsAndLength, JS_GetReservedSlot, JS_GetClass};
 use js::jsapi::{JS_GetTwoByteStringCharsAndLength, JS_NewStringCopyN};
 use js::jsapi::{JS_NewUCStringCopyN, JS_StringHasLatin1Chars, JS_WrapValue};
-use js::jsapi::{JSClass, JSContext, JSObject, JSString, MutableHandleValue};
+use js::jsapi::{JSClass, JSContext, JSObject, JSString};
 use js::jsval::JSVal;
 use js::jsval::{UndefinedValue, NullValue, BooleanValue, Int32Value, UInt32Value};
 use js::jsval::{StringValue, ObjectValue, ObjectOrNullValue};
@@ -196,10 +196,10 @@ impl ToJSValConvertible for JSVal {
     }
 }
 
-impl ToJSValConvertible for HandleValue {
-    fn to_jsval(&self, cx: *mut JSContext, rval: MutableHandleValue) {
+impl<'a> ToJSValConvertible for HandleValue<'a> {
+    fn to_jsval<'b>(&self, cx: *mut JSContext, rval: MutableHandleValue<'b>) {
         rval.set(self.get());
-        if unsafe { JS_WrapValue(cx, rval) } == 0 {
+        if unsafe { JS_WrapValue(cx, rval.to_jsapi()) } == 0 {
             panic!("JS_WrapValue failed.");
         }
     }

@@ -977,14 +977,14 @@ def getJSToNativeConversionInfo(type, descriptorProvider, failureCode=None,
             else:
                 raise TypeError("Can't handle non-null, non-undefined default value here")
         else:
-            declType = CGGeneric("HandleValue")
+            declType = CGGeneric("RawHandleValue")
 
             if defaultValue is None:
                 default = None
             elif isinstance(defaultValue, IDLNullValue):
-                default = "HandleValue::null()"
+                default = "RawHandleValue::null()"
             elif isinstance(defaultValue, IDLUndefinedValue):
-                default = "HandleValue::undefined()"
+                default = "RawHandleValue::undefined()"
             else:
                 raise TypeError("Can't handle non-null, non-undefined default value here")
 
@@ -1978,8 +1978,8 @@ def UnionTypes(descriptors, dictionaries, callbacks, config):
         'dom::bindings::js::Root',
         'dom::types::*',
         'js::jsapi::JSContext',
-        'js::jsapi::{HandleValue, MutableHandleValue}',
         'js::jsval::JSVal',
+        'js::rust::{HandleValue, MutableHandleValue}',
         'util::str::DOMString',
     ]
 
@@ -2139,7 +2139,7 @@ let obj = RootedObject::new(cx, obj);\
             create += ("let obj = {\n"
                        "    let _ac = JSAutoCompartment::new(cx, proto.ptr);\n"
                        "    JS_NewObjectWithGivenProto(\n"
-                       "        cx, &Class.base as *const js::jsapi::Class as *const JSClass, proto.handle())\n"
+                       "        cx, &Class.base as *const js::jsapi::Class as *const JSClass, proto.handle().to_jsapi())\n"
                        "};\n"
                        "let obj = RootedObject::new(cx, obj);\n")
         create += """\
@@ -2194,7 +2194,7 @@ let _ar = JSAutoRequest::new(cx);
 let _ac = JSAutoCompartment::new(cx, obj.ptr);
 let mut proto = RootedObject::new(cx, ptr::null_mut());
 GetProtoObject(cx, obj.handle(), obj.handle(), proto.handle_mut());
-JS_SetPrototype(cx, obj.handle(), proto.handle());
+JS_SetPrototype(cx, obj.handle().to_jsapi(), proto.handle().to_jsapi());
 
 (*raw).init_reflector(obj.ptr);
 
@@ -2299,8 +2299,8 @@ class CGCreateInterfaceObjectsMethod(CGAbstractMethod):
     properties should be a PropertyArrays instance.
     """
     def __init__(self, descriptor, properties):
-        args = [Argument('*mut JSContext', 'cx'), Argument('HandleObject', 'global'),
-                Argument('HandleObject', 'receiver'),
+        args = [Argument('*mut JSContext', 'cx'), Argument('RawHandleObject', 'global'),
+                Argument('RawHandleObject', 'receiver'),
                 Argument('MutableHandleObject', 'rval')]
         CGAbstractMethod.__init__(self, descriptor, 'CreateInterfaceObjects', 'void', args)
         self.properties = properties
@@ -2377,8 +2377,8 @@ class CGGetPerInterfaceObject(CGAbstractMethod):
     constructor object).
     """
     def __init__(self, descriptor, name, idPrefix="", pub=False):
-        args = [Argument('*mut JSContext', 'cx'), Argument('HandleObject', 'global'),
-                Argument('HandleObject', 'receiver'),
+        args = [Argument('*mut JSContext', 'cx'), Argument('RawHandleObject', 'global'),
+                Argument('RawHandleObject', 'receiver'),
                 Argument('MutableHandleObject', 'rval')]
         CGAbstractMethod.__init__(self, descriptor, name,
                                   'void', args, pub=pub)
@@ -2511,7 +2511,7 @@ class CGDefineDOMInterfaceMethod(CGAbstractMethod):
         assert descriptor.interface.hasInterfaceObject()
         args = [
             Argument('*mut JSContext', 'cx'),
-            Argument('HandleObject', 'global'),
+            Argument('RawHandleObject', 'global'),
         ]
         CGAbstractMethod.__init__(self, descriptor, 'DefineDOMInterface', 'void', args, pub=True)
 
@@ -2817,7 +2817,7 @@ class CGSpecializedMethod(CGAbstractExternMethod):
     def __init__(self, descriptor, method):
         self.method = method
         name = method.identifier.name
-        args = [Argument('*mut JSContext', 'cx'), Argument('HandleObject', '_obj'),
+        args = [Argument('*mut JSContext', 'cx'), Argument('RawHandleObject', '_obj'),
                 Argument('*const %s' % descriptor.concreteType, 'this'),
                 Argument('*const JSJitMethodCallArgs', 'args')]
         CGAbstractExternMethod.__init__(self, descriptor, name, 'u8', args)
@@ -2863,7 +2863,7 @@ class CGSpecializedGetter(CGAbstractExternMethod):
         self.attr = attr
         name = 'get_' + attr.identifier.name
         args = [Argument('*mut JSContext', 'cx'),
-                Argument('HandleObject', '_obj'),
+                Argument('RawHandleObject', '_obj'),
                 Argument('*const %s' % descriptor.concreteType, 'this'),
                 Argument('JSJitGetterCallArgs', 'args')]
         CGAbstractExternMethod.__init__(self, descriptor, name, "u8", args)
@@ -2915,7 +2915,7 @@ class CGSpecializedSetter(CGAbstractExternMethod):
         self.attr = attr
         name = 'set_' + attr.identifier.name
         args = [Argument('*mut JSContext', 'cx'),
-                Argument('HandleObject', 'obj'),
+                Argument('RawHandleObject', 'obj'),
                 Argument('*const %s' % descriptor.concreteType, 'this'),
                 Argument('JSJitSetterCallArgs', 'args')]
         CGAbstractExternMethod.__init__(self, descriptor, name, "u8", args)
@@ -2971,7 +2971,7 @@ class CGSpecializedForwardingSetter(CGSpecializedSetter):
         assert all(ord(c) < 128 for c in forwardToAttrName)
         return CGGeneric("""\
 let mut v = RootedValue::new(cx, UndefinedValue());
-if JS_GetProperty(cx, obj, %s as *const u8 as *const libc::c_char, v.handle_mut()) == 0 {
+if JS_GetProperty(cx, obj, %s as *const u8 as *const libc::c_char, v.handle_mut().to_jsapi()) == 0 {
     return JSFalse;
 }
 if !v.ptr.is_object() {
@@ -2979,7 +2979,7 @@ if !v.ptr.is_object() {
     return JSFalse;
 }
 let target_obj = RootedObject::new(cx, v.ptr.to_object());
-JS_SetProperty(cx, target_obj.handle(), %s as *const u8 as *const libc::c_char, args.get(0))
+JS_SetProperty(cx, target_obj.handle().to_jsapi(), %s as *const u8 as *const libc::c_char, args.get(0))
 """ % (str_to_const_array(attrName), attrName, str_to_const_array(forwardToAttrName)))
 
 
@@ -3274,8 +3274,9 @@ pub enum %s {
 
         inner = """\
 use dom::bindings::conversions::ToJSValConvertible;
-use js::jsapi::{JSContext, MutableHandleValue};
+use js::jsapi::JSContext;
 use js::jsval::JSVal;
+use js::rust::MutableHandleValue;
 
 pub const strings: &'static [&'static str] = &[
     %s,
@@ -3916,7 +3917,7 @@ class CGProxySpecialOperation(CGPerSignatureCall):
             needsRooting = info.needsRooting
 
             templateValues = {
-                "val": "value.handle()",
+                "val": "value.handle().to_jsapi()",
             }
             self.cgRoot.prepend(instantiateJSToNativeConversionTemplate(
                 template, templateValues, declType, argument.identifier.name,
@@ -3993,7 +3994,7 @@ class CGProxyNamedDeleter(CGProxySpecialOperation):
 
 class CGProxyUnwrap(CGAbstractMethod):
     def __init__(self, descriptor):
-        args = [Argument('HandleObject', 'obj')]
+        args = [Argument('RawHandleObject', 'obj')]
         CGAbstractMethod.__init__(self, descriptor, "UnwrapProxy",
                                   '*const ' + descriptor.concreteType, args, alwaysInline=True)
 
@@ -4009,9 +4010,9 @@ return box_;""" % self.descriptor.concreteType)
 
 class CGDOMJSProxyHandler_getOwnPropertyDescriptor(CGAbstractExternMethod):
     def __init__(self, descriptor):
-        args = [Argument('*mut JSContext', 'cx'), Argument('HandleObject', 'proxy'),
-                Argument('HandleId', 'id'),
-                Argument('MutableHandle<JSPropertyDescriptor>', 'desc')]
+        args = [Argument('*mut JSContext', 'cx'), Argument('RawHandleObject', 'proxy'),
+                Argument('RawHandleId', 'id'),
+                Argument('RawMutableHandle<JSPropertyDescriptor>', 'desc')]
         CGAbstractExternMethod.__init__(self, descriptor, "getOwnPropertyDescriptor",
                                         "u8", args)
         self.descriptor = descriptor
@@ -4030,7 +4031,7 @@ class CGDOMJSProxyHandler_getOwnPropertyDescriptor(CGAbstractExternMethod):
                               "fill_property_descriptor(&mut *desc.ptr, *proxy.ptr, %s);\n"
                               "return JSTrue;" % readonly)
             templateValues = {
-                'jsvalRef': 'result_root.handle_mut()',
+                'jsvalRef': 'result_root.handle_mut().to_jsapi()',
                 'successCode': fillDescriptor,
                 'pre': 'let mut result_root = RootedValue::new(cx, UndefinedValue());'
             }
@@ -4047,7 +4048,7 @@ class CGDOMJSProxyHandler_getOwnPropertyDescriptor(CGAbstractExternMethod):
                               "fill_property_descriptor(&mut *desc.ptr, *proxy.ptr, %s);\n"
                               "return JSTrue;" % readonly)
             templateValues = {
-                'jsvalRef': 'result_root.handle_mut()',
+                'jsvalRef': 'result_root.handle_mut().to_jsapi()',
                 'successCode': fillDescriptor,
                 'pre': 'let mut result_root = RootedValue::new(cx, UndefinedValue());'
             }
@@ -4068,7 +4069,7 @@ class CGDOMJSProxyHandler_getOwnPropertyDescriptor(CGAbstractExternMethod):
 let expando = RootedObject::new(cx, get_expando_object(proxy));
 //if (!xpc::WrapperFactory::IsXrayWrapper(proxy) && (expando = GetExpandoObject(proxy))) {
 if !expando.ptr.is_null() {
-    if JS_GetPropertyDescriptorById(cx, expando.handle(), id, desc) == 0 {
+    if JS_GetPropertyDescriptorById(cx, expando.handle.to_jsapi()(), id, desc) == 0 {
         return JSFalse;
     }
     if !desc.get().obj.is_null() {
@@ -4088,9 +4089,9 @@ return JSTrue;"""
 # TODO(Issue 5876)
 class CGDOMJSProxyHandler_defineProperty(CGAbstractExternMethod):
     def __init__(self, descriptor):
-        args = [Argument('*mut JSContext', 'cx'), Argument('HandleObject', 'proxy'),
-                Argument('HandleId', 'id'),
-                Argument('Handle<JSPropertyDescriptor>', 'desc'),
+        args = [Argument('*mut JSContext', 'cx'), Argument('RawHandleObject', 'proxy'),
+                Argument('RawHandleId', 'id'),
+                Argument('RawHandle<JSPropertyDescriptor>', 'desc'),
                 Argument('*mut ObjectOpResult', 'opresult')]
         CGAbstractExternMethod.__init__(self, descriptor, "defineProperty", "u8", args)
         self.descriptor = descriptor
@@ -4155,8 +4156,8 @@ class CGDOMJSProxyHandler_defineProperty(CGAbstractExternMethod):
 
 class CGDOMJSProxyHandler_delete(CGAbstractExternMethod):
     def __init__(self, descriptor):
-        args = [Argument('*mut JSContext', 'cx'), Argument('HandleObject', 'proxy'),
-                Argument('HandleId', 'id'),
+        args = [Argument('*mut JSContext', 'cx'), Argument('RawHandleObject', 'proxy'),
+                Argument('RawHandleId', 'id'),
                 Argument('*mut ObjectOpResult', 'res')]
         CGAbstractExternMethod.__init__(self, descriptor, "delete", "u8", args)
         self.descriptor = descriptor
@@ -4177,8 +4178,8 @@ class CGDOMJSProxyHandler_delete(CGAbstractExternMethod):
 
 class CGDOMJSProxyHandler_hasOwn(CGAbstractExternMethod):
     def __init__(self, descriptor):
-        args = [Argument('*mut JSContext', 'cx'), Argument('HandleObject', 'proxy'),
-                Argument('HandleId', 'id'), Argument('*mut u8', 'bp')]
+        args = [Argument('*mut JSContext', 'cx'), Argument('RawHandleObject', 'proxy'),
+                Argument('RawHandleId', 'id'), Argument('*mut u8', 'bp')]
         CGAbstractExternMethod.__init__(self, descriptor, "hasOwn", "u8", args)
         self.descriptor = descriptor
 
@@ -4214,7 +4215,7 @@ class CGDOMJSProxyHandler_hasOwn(CGAbstractExternMethod):
 let expando = RootedObject::new(cx, get_expando_object(proxy));
 if !expando.ptr.is_null() {
     let mut b: u8 = 1;
-    let ok = JS_HasPropertyById(cx, expando.handle(), id, &mut b) != 0;
+    let ok = JS_HasPropertyById(cx, expando.handle.to_jsapi()(), id, &mut b) != 0;
     *bp = (b != 0) as u8;
     if !ok || *bp != 0 {
         return ok as u8;
@@ -4230,9 +4231,9 @@ return JSTrue;"""
 
 class CGDOMJSProxyHandler_get(CGAbstractExternMethod):
     def __init__(self, descriptor):
-        args = [Argument('*mut JSContext', 'cx'), Argument('HandleObject', 'proxy'),
-                Argument('HandleObject', '_receiver'), Argument('HandleId', 'id'),
-                Argument('MutableHandleValue', 'vp')]
+        args = [Argument('*mut JSContext', 'cx'), Argument('RawHandleObject', 'proxy'),
+                Argument('RawHandleObject', '_receiver'), Argument('RawHandleId', 'id'),
+                Argument('RawMutableHandleValue', 'vp')]
         CGAbstractExternMethod.__init__(self, descriptor, "get", "u8", args)
         self.descriptor = descriptor
 
@@ -4241,12 +4242,12 @@ class CGDOMJSProxyHandler_get(CGAbstractExternMethod):
 let expando = RootedObject::new(cx, get_expando_object(proxy));
 if !expando.ptr.is_null() {
     let mut hasProp = 0;
-    if JS_HasPropertyById(cx, expando.handle(), id, &mut hasProp) == 0 {
+    if JS_HasPropertyById(cx, expando.handle().to_jsapi(), id, &mut hasProp) == 0 {
         return JSFalse;
     }
 
     if hasProp != 0 {
-        return (JS_GetPropertyById(cx, expando.handle(), id, vp) != 0) as u8;
+        return (JS_GetPropertyById(cx, expando.handle().to_jsapi(), id, vp) != 0) as u8;
     }
 }"""
 
@@ -4306,7 +4307,7 @@ return JSTrue;""" % (getIndexedOrExpando, getNamed)
 
 class CGDOMJSProxyHandler_className(CGAbstractExternMethod):
     def __init__(self, descriptor):
-        args = [Argument('*mut JSContext', 'cx'), Argument('HandleObject', '_proxy')]
+        args = [Argument('*mut JSContext', 'cx'), Argument('RawHandleObject', '_proxy')]
         CGAbstractExternMethod.__init__(self, descriptor, "className", "*const i8", args)
         self.descriptor = descriptor
 
@@ -4952,6 +4953,12 @@ class CGBindingRoot(CGThing):
             'js::{JSCLASS_IS_GLOBAL, JSCLASS_RESERVED_SLOTS_SHIFT}',
             'js::{JSCLASS_RESERVED_SLOTS_MASK}',
             'js::{JSPROP_ENUMERATE, JSPROP_SHARED}',
+            'js::jsapi::HandleValue as RawHandleValue',
+            'js::jsapi::HandleObject as RawHandleObject',
+            'js::jsapi::HandleId as RawHandleId',
+            'js::jsapi::Handle as RawHandle',
+            'js::jsapi::MutableHandle as RawMutableHandle',
+            'js::jsapi::MutableHandleValue as RawMutableHandleValue',
             'js::jsapi::{JS_CallFunctionValue, JS_GetClass, JS_GetGlobalForObject}',
             'js::jsapi::{JS_GetObjectPrototype, JS_GetProperty, JS_GetPropertyById}',
             'js::jsapi::{JS_GetPropertyDescriptorById, JS_GetReservedSlot}',
@@ -4959,11 +4966,11 @@ class CGBindingRoot(CGThing):
             'js::jsapi::{JS_NewObjectWithGivenProto, JS_NewObject, IsCallable, JS_SetProperty, JS_SetPrototype}',
             'js::jsapi::{JS_SetReservedSlot, JS_WrapValue, JSContext}',
             'js::jsapi::{JSClass, FreeOp, JSFreeOp, JSFunctionSpec, jsid}',
-            'js::jsapi::{MutableHandleValue, MutableHandleObject, HandleObject, HandleValue, RootedObject}',
+            'js::jsapi::{RootedObject}',
             'js::jsapi::{RootedValue, JSNativeWrapper, JSNative, JSObject, JSPropertyDescriptor}',
             'js::jsapi::{JSPropertySpec}',
             'js::jsapi::{JSString, JSTracer, JSJitInfo, JSJitInfo_OpType, JSJitInfo_AliasSet}',
-            'js::jsapi::{MutableHandle, Handle, HandleId, JSType, JSValueType}',
+            'js::jsapi::{JSType, JSValueType}',
             'js::jsapi::{SymbolCode, ObjectOpResult, HandleValueArray}',
             'js::jsapi::{JSJitGetterCallArgs, JSJitSetterCallArgs, JSJitMethodCallArgs, CallArgs}',
             'js::jsapi::{JSAutoCompartment, JSAutoRequest, JS_ComputeThis}',
@@ -4976,6 +4983,8 @@ class CGBindingRoot(CGThing):
             'js::glue::{RUST_FUNCTION_VALUE_TO_JITINFO}',
             'js::glue::{RUST_JS_NumberValue, RUST_JSID_IS_STRING}',
             'js::rust::GCMethods',
+            'js::rust::{MutableHandleValue, MutableHandleObject, HandleObject, HandleValue}',
+            'js::rust::{MutableHandle, Handle, HandleId}',
             'js::{JSTrue, JSFalse}',
             'dom::bindings',
             'dom::bindings::global::GlobalRef',
@@ -5505,11 +5514,11 @@ class CallbackMethod(CallbackMember):
             "let ok = unsafe {\n"
             "    let rootedThis = RootedObject::new(cx, ${thisObj});\n"
             "    JS_CallFunctionValue(\n"
-            "        cx, rootedThis.handle(), callable.handle(),\n"
+            "        cx, rootedThis.handle().to_jsapi(), callable.handle().to_jsapi(),\n"
             "        &HandleValueArray {\n"
             "            length_: ${argc} as ::libc::size_t,\n"
             "            elements_: ${argv}\n"
-            "        }, rval.handle_mut())\n"
+            "        }, rval.handle_mut().to_jsapi())\n"
             "};\n"
             "if ok == 0 {\n"
             "    return Err(JSFailed);\n"
@@ -5671,7 +5680,7 @@ class GlobalGenRoots():
             'dom::bindings::codegen',
             'dom::bindings::codegen::PrototypeList::Proxies',
             'js::jsapi::JSContext',
-            'js::jsapi::HandleObject',
+            'js::rust::HandleObject',
             'libc',
         ], ignored_warnings=[])
 
