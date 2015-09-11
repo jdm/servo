@@ -80,7 +80,7 @@ use std::sync::mpsc::{Receiver, Sender};
 use string_cache::{Atom, Namespace};
 use style::properties::PropertyDeclarationBlock;
 use style::values::specified::Length;
-use url::Url;
+use url::{Url, Host};
 use util::str::{LengthOrPercentageOrAuto};
 
 
@@ -269,7 +269,7 @@ impl<A: JSTraceable, B: JSTraceable> JSTraceable for (A, B) {
 }
 
 
-no_jsmanaged_fields!(bool, f32, f64, String, Url);
+no_jsmanaged_fields!(bool, f32, f64, String, Url, Host);
 no_jsmanaged_fields!(usize, u8, u16, u32, u64);
 no_jsmanaged_fields!(isize, i8, i16, i32, i64);
 no_jsmanaged_fields!(Sender<T>);

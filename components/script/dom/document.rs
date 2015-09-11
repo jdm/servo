@@ -83,6 +83,7 @@ use net_traits::ControlMsg::{GetCookiesForUrl, SetCookiesForUrl};
 use net_traits::CookieSource::NonHTTP;
 use net_traits::{AsyncResponseTarget, PendingAsyncLoad};
 use num::ToPrimitive;
+use origin::Origin;
 use script_task::{MainThreadScriptMsg, Runnable};
 use script_traits::{MouseButton, UntrustedNodeAddress};
 use std::ascii::AsciiExt;
@@ -176,6 +177,10 @@ pub struct Document {
     appropriate_template_contents_owner_document: MutNullableHeap<JS<Document>>,
     // The collection of EventStates that have been changed since the last restyle.
     event_state_changes: DOMRefCell<HashMap<JS<Element>, EventState>>,
+    /// The document's origin.
+    origin: Origin,
+    /// The document's effective script origin.
+    effective_script_origin: Origin,
 }
 
 impl PartialEq for Document {
@@ -1221,6 +1226,8 @@ impl Document {
             (DocumentReadyState::Complete, true)
         };
 
+        let origin = Origin::opaque_identifier(url.clone());
+
         Document {
             node: Node::new_document_node(),
             window: JS::from_ref(window),
@@ -1269,6 +1276,8 @@ impl Document {
             base_element: Default::default(),
             appropriate_template_contents_owner_document: Default::default(),
             event_state_changes: DOMRefCell::new(HashMap::new()),
+            effective_script_origin: origin.alias(),
+            origin: origin,
         }
     }
 

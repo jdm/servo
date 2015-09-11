@@ -61,6 +61,7 @@ extern crate hyper;
 extern crate image;
 extern crate ipc_channel;
 extern crate js;
+#[macro_use] extern crate lazy_static;
 extern crate libc;
 extern crate msg;
 extern crate net_traits;
@@ -90,6 +91,7 @@ pub mod dom;
 pub mod layout_interface;
 mod mem;
 mod network_listener;
+mod origin;
 pub mod page;
 pub mod parse;
 #[allow(unsafe_code)]
