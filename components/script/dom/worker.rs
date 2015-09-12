@@ -20,6 +20,7 @@ use dom::event::{Event, EventBubbles, EventCancelable};
 use dom::eventtarget::EventTarget;
 use dom::messageevent::MessageEvent;
 use dom::workerglobalscope::WorkerGlobalScopeInit;
+use environment_settings::ScriptSettingsStack;
 use ipc_channel::ipc;
 use js::jsapi::{HandleValue, JSContext, RootedValue};
 use js::jsapi::{JSAutoCompartment, JSAutoRequest};
@@ -96,6 +97,10 @@ impl Worker {
             None => None,
         };
 
+        let inherited_origin = ScriptSettingsStack::incumbent_settings_object(|settings| {
+            settings.origin()
+        });
+
         let init = WorkerGlobalScopeInit {
             resource_task: resource_task,
             mem_profiler_chan: global.mem_profiler_chan(),
@@ -104,6 +109,7 @@ impl Worker {
             constellation_chan: constellation_chan,
             scheduler_chan: scheduler_chan,
             worker_id: worker_id,
+            inherited_origin: inherited_origin.unwrap(),
         };
         DedicatedWorkerGlobalScope::run_worker_scope(
             init, worker_url, global.pipeline(), devtools_receiver, worker_ref,

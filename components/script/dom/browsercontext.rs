@@ -2,15 +2,20 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+use dom::bindings::codegen::Bindings::WindowBinding::WindowMethods;
 use dom::bindings::conversions::native_from_handleobject;
 use dom::bindings::conversions::{ToJSValConvertible};
+use dom::bindings::global::GlobalRoot;
 use dom::bindings::js::{JS, Root};
 use dom::bindings::proxyhandler::{fill_property_descriptor, get_property_descriptor};
+use dom::bindings::refcounted::Trusted;
 use dom::bindings::utils::get_array_index_from_id;
 use dom::bindings::utils::{Reflectable, WindowProxyHandler};
 use dom::document::Document;
 use dom::element::Element;
 use dom::window::Window;
+use encoding::EncodingRef;
+use environment_settings::{HttpsState, EnvironmentSettings};
 use js::glue::{CreateWrapperProxyHandler, ProxyTraps, WrapperNew};
 use js::glue::{GetProxyPrivate};
 use js::jsapi::{Handle, Heap, JS_ForwardSetPropertyTo, ObjectOpResult, RootedObject, RootedValue};
@@ -20,8 +25,11 @@ use js::jsapi::{JSContext, JSErrNum, JSObject, JSPropertyDescriptor};
 use js::jsapi::{JS_AlreadyHasOwnPropertyById, JS_ForwardGetPropertyTo};
 use js::jsapi::{JS_DefinePropertyById6, JS_GetPropertyDescriptorById};
 use js::jsval::{ObjectValue, UndefinedValue};
+use origin::Origin;
+use script_task::ScriptChan;
 use std::default::Default;
 use std::ptr;
+use url::Url;
 
 #[derive(JSTraceable, HeapSizeOf)]
 #[privatize]
@@ -32,6 +40,7 @@ pub struct BrowsingContext {
     active_index: usize,
     window_proxy: Heap<*mut JSObject>,
     frame_element: Option<JS<Element>>,
+    environment_settings: BrowsingContextEnvironmentSettings,
 }
 
 impl BrowsingContext {
@@ -41,6 +50,10 @@ impl BrowsingContext {
             active_index: 0,
             window_proxy: Heap::default(),
             frame_element: frame_element.map(JS::from_ref),
+            environment_settings: BrowsingContextEnvironmentSettings {
+                creation_url: document.url().clone(),
+                window: document.window().to_trusted(),
+            },
         }
     }
 
@@ -76,6 +89,10 @@ impl BrowsingContext {
         let wrapper = unsafe { WrapperNew(cx, parent, handler, ptr::null(), false) };
         assert!(!wrapper.is_null());
         self.window_proxy.set(wrapper);
+    }
+
+    pub fn environment_settings(&self) -> Box<EnvironmentSettings + 'static> {
+        self.environment_settings.clone()
     }
 }
 
@@ -245,5 +262,58 @@ static PROXY_HANDLER: ProxyTraps = ProxyTraps {
 pub fn new_window_proxy_handler() -> WindowProxyHandler {
     unsafe {
         WindowProxyHandler(CreateWrapperProxyHandler(&PROXY_HANDLER))
+    }
+}
+
+/// https://html.spec.whatwg.org/multipage/#script-settings-for-browsing-contexts
+#[derive(HeapSizeOf, JSTraceable)]
+pub struct BrowsingContextEnvironmentSettings {
+    #[ignore_heap_size_of = "unclear ownership for Trusted<T>"]
+    window: Trusted<Window>,
+    creation_url: Url,
+}
+
+impl EnvironmentSettings for BrowsingContextEnvironmentSettings {
+    fn global(&self) -> GlobalRoot {
+        GlobalRoot::Window(self.window.root())
+    }
+
+    fn responsible_event_loop(&self) -> Box<ScriptChan + Send> {
+        self.window.root().script_chan()
+    }
+
+    fn responsible_document(&self) -> Option<Root<Document>> {
+        Some(self.window.root().Document())
+    }
+
+    fn api_url_character_encoding(&self) -> EncodingRef {
+        self.window.root().Document().character_encoding()
+    }
+
+    fn api_base_url(&self) -> Url {
+        self.window.root().Document().base_url()
+    }
+
+    fn origin(&self) -> Origin {
+        self.window.root().Document().origin()
+    }
+
+    fn effective_script_origin(&self) -> Origin {
+        self.window.root().Document().effective_script_origin()
+    }
+
+    fn creation_url(&self) -> Url {
+        self.creation_url.clone()
+    }
+
+    fn https_state(&self) -> Option<HttpsState> {
+        None
+    }
+
+    fn clone(&self) -> Box<EnvironmentSettings + 'static> {
+        box BrowsingContextEnvironmentSettings {
+            window: self.window.clone(),
+            creation_url: self.creation_url.clone(),
+        }
     }
 }

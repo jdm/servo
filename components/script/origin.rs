@@ -2,9 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+#![allow(dead_code)]
 #![allow(unsafe_code)]
 
-use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use url::{Url, Host};
 
@@ -12,14 +12,14 @@ use url::{Url, Host};
 #[derive(Clone, JSTraceable, HeapSizeOf)]
 pub struct Origin {
     #[ignore_heap_size_of = "Rc<T> has unclear ownership semantics"]
-    repr: Rc<OriginRepresentation>,
+    repr: Arc<OriginRepresentation>,
 }
 
 #[derive(Clone, JSTraceable)]
 enum OriginRepresentation {
     OpaqueIdentifier { id: u64, debug_repr: String },
     Tuple { scheme: String, host: Host, port: u16, },
-    Alias(Rc<OriginRepresentation>),
+    Alias(Arc<OriginRepresentation>),
 }
 
 lazy_static! {
@@ -47,7 +47,7 @@ impl Origin {
 
             "ftp" | "gopher" | "http" | "https" | "ws" | "wss" => {
                 Origin {
-                    repr: Rc::new(OriginRepresentation::Tuple {
+                    repr: Arc::new(OriginRepresentation::Tuple {
                         scheme: url.scheme.clone(),
                         host: url.host().unwrap().clone(),
                         port: url.port_or_default().unwrap(),
@@ -73,13 +73,13 @@ impl Origin {
             debug_repr: url.serialize(),
         };
         Origin {
-            repr: Rc::new(opaque_id),
+            repr: Arc::new(opaque_id),
         }
     }
 
     pub fn alias(&self) -> Origin {
         Origin {
-            repr: Rc::new(OriginRepresentation::Alias(self.repr.clone())),
+            repr: Arc::new(OriginRepresentation::Alias(self.repr.clone())),
         }
     }
 
@@ -89,8 +89,8 @@ trait Dealias {
     fn dealiased(&self) -> Self;
 }
 
-impl Dealias for Rc<OriginRepresentation> {
-    fn dealiased(&self) -> Rc<OriginRepresentation> {
+impl Dealias for Arc<OriginRepresentation> {
+    fn dealiased(&self) -> Arc<OriginRepresentation> {
         match **self {
             OriginRepresentation::Alias(ref aliased) => aliased.dealiased(),
             _ => self.clone(),

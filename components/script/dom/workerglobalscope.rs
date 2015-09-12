@@ -7,21 +7,27 @@ use dom::bindings::codegen::Bindings::FunctionBinding::Function;
 use dom::bindings::codegen::Bindings::WorkerGlobalScopeBinding::WorkerGlobalScopeMethods;
 use dom::bindings::conversions::Castable;
 use dom::bindings::error::{Error, ErrorResult, Fallible, report_pending_exception};
-use dom::bindings::global::GlobalRef;
+use dom::bindings::global::{GlobalRoot, GlobalRef};
 use dom::bindings::js::{JS, MutNullableHeap, Root};
+use dom::bindings::refcounted::Trusted;
 use dom::bindings::utils::Reflectable;
 use dom::console::Console;
 use dom::crypto::Crypto;
 use dom::dedicatedworkerglobalscope::DedicatedWorkerGlobalScope;
+use dom::document::Document;
+use encoding::all::UTF_8;
+use encoding::EncodingRef;
 use dom::eventtarget::EventTarget;
 use dom::window::{base64_atob, base64_btoa};
 use dom::workerlocation::WorkerLocation;
 use dom::workernavigator::WorkerNavigator;
+use environment_settings::{EnvironmentSettings, HttpsState};
 use ipc_channel::ipc::IpcSender;
 use js::jsapi::{HandleValue, JSAutoRequest, JSContext};
 use js::rust::Runtime;
 use msg::constellation_msg::{ConstellationChan, PipelineId, WorkerId};
 use net_traits::{ResourceTask, load_whole_resource};
+use origin::Origin;
 use profile_traits::mem;
 use script_task::{CommonScriptMsg, ScriptChan, ScriptPort};
 use script_traits::{TimerEventChan, TimerEventId, TimerEventRequest, TimerSource};
@@ -46,6 +52,7 @@ pub struct WorkerGlobalScopeInit {
     pub constellation_chan: ConstellationChan,
     pub scheduler_chan: Sender<TimerEventRequest>,
     pub worker_id: WorkerId,
+    pub inherited_origin: Origin,
 }
 
 // https://html.spec.whatwg.org/multipage/#the-workerglobalscope-common-interface
@@ -88,6 +95,8 @@ pub struct WorkerGlobalScope {
 
     #[ignore_heap_size_of = "Defined in std"]
     scheduler_chan: Sender<TimerEventRequest>,
+
+    origin: Origin,
 }
 
 impl WorkerGlobalScope {
@@ -116,6 +125,7 @@ impl WorkerGlobalScope {
             devtools_wants_updates: Cell::new(false),
             constellation_chan: init.constellation_chan,
             scheduler_chan: init.scheduler_chan,
+            origin: init.inherited_origin,
         }
     }
 
@@ -249,7 +259,9 @@ impl WorkerGlobalScopeMethods for WorkerGlobalScope {
 
     // https://html.spec.whatwg.org/multipage/#dom-windowtimers-setinterval
     fn SetTimeout_(&self, _cx: *mut JSContext, callback: DOMString, timeout: i32, args: Vec<HandleValue>) -> i32 {
-        self.timers.set_timeout_or_interval(TimerCallback::StringTimerCallback(callback),
+        let url = self.worker_url.clone();
+        let line = 0; //FIXME: get current JS execution line
+        self.timers.set_timeout_or_interval(TimerCallback::StringTimerCallback(callback, url, line),
                                             args,
                                             timeout,
                                             IsInterval::NonInterval,
@@ -272,7 +284,9 @@ impl WorkerGlobalScopeMethods for WorkerGlobalScope {
 
     // https://html.spec.whatwg.org/multipage/#dom-windowtimers-setinterval
     fn SetInterval_(&self, _cx: *mut JSContext, callback: DOMString, timeout: i32, args: Vec<HandleValue>) -> i32 {
-        self.timers.set_timeout_or_interval(TimerCallback::StringTimerCallback(callback),
+        let url = self.worker_url.clone();
+        let line = 0; //FIXME: get current JS execution line
+        self.timers.set_timeout_or_interval(TimerCallback::StringTimerCallback(callback, url, line),
                                             args,
                                             timeout,
                                             IsInterval::Interval,
@@ -343,5 +357,69 @@ impl WorkerGlobalScope {
 
     pub fn set_devtools_wants_updates(&self, value: bool) {
         self.devtools_wants_updates.set(value);
+    }
+
+    pub fn to_trusted(&self) -> Trusted<WorkerGlobalScope> {
+        Trusted::new(self.get_cx(), self, self.script_chan())
+    }
+
+    // https://html.spec.whatwg.org/multipage/#set-up-a-worker-environment-settings-object
+    pub fn environment_settings(&self) -> Box<EnvironmentSettings + 'static> {
+        box WorkerEnvironmentSettings {
+            worker: self.to_trusted(),
+            origin: self.origin.clone(),
+        }
+    }
+}
+
+#[derive(HeapSizeOf, JSTraceable)]
+pub struct WorkerEnvironmentSettings {
+    #[ignore_heap_size_of = "unclear ownership for Trusted<T>"]
+    worker: Trusted<WorkerGlobalScope>,
+    origin: Origin,
+}
+
+impl EnvironmentSettings for WorkerEnvironmentSettings {
+    fn global(&self) -> GlobalRoot {
+        GlobalRoot::Worker(self.worker.root())
+    }
+
+    fn responsible_event_loop(&self) -> Box<ScriptChan + Send> {
+        self.worker.root().script_chan()
+    }
+
+    fn responsible_document(&self) -> Option<Root<Document>> {
+        None
+    }
+
+    fn api_url_character_encoding(&self) -> EncodingRef {
+        UTF_8
+    }
+
+    fn api_base_url(&self) -> Url {
+        self.worker.root().get_url().clone()
+    }
+
+    fn origin(&self) -> Origin {
+        self.origin.clone()
+    }
+
+    fn effective_script_origin(&self) -> Origin {
+        self.origin.clone()
+    }
+
+    fn creation_url(&self) -> Url {
+        self.worker.root().get_url().clone()
+    }
+
+    fn https_state(&self) -> Option<HttpsState> {
+        None
+    }
+
+    fn clone(&self) -> Box<EnvironmentSettings + 'static> {
+        box WorkerEnvironmentSettings {
+            worker: self.worker.clone(),
+            origin: self.origin.clone(),
+        }
     }
 }

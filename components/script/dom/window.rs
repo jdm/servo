@@ -18,6 +18,7 @@ use dom::bindings::global::global_object_for_js_object;
 use dom::bindings::js::RootedReference;
 use dom::bindings::js::{JS, MutNullableHeap, Root};
 use dom::bindings::num::Finite;
+use dom::bindings::refcounted::Trusted;
 use dom::bindings::utils::{GlobalStaticData, Reflectable, WindowProxyHandler};
 use dom::browsercontext::BrowsingContext;
 use dom::console::Console;
@@ -32,6 +33,7 @@ use dom::node::{Node, TrustedNodeAddress, from_untrusted_node_address, window_fr
 use dom::performance::Performance;
 use dom::screen::Screen;
 use dom::storage::Storage;
+use environment_settings::EnvironmentSettings;
 use euclid::{Point2D, Rect, Size2D};
 use ipc_channel::ipc::{self, IpcSender};
 use js::jsapi::{Evaluate2, MutableHandleValue};
@@ -213,7 +215,7 @@ pub struct Window {
     /// The current state of the window object
     current_state: Cell<WindowState>,
 
-    current_viewport: Cell<Rect<Au>>
+    current_viewport: Cell<Rect<Au>>,
 }
 
 impl Window {
@@ -427,7 +429,9 @@ impl WindowMethods for Window {
 
     // https://html.spec.whatwg.org/multipage/#dom-windowtimers-settimeout
     fn SetTimeout_(&self, _cx: *mut JSContext, callback: DOMString, timeout: i32, args: Vec<HandleValue>) -> i32 {
-        self.timers.set_timeout_or_interval(TimerCallback::StringTimerCallback(callback),
+        let url = self.Document().url().clone();
+        let line = 0; //FIXME: get current JS execution line
+        self.timers.set_timeout_or_interval(TimerCallback::StringTimerCallback(callback, url, line),
                                             args,
                                             timeout,
                                             IsInterval::NonInterval,
@@ -450,7 +454,9 @@ impl WindowMethods for Window {
 
     // https://html.spec.whatwg.org/multipage/#dom-windowtimers-setinterval
     fn SetInterval_(&self, _cx: *mut JSContext, callback: DOMString, timeout: i32, args: Vec<HandleValue>) -> i32 {
-        self.timers.set_timeout_or_interval(TimerCallback::StringTimerCallback(callback),
+        let url = self.Document().url().clone();
+        let line = 0; //FIXME: get current JS execution line
+        self.timers.set_timeout_or_interval(TimerCallback::StringTimerCallback(callback, url, line),
                                             args,
                                             timeout,
                                             IsInterval::Interval,
@@ -1204,6 +1210,14 @@ impl Window {
             let context = r.browsing_context();
             Root::from_ref(context.as_ref().unwrap().active_window())
         })
+    }
+
+    pub fn environment_settings(&self) -> Box<EnvironmentSettings + 'static> {
+        self.browsing_context().as_ref().unwrap().environment_settings()
+    }
+
+    pub fn to_trusted(&self) -> Trusted<Window> {
+        Trusted::new(self.get_cx(), self, self.script_chan())
     }
 }
 

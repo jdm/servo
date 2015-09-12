@@ -7,11 +7,11 @@ use dom::bindings::cell::DOMRefCell;
 use dom::bindings::codegen::Bindings::FunctionBinding::Function;
 use dom::bindings::global::global_object_for_js_object;
 use dom::bindings::utils::Reflectable;
-use dom::window::ScriptHelpers;
 use euclid::length::Length;
-use js::jsapi::{HandleValue, Heap, RootedValue};
-use js::jsval::{JSVal, UndefinedValue};
+use js::jsapi::{HandleValue, Heap};
+use js::jsval::JSVal;
 use num::traits::Saturating;
+use script::{ErrorReporting, create_a_script};
 use script_traits::{MsDuration, precise_time_ms};
 use script_traits::{TimerEventChan, TimerEventId, TimerEventRequest, TimerSource};
 use std::cell::Cell;
@@ -19,6 +19,7 @@ use std::cmp::{self, Ord, Ordering};
 use std::default::Default;
 use std::rc::Rc;
 use std::sync::mpsc::Sender;
+use url::Url;
 use util::mem::HeapSizeOf;
 use util::str::DOMString;
 
@@ -98,13 +99,13 @@ impl PartialEq for Timer {
 
 #[derive(Clone)]
 pub enum TimerCallback {
-    StringTimerCallback(DOMString),
+    StringTimerCallback(DOMString, Url, usize),
     FunctionTimerCallback(Rc<Function>),
 }
 
 #[derive(JSTraceable, Clone)]
 enum InternalTimerCallback {
-    StringTimerCallback(DOMString),
+    StringTimerCallback(DOMString, Url, usize),
     FunctionTimerCallback(Rc<Function>, Rc<Vec<Heap<JSVal>>>),
 }
 
@@ -151,8 +152,8 @@ impl ActiveTimers {
         let next_call = self.base_time() + duration;
 
         let callback = match callback {
-            TimerCallback::StringTimerCallback(code_str) =>
-                InternalTimerCallback::StringTimerCallback(code_str),
+            TimerCallback::StringTimerCallback(code_str, source_url, source_line) =>
+                InternalTimerCallback::StringTimerCallback(code_str, source_url, source_line),
             TimerCallback::FunctionTimerCallback(function) => {
                 // This is a bit complicated, but this ensures that the vector's
                 // buffer isn't reallocated (and moved) after setting the Heap values
@@ -246,12 +247,14 @@ impl ActiveTimers {
 
             // step 14
             match callback {
-                InternalTimerCallback::StringTimerCallback(code_str) => {
+                InternalTimerCallback::StringTimerCallback(code_str, source_url, source_line) => {
                     let proxy = this.reflector().get_jsobject();
-                    let cx = global_object_for_js_object(proxy.get()).r().get_cx();
-                    let mut rval = RootedValue::new(cx, UndefinedValue());
-
-                    this.evaluate_js_on_global_with_result(&code_str, rval.handle_mut());
+                    let global = global_object_for_js_object(proxy.get());
+                    create_a_script(&code_str,
+                                    source_url,
+                                    source_line,
+                                    global.r().environment_settings(),
+                                    ErrorReporting::DontMuteErrors);
                 },
                 InternalTimerCallback::FunctionTimerCallback(function, arguments) => {
                     let arguments: Vec<JSVal> = arguments.iter().map(|arg| arg.get()).collect();

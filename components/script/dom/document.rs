@@ -67,6 +67,8 @@ use dom::touchlist::TouchList;
 use dom::treewalker::TreeWalker;
 use dom::uievent::UIEvent;
 use dom::window::{ReflowReason, Window};
+use encoding::all::UTF_8;
+use encoding::EncodingRef;
 use euclid::point::Point2D;
 use html5ever::tree_builder::{LimitedQuirks, NoQuirks, Quirks, QuirksMode};
 use ipc_channel::ipc::{self, IpcSender};
@@ -1355,6 +1357,19 @@ impl Document {
         if empty {
             map.remove(&JS::from_ref(el));
         }
+    }
+
+    pub fn character_encoding(&self) -> EncodingRef {
+        //TODO make this reflect the actual document's character encoding
+        UTF_8
+    }
+
+    pub fn origin(&self) -> Origin {
+        self.origin.clone()
+    }
+
+    pub fn effective_script_origin(&self) -> Origin {
+        self.effective_script_origin.clone()
     }
 }
 

@@ -14,6 +14,7 @@ use dom::bindings::js::{JS, Root};
 use dom::bindings::utils::{Reflectable, Reflector};
 use dom::window::{self, ScriptHelpers};
 use dom::workerglobalscope::WorkerGlobalScope;
+use environment_settings::EnvironmentSettings;
 use ipc_channel::ipc::IpcSender;
 use js::jsapi::{GetGlobalForObjectCrossCompartment};
 use js::jsapi::{JSContext, JSObject, JS_GetClass, MutableHandleValue};
@@ -202,6 +203,14 @@ impl<'a> GlobalRef<'a> {
         match *self {
             GlobalRef::Window(ref window) => window.reflector(),
             GlobalRef::Worker(ref worker) => worker.reflector(),
+        }
+    }
+
+    /// Returns this global's environment settings object.
+    pub fn environment_settings(&self) -> Box<EnvironmentSettings + 'static> {
+        match *self {
+            GlobalRef::Window(ref window) => window.environment_settings(),
+            GlobalRef::Worker(ref worker) => worker.environment_settings(),
         }
     }
 }

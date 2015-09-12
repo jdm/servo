@@ -23,17 +23,15 @@ use dom::htmlelement::HTMLElement;
 use dom::node::{ChildrenMutation, CloneChildrenFlag, Node};
 use dom::node::{document_from_node, window_from_node};
 use dom::virtualmethods::VirtualMethods;
-use dom::window::ScriptHelpers;
 use encoding::all::UTF_8;
 use encoding::label::encoding_from_whatwg_label;
 use encoding::types::{DecoderTrap, Encoding, EncodingRef};
 use html5ever::tree_builder::NextParserState;
 use ipc_channel::ipc;
 use ipc_channel::router::ROUTER;
-use js::jsapi::RootedValue;
-use js::jsval::UndefinedValue;
 use net_traits::{AsyncResponseListener, AsyncResponseTarget, Metadata};
 use network_listener::{NetworkListener, PreInvoke};
+use script::{create_a_script, ErrorReporting};
 use script_task::ScriptTaskEventCategory::ScriptEvent;
 use script_task::{CommonScriptMsg, Runnable, ScriptChan};
 use std::ascii::AsciiExt;
@@ -430,12 +428,10 @@ impl HTMLScriptElement {
         document.set_current_script(Some(self));
 
         // Step 2.b.6.
-        // TODO: Create a script...
+        let source_line = 0; //FIXME get the actual source position
         let window = window_from_node(self);
-        let mut rval = RootedValue::new(window.r().get_cx(), UndefinedValue());
-        window.r().evaluate_script_on_global_with_result(&*source,
-                                                         &*url.serialize(),
-                                                         rval.handle_mut());
+        let muting = ErrorReporting::DontMuteErrors; //TODO determine CORS-status of script
+        create_a_script(&*source, url, source_line, window.environment_settings(), muting);
 
         // Step 2.b.7.
         document.set_current_script(old_script.r());

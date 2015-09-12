@@ -88,6 +88,7 @@ mod devtools;
 pub mod document_loader;
 #[macro_use]
 pub mod dom;
+mod environment_settings;
 pub mod layout_interface;
 mod mem;
 mod network_listener;
@@ -96,6 +97,7 @@ pub mod page;
 pub mod parse;
 #[allow(unsafe_code)]
 pub mod script_task;
+mod script;
 pub mod textinput;
 mod timers;
 mod unpremultiplytable;
