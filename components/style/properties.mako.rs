@@ -5617,7 +5617,7 @@ mod property_bit_field {
         fn substitute_variables_${property.ident}<'a, F, R>(
             value: &DeclaredValue<longhands::${property.ident}::SpecifiedValue>,
             custom_properties: &Option<Arc<::custom_properties::ComputedValuesMap>>,
-            f: F, error_reporter: &'a (ParseErrorReporter + 'a))
+            f: F, error_reporter: Box<ParseErrorReporter + Send>)
             -> R
             where F: FnOnce(&DeclaredValue<longhands::${property.ident}::SpecifiedValue>) -> R
         {
@@ -5673,7 +5673,7 @@ pub struct PropertyDeclarationBlock {
 }
 
 
-pub fn parse_style_attribute<'a>(input: &str, base_url: &Url, error_reporter: &'a (ParseErrorReporter + 'a)) -> PropertyDeclarationBlock {
+pub fn parse_style_attribute<'a>(input: &str, base_url: &Url, error_reporter: Box<ParseErrorReporter + Send>) -> PropertyDeclarationBlock {
     let context = ParserContext::new(Origin::Author, base_url, error_reporter);
     parse_property_declaration_list(&context, &mut Parser::new(input))
 }
