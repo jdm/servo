@@ -6503,7 +6503,7 @@ pub fn cascade(viewport_size: Size2D<Au>,
 
     // This assumes that the computed and specified values have the same Rust type.
     macro_rules! get_specified(
-        ($style_struct_getter: ident, $property: ident, $declared_value: expr) => {
+        ($style_struct_getter: ident, $property: ident, $declared_value: expr, $error_reporter: expr) => {
             concat_idents!(substitute_variables_, $property)(
                 $declared_value, &custom_properties, |value| match *value {
                     DeclaredValue::Value(specified_value) => specified_value,
@@ -6557,31 +6557,31 @@ pub fn cascade(viewport_size: Size2D<Au>,
                     );
                 }
                 PropertyDeclaration::Display(ref value) => {
-                    context.display = get_specified!(get_box, display, value);
+                    context.display = get_specified!(get_box, display, value, error_reporter);
                 }
                 PropertyDeclaration::Position(ref value) => {
-                    context.positioned = match get_specified!(get_box, position, value) {
+                    context.positioned = match get_specified!(get_box, position, value, error_reporter) {
                         longhands::position::SpecifiedValue::absolute |
                         longhands::position::SpecifiedValue::fixed => true,
                         _ => false,
                     }
                 }
                 PropertyDeclaration::OverflowX(ref value) => {
-                    context.overflow_x = get_specified!(get_box, overflow_x, value);
+                    context.overflow_x = get_specified!(get_box, overflow_x, value, error_reporter);
                 }
                 PropertyDeclaration::OverflowY(ref value) => {
-                    context.overflow_y = get_specified!(get_box, overflow_y, value);
+                    context.overflow_y = get_specified!(get_box, overflow_y, value, error_reporter);
                 }
                 PropertyDeclaration::Float(ref value) => {
-                    context.floated = get_specified!(get_box, float, value)
+                    context.floated = get_specified!(get_box, float, value, error_reporter)
                                       != longhands::float::SpecifiedValue::none;
                 }
                 PropertyDeclaration::TextDecoration(ref value) => {
-                    context.text_decoration = get_specified!(get_text, text_decoration, value);
+                    context.text_decoration = get_specified!(get_text, text_decoration, value, error_reporter);
                 }
                 PropertyDeclaration::OutlineStyle(ref value) => {
                     context.outline_style_present =
-                        match get_specified!(get_outline, outline_style, value) {
+                        match get_specified!(get_outline, outline_style, value, error_reporter) {
                             BorderStyle::none => false,
                             _ => true,
                         };
@@ -6589,7 +6589,7 @@ pub fn cascade(viewport_size: Size2D<Au>,
                 % for side in ["top", "right", "bottom", "left"]:
                     PropertyDeclaration::Border${side.capitalize()}Style(ref value) => {
                         context.border_${side}_present =
-                            match get_specified!(get_border, border_${side}_style, value) {
+                            match get_specified!(get_border, border_${side}_style, value, error_reporter) {
                                 BorderStyle::none | BorderStyle::hidden => false,
                                 _ => true,
                             };
