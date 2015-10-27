@@ -6512,7 +6512,7 @@ pub fn cascade(viewport_size: Size2D<Au>,
                         inherited_style.$style_struct_getter().$property.clone()
                     }
                     DeclaredValue::WithVariables { .. } => unreachable!()
-                }
+                }, $error_reporter
             )
         };
     );
