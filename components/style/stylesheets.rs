@@ -16,9 +16,10 @@ use std::cell::Cell;
 use std::iter::Iterator;
 use std::slice;
 use string_cache::{Atom, Namespace};
+use style_traits::ParseErrorReporter;
 use url::Url;
 use viewport::ViewportRule;
-use style_traits::ParseErrorReporter;
+
 
 /// Each style rule has an origin, which determines where it enters the cascade.
 ///
@@ -76,9 +77,10 @@ pub struct StyleRule {
 
 
 impl Stylesheet {
-    pub fn from_bytes_iter<'a, I: Iterator<Item=Vec<u8>>>(
+    pub fn from_bytes_iter<I: Iterator<Item=Vec<u8>>>(
             input: I, base_url: Url, protocol_encoding_label: Option<&str>,
-            environment_encoding: Option<EncodingRef>, origin: Origin, error_reporter: &'a (ParseErrorReporter + 'a)) -> Stylesheet {
+            environment_encoding: Option<EncodingRef>, origin: Origin,
+            error_reporter: Box<ParseErrorReporter + Send>) -> Stylesheet {
         let mut bytes = vec![];
         // TODO: incremental decoding and tokenization/parsing
         for chunk in input {
@@ -88,11 +90,11 @@ impl Stylesheet {
                                environment_encoding, origin, error_reporter)
     }
 
-    pub fn from_bytes<'a>(bytes: &[u8],
+    pub fn from_bytes(bytes: &[u8],
                       base_url: Url,
                       protocol_encoding_label: Option<&str>,
                       environment_encoding: Option<EncodingRef>,
-                      origin: Origin, error_reporter: &'a (ParseErrorReporter + 'a))
+                      origin: Origin, error_reporter: Box<ParseErrorReporter + Send>)
                       -> Stylesheet {
         // TODO: bytes.as_slice could be bytes.container_as_bytes()
         let (string, _) = decode_stylesheet_bytes(
@@ -100,7 +102,8 @@ impl Stylesheet {
         Stylesheet::from_str(&string, base_url, origin, error_reporter)
     }
 
-    pub fn from_str<'a>(css: &str, base_url: Url, origin: Origin, error_reporter: &'a (ParseErrorReporter + 'a)) -> Stylesheet {
+    pub fn from_str(css: &str, base_url: Url, origin: Origin,
+                    error_reporter: Box<ParseErrorReporter + Send>) -> Stylesheet {
         let rule_parser = TopLevelRuleParser {
             context: ParserContext::new(origin, &base_url, error_reporter),
             state: Cell::new(State::Start),
