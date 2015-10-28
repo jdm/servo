@@ -6348,7 +6348,7 @@ fn cascade_with_cached_declarations(
                                                             .clone()
                                             }
                                             DeclaredValue::WithVariables { .. } => unreachable!()
-                                        }
+                                        }, error_reporter
                                     );
                                     Arc::make_mut(&mut style_${style_struct.ident})
                                         .${property.ident} = computed_value;
@@ -6448,7 +6448,8 @@ pub fn cascade(viewport_size: Size2D<Au>,
                applicable_declarations: &[DeclarationBlock<Vec<PropertyDeclaration>>],
                shareable: bool,
                parent_style: Option< &ComputedValues >,
-               cached_style: Option< &ComputedValues >)
+               cached_style: Option< &ComputedValues >,
+               error_reporter: Box<ParseErrorReporter + Send>)
                -> (ComputedValues, bool) {
     let initial_values = &*INITIAL_VALUES;
     let (is_root_element, inherited_style) = match parent_style {
