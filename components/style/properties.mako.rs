@@ -6542,7 +6542,7 @@ pub fn cascade(viewport_size: Size2D<Au>,
                             DeclaredValue::Initial => longhands::font_size::get_initial_value(),
                             DeclaredValue::Inherit => context.inherited_font_size,
                             DeclaredValue::WithVariables { .. } => unreachable!(),
-                        }
+                        }, error_reporter
                     );
                 }
                 PropertyDeclaration::Color(ref value) => {
@@ -6554,7 +6554,7 @@ pub fn cascade(viewport_size: Size2D<Au>,
                             DeclaredValue::Initial => longhands::color::get_initial_value(),
                             DeclaredValue::Inherit => inherited_style.get_color().color.clone(),
                             DeclaredValue::WithVariables { .. } => unreachable!(),
-                        }
+                        }, error_reporter
                     );
                 }
                 PropertyDeclaration::Display(ref value) => {
