@@ -13,13 +13,14 @@ use selectors::matching::{Rule, SelectorMap};
 use selectors::parser::PseudoElement;
 use smallvec::VecLike;
 use std::process;
+use style_traits::ParseErrorReporter;
 use style_traits::viewport::ViewportConstraints;
 use stylesheets::{CSSRuleIteratorExt, Origin, Stylesheet};
 use url::Url;
 use util::opts;
 use util::resource_files::read_resource_file;
 use viewport::{MaybeNew, ViewportRuleCascade};
-use style_traits::ParseErrorReporter;
+
 
 
 pub type DeclarationBlock = GenericDeclarationBlock<Vec<PropertyDeclaration>>;

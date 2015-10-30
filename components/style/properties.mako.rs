@@ -5673,7 +5673,8 @@ pub struct PropertyDeclarationBlock {
 }
 
 
-pub fn parse_style_attribute(input: &str, base_url: &Url, error_reporter: Box<ParseErrorReporter + Send>) -> PropertyDeclarationBlock {
+pub fn parse_style_attribute(input: &str, base_url: &Url, error_reporter: Box<ParseErrorReporter + Send>)
+                             -> PropertyDeclarationBlock {
     let context = ParserContext::new(Origin::Author, base_url, error_reporter);
     parse_property_declaration_list(&context, &mut Parser::new(input))
 }
