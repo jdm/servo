@@ -46,7 +46,7 @@ pub struct Stylist {
 
 impl Stylist {
     #[inline]
-    pub fn new<'a>(device: Device, error_reporter: &'a (ParseErrorReporter + 'a)) -> Stylist {
+    pub fn new(device: Device, error_reporter: Box<ParseErrorReporter + Send>) -> Stylist {
         let mut stylist = Stylist {
             stylesheets: vec!(),
             device: device,
@@ -173,7 +173,7 @@ impl Stylist {
         self.is_dirty |= is_dirty;
     }
 
-    pub fn add_quirks_mode_stylesheet<'a>(&mut self, error_reporter: &'a (ParseErrorReporter + 'a)) {
+    pub fn add_quirks_mode_stylesheet(&mut self, error_reporter: Box<ParseErrorReporter + Send>) {
         match read_resource_file(&["quirks-mode.css"]) {
             Ok(res) => {
             self.add_stylesheet(Stylesheet::from_bytes(
