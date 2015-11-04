@@ -21,7 +21,7 @@ use dom::eventtarget::EventTarget;
 use dom::window::{base64_atob, base64_btoa};
 use dom::workerlocation::WorkerLocation;
 use dom::workernavigator::WorkerNavigator;
-use environment_settings::{EnvironmentSettings, HttpsState};
+use environment_settings::{EnvironmentSettings, HttpsState, ScriptSettingsStack};
 use ipc_channel::ipc::IpcSender;
 use js::jsapi::{HandleValue, JSAutoRequest, JSContext};
 use js::rust::Runtime;
@@ -29,6 +29,7 @@ use msg::constellation_msg::{ConstellationChan, PipelineId, WorkerId};
 use net_traits::{ResourceTask, load_whole_resource};
 use origin::Origin;
 use profile_traits::mem;
+use script::{create_a_script, ErrorReporting};
 use script_task::{CommonScriptMsg, ScriptChan, ScriptPort};
 use script_traits::{TimerEventChan, TimerEventId, TimerEventRequest, TimerSource};
 use std::cell::Cell;
@@ -192,9 +193,12 @@ impl WorkerGlobalScopeMethods for WorkerGlobalScope {
 
     // https://html.spec.whatwg.org/multipage/#dom-workerglobalscope-importscripts
     fn ImportScripts(&self, url_strings: Vec<DOMString>) -> ErrorResult {
+        let base_url =
+            ScriptSettingsStack::incumbent_settings_object(|settings| settings.api_base_url());
+
         let mut urls = Vec::with_capacity(url_strings.len());
         for url in url_strings {
-            let url = UrlParser::new().base_url(&self.worker_url)
+            let url = UrlParser::new().base_url(base_url.as_ref().unwrap())
                                       .parse(&url);
             match url {
                 Ok(url) => urls.push(url),
@@ -210,14 +214,8 @@ impl WorkerGlobalScopeMethods for WorkerGlobalScope {
                 }
             };
 
-            match self.runtime.evaluate_script(
-                self.reflector().get_jsobject(), source, url.serialize(), 1) {
-                Ok(_) => (),
-                Err(_) => {
-                    println!("evaluate_script failed");
-                    return Err(Error::JSFailed);
-                }
-            }
+            let muted = ErrorReporting::DontMuteErrors; //TODO determine CORS state of script
+            create_a_script(&source, url, 1, self.environment_settings(), muted);
         }
 
         Ok(())
