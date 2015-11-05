@@ -750,7 +750,7 @@ def getJSToNativeConversionInfo(type, descriptorProvider, failureCode=None,
         if descriptor.interface.isCallback():
             name = descriptor.nativeType
             declType = CGWrapper(CGGeneric(name), pre="Rc<", post=">")
-            template = "%s::new(${val}.get().to_object())" % name
+            template = "%s::new(${val}.get().to_object(), ScriptSettingsStack::incumbent_settings_object(|obj| obj.clone()).unwrap())" % name
             if type.nullable():
                 declType = CGWrapper(declType, pre="Option<", post=">")
                 template = wrapObjectTemplate("Some(%s)" % template, "None",
@@ -1948,7 +1948,7 @@ class CGGeneric(CGThing):
 
 class CGCallbackTempRoot(CGGeneric):
     def __init__(self, name):
-        CGGeneric.__init__(self, "%s::new(${val}.get().to_object())" % name)
+        CGGeneric.__init__(self, "%s::new(${val}.get().to_object(), ScriptSettingsStack::incumbent_settings_object(|obj| obj.clone()).unwrap())" % name)
 
 
 def getAllTypes(descriptors, dictionaries, callbacks):
@@ -5238,6 +5238,7 @@ class CGBindingRoot(CGThing):
             'dom::bindings::num::Finite',
             'dom::bindings::str::ByteString',
             'dom::bindings::str::USVString',
+            'environment_settings::{EnvironmentSettings, ScriptSettingsStack}',
             'mem::heap_size_of_raw_self_and_children',
             'libc',
             'util::str::DOMString',
@@ -5360,13 +5361,15 @@ class CGCallback(CGClass):
 
     def getConstructors(self):
         return [ClassConstructor(
-            [Argument("*mut JSObject", "aCallback")],
-            bodyInHeader=True,
-            visibility="pub",
-            explicit=False,
-            baseConstructors=[
-                "%s::new()" % self.baseName
-            ])]
+                [Argument("*mut JSObject", "aCallback"),
+                 Argument("Box<EnvironmentSettings + 'static>", "script_settings")],
+                bodyInHeader=True,
+                visibility="pub",
+                explicit=False,
+                baseConstructors=[
+                    "%s::new(script_settings)" % self.baseName
+                ]),
+            ]
 
     def getMethodImpls(self, method):
         assert method.needThisHandling
@@ -5459,12 +5462,16 @@ class CGCallbackFunctionImpl(CGGeneric):
     def __init__(self, callback):
         impl = string.Template("""\
 impl CallbackContainer for ${type} {
-    fn new(callback: *mut JSObject) -> Rc<${type}> {
-        ${type}::new(callback)
+    fn new(callback: *mut JSObject, settings_object: Box<EnvironmentSettings + 'static>) -> Rc<${type}> {
+        ${type}::new(callback, settings_object)
     }
 
     fn callback(&self) -> *mut JSObject {
         self.parent.callback()
+    }
+
+    fn script_settings(&self) -> Box<EnvironmentSettings + 'static> {
+        self.parent.script_settings()
     }
 }
 

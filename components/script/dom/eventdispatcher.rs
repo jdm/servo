@@ -10,7 +10,7 @@ use dom::bindings::global::{GlobalRoot, global_object_for_reflector};
 use dom::bindings::js::{JS, Root, RootedReference};
 use dom::bindings::trace::RootedVec;
 use dom::event::{Event, EventPhase};
-use dom::eventtarget::{EventListenerType, EventTarget, ListenerPhase};
+use dom::eventtarget::{EventTarget, ListenerPhase, CompiledEventListener};
 use dom::node::Node;
 use dom::virtualmethods::vtable_for;
 use dom::window::Window;
@@ -35,7 +35,7 @@ impl Drop for AutoDOMEventMarker {
     }
 }
 
-fn handle_event(window: Option<&Window>, listener: &EventListenerType,
+fn handle_event(window: Option<&Window>, listener: &CompiledEventListener,
                 current_target: &EventTarget, event: &Event) {
     let _marker;
     if let Some(window) = window {
@@ -67,8 +67,8 @@ fn dispatch_to_listeners(event: &Event, target: &EventTarget, chain: &[&EventTar
     for cur_target in chain.iter().rev() {
         if let Some(listeners) = cur_target.get_listeners_for(&type_, ListenerPhase::Capturing) {
             event.set_current_target(cur_target);
-            for listener in &listeners {
-                handle_event(window.r(), listener, *cur_target, event);
+            for listener in listeners {
+                handle_event(window.r(), &listener, *cur_target, event);
 
                 if event.stop_immediate() {
                     return;
@@ -113,8 +113,8 @@ fn dispatch_to_listeners(event: &Event, target: &EventTarget, chain: &[&EventTar
     for cur_target in chain {
         if let Some(listeners) = cur_target.get_listeners_for(&type_, ListenerPhase::Bubbling) {
             event.set_current_target(cur_target);
-            for listener in &listeners {
-                handle_event(window.r(), listener, *cur_target, event);
+            for listener in listeners {
+                handle_event(window.r(), &listener, *cur_target, event);
 
                 if event.stop_immediate() {
                     return;

@@ -6,6 +6,7 @@
 
 use dom::bindings::global::GlobalRoot;
 use dom::bindings::js::Root;
+use dom::bindings::trace::JSTraceable;
 use dom::document::Document;
 use encoding::EncodingRef;
 use origin::Origin;
@@ -20,7 +21,7 @@ pub enum HttpsState {
 }
 
 /// https://html.spec.whatwg.org/multipage/#environment-settings-object
-pub trait EnvironmentSettings {
+pub trait EnvironmentSettings: JSTraceable {
     fn global(&self) -> GlobalRoot;
     fn responsible_event_loop(&self) -> Box<ScriptChan + Send>;
     fn responsible_document(&self) -> Option<Root<Document>>;

@@ -7,6 +7,7 @@
 use dom::bindings::error::{Error, Fallible};
 use dom::bindings::global::global_object_for_js_object;
 use dom::bindings::utils::Reflectable;
+use environment_settings::{EnvironmentSettings, ScriptSettingsStack};
 use js::jsapi::GetGlobalForObjectCrossCompartment;
 use js::jsapi::{Heap, MutableHandleObject, RootedObject, RootedValue};
 use js::jsapi::{IsCallable, JSContext, JSObject, JS_WrapObject};
@@ -39,10 +40,11 @@ pub struct CallbackFunction {
 
 impl CallbackFunction {
     /// Create a new `CallbackFunction` for this object.
-    pub fn new() -> CallbackFunction {
+    pub fn new(script_settings: Box<EnvironmentSettings + 'static>) -> CallbackFunction {
         CallbackFunction {
             object: CallbackObject {
-                callback: Heap::default()
+                callback: Heap::default(),
+                script_settings: script_settings,
             }
         }
     }
@@ -67,6 +69,7 @@ pub struct CallbackInterface {
 struct CallbackObject {
     /// The underlying `JSObject`.
     callback: Heap<*mut JSObject>,
+    script_settings: Box<EnvironmentSettings + 'static>,
 }
 
 impl PartialEq for CallbackObject {
@@ -79,15 +82,22 @@ impl PartialEq for CallbackObject {
 /// callback interface types.
 pub trait CallbackContainer {
     /// Create a new CallbackContainer object for the given `JSObject`.
-    fn new(callback: *mut JSObject) -> Rc<Self>;
+    fn new(callback: *mut JSObject, script_settings: Box<EnvironmentSettings + 'static>) -> Rc<Self>;
     /// Returns the underlying `JSObject`.
     fn callback(&self) -> *mut JSObject;
+    /// Returns the script settings object for the given callback.
+    fn script_settings(&self) -> Box<EnvironmentSettings + 'static>;
 }
 
 impl CallbackInterface {
     /// Returns the underlying `JSObject`.
     pub fn callback(&self) -> *mut JSObject {
         self.object.callback.get()
+    }
+
+    /// Returns the environment settings object associated with this callback.
+    pub fn script_settings(&self) -> Box<EnvironmentSettings + 'static> {
+        self.object.script_settings.clone()
     }
 }
 
@@ -96,14 +106,20 @@ impl CallbackFunction {
     pub fn callback(&self) -> *mut JSObject {
         self.object.callback.get()
     }
+
+    /// Returns the environment settings object associated with this callback.
+    pub fn script_settings(&self) -> Box<EnvironmentSettings + 'static> {
+        self.object.script_settings.clone()
+    }
 }
 
 impl CallbackInterface {
     /// Create a new CallbackInterface object for the given `JSObject`.
-    pub fn new() -> CallbackInterface {
+    pub fn new(script_settings: Box<EnvironmentSettings + 'static>) -> CallbackInterface {
         CallbackInterface {
             object: CallbackObject {
-                callback: Heap::default()
+                callback: Heap::default(),
+                script_settings: script_settings,
             }
         }
     }
@@ -174,6 +190,8 @@ impl CallSetup {
         let cx = global.r().get_cx();
         unsafe { JS_BeginRequest(cx); }
 
+        ScriptSettingsStack::push(callback.script_settings());
+
         let exception_compartment = unsafe {
             GetGlobalForObjectCrossCompartment(callback.callback())
         };
@@ -195,6 +213,8 @@ impl CallSetup {
 
 impl Drop for CallSetup {
     fn drop(&mut self) {
+        ScriptSettingsStack::pop_incumbent_settings_object();
+
         unsafe { JS_LeaveCompartment(self.cx, self.old_compartment); }
         let need_to_deal_with_exception =
             self.handling == ExceptionHandling::Report &&

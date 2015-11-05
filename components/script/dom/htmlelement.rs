@@ -332,7 +332,9 @@ impl VirtualMethods for HTMLElement {
                                             window.r().get_url(),
                                             window.r().reflector().get_jsobject());
                 let evtarget = self.upcast::<EventTarget>();
-                evtarget.set_event_handler_uncompiled(cx, url, reflector,
+                let source_line = 1; //TODO get current JS execution line
+                evtarget.set_event_handler_uncompiled(url,
+                                                      source_line,
                                                       &name[2..],
                                                       (**attr.value()).to_owned());
             },
