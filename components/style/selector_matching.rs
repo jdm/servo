@@ -70,7 +70,7 @@ impl Stylist {
                         None,
                         None,
                         Origin::UserAgent,
-                        error_reporter);
+                        error_reporter.clone());
                     stylist.add_stylesheet(ua_stylesheet);
                 }
                 Err(..) => {
@@ -81,7 +81,7 @@ impl Stylist {
         }
         for &(ref contents, ref url) in &opts::get().user_stylesheets {
             stylist.add_stylesheet(Stylesheet::from_bytes(
-                &contents, url.clone(), None, None, Origin::User, error_reporter));
+                &contents, url.clone(), None, None, Origin::User, error_reporter.clone()));
         }
         stylist
     }

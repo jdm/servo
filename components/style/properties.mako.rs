@@ -136,6 +136,7 @@ pub mod longhands {
             use properties::{ComputedValues, PropertyDeclaration};
             use std::collections::HashMap;
             use std::sync::Arc;
+            use style_traits::ParseErrorReporter;
             use values::computed::ToComputedValue;
             use values::{computed, specified};
             use string_cache::Atom;
@@ -146,7 +147,8 @@ pub mod longhands {
                                     inherited_style: &ComputedValues,
                                     context: &computed::Context,
                                     seen: &mut PropertyBitField,
-                                    cacheable: &mut bool) {
+                                    cacheable: &mut bool,
+                                    error_reporter: Box<ParseErrorReporter + Send>) {
                 let declared_value = match *declaration {
                     PropertyDeclaration::${property.camel_case}(ref declared_value) => {
                         declared_value
@@ -175,7 +177,7 @@ pub mod longhands {
                                                .${property.ident}
                                                .clone()
                             }
-                        }
+                        }, error_reporter.clone()
                     );
                     Arc::make_mut(&mut style.${THIS_STYLE_STRUCT.ident}).${property.ident} =
                         computed_value;
@@ -187,7 +189,8 @@ pub mod longhands {
                                                 inherited_style,
                                                 context,
                                                 seen,
-                                                cacheable);
+                                                cacheable,
+                                                error_reporter);
                     % endif
                 % else:
                     // Do not allow stylesheets to set derived properties.
@@ -534,7 +537,8 @@ pub mod longhands {
                                    _inherited_style: &ComputedValues,
                                    context: &computed::Context,
                                    _seen: &mut PropertyBitField,
-                                   _cacheable: &mut bool) {
+                                   _cacheable: &mut bool,
+                                   _error_reporter: Box<ParseErrorReporter + Send>) {
             Arc::make_mut(&mut style.box_)._servo_display_for_hypothetical_box =
                 longhands::_servo_display_for_hypothetical_box::derive_from_display(
                     *computed_value,
@@ -2250,7 +2254,8 @@ pub mod longhands {
                                    _inherited_style: &ComputedValues,
                                    context: &computed::Context,
                                    _seen: &mut PropertyBitField,
-                                   _cacheable: &mut bool) {
+                                   _cacheable: &mut bool,
+                                   _error_reporter: Box<ParseErrorReporter + Send>) {
             Arc::make_mut(&mut style.inheritedtext)._servo_text_decorations_in_effect =
                 longhands::_servo_text_decorations_in_effect::derive_from_text_decoration(
                     *computed_value,
@@ -5678,9 +5683,9 @@ pub fn parse_style_attribute(input: &str, base_url: &Url, error_reporter: Box<Pa
     parse_property_declaration_list(&context, &mut Parser::new(input))
 }
 
-pub fn parse_one_declaration(name: &str, input: &str, base_url: &Url)
+pub fn parse_one_declaration(name: &str, input: &str, base_url: &Url, error_reporter: Box<ParseErrorReporter + Send>)
                              -> Result<Vec<PropertyDeclaration>, ()> {
-    let context = ParserContext::new(Origin::Author, base_url);
+    let context = ParserContext::new(Origin::Author, base_url, error_reporter);
     let mut results = vec![];
     match PropertyDeclaration::parse(name, &context, &mut Parser::new(input), &mut results) {
         PropertyDeclarationParseResult::ValidOrIgnoredDeclaration => Ok(results),
@@ -6304,7 +6309,8 @@ fn cascade_with_cached_declarations(
         parent_style: &ComputedValues,
         cached_style: &ComputedValues,
         custom_properties: Option<Arc<::custom_properties::ComputedValuesMap>>,
-        context: &computed::Context)
+        context: &computed::Context,
+        error_reporter: Box<ParseErrorReporter + Send>)
         -> ComputedValues {
     % for style_struct in STYLE_STRUCTS:
         % if style_struct.inherited:
@@ -6348,7 +6354,7 @@ fn cascade_with_cached_declarations(
                                                             .clone()
                                             }
                                             DeclaredValue::WithVariables { .. } => unreachable!()
-                                        }, error_reporter
+                                        }, error_reporter.clone()
                                     );
                                     Arc::make_mut(&mut style_${style_struct.ident})
                                         .${property.ident} = computed_value;
@@ -6403,7 +6409,8 @@ type CascadePropertyFn = extern "Rust" fn(declaration: &PropertyDeclaration,
                                           inherited_style: &ComputedValues,
                                           context: &computed::Context,
                                           seen: &mut PropertyBitField,
-                                          cacheable: &mut bool);
+                                          cacheable: &mut bool,
+                                          error_reporter: Box<ParseErrorReporter + Send>);
 
 // This is a thread-local rather than a lazy static to avoid atomic operations when cascading
 // properties.
@@ -6513,7 +6520,7 @@ pub fn cascade(viewport_size: Size2D<Au>,
                         inherited_style.$style_struct_getter().$property.clone()
                     }
                     DeclaredValue::WithVariables { .. } => unreachable!()
-                }, $error_reporter
+                }, $error_reporter.clone()
             )
         };
     );
@@ -6542,7 +6549,7 @@ pub fn cascade(viewport_size: Size2D<Au>,
                             DeclaredValue::Initial => longhands::font_size::get_initial_value(),
                             DeclaredValue::Inherit => context.inherited_font_size,
                             DeclaredValue::WithVariables { .. } => unreachable!(),
-                        }, error_reporter
+                        }, error_reporter.clone()
                     );
                 }
                 PropertyDeclaration::Color(ref value) => {
@@ -6554,35 +6561,35 @@ pub fn cascade(viewport_size: Size2D<Au>,
                             DeclaredValue::Initial => longhands::color::get_initial_value(),
                             DeclaredValue::Inherit => inherited_style.get_color().color.clone(),
                             DeclaredValue::WithVariables { .. } => unreachable!(),
-                        }, error_reporter
+                        }, error_reporter.clone()
                     );
                 }
                 PropertyDeclaration::Display(ref value) => {
-                    context.display = get_specified!(get_box, display, value, error_reporter);
+                    context.display = get_specified!(get_box, display, value, error_reporter.clone());
                 }
                 PropertyDeclaration::Position(ref value) => {
-                    context.positioned = match get_specified!(get_box, position, value, error_reporter) {
+                    context.positioned = match get_specified!(get_box, position, value, error_reporter.clone()) {
                         longhands::position::SpecifiedValue::absolute |
                         longhands::position::SpecifiedValue::fixed => true,
                         _ => false,
                     }
                 }
                 PropertyDeclaration::OverflowX(ref value) => {
-                    context.overflow_x = get_specified!(get_box, overflow_x, value, error_reporter);
+                    context.overflow_x = get_specified!(get_box, overflow_x, value, error_reporter.clone());
                 }
                 PropertyDeclaration::OverflowY(ref value) => {
-                    context.overflow_y = get_specified!(get_box, overflow_y, value, error_reporter);
+                    context.overflow_y = get_specified!(get_box, overflow_y, value, error_reporter.clone());
                 }
                 PropertyDeclaration::Float(ref value) => {
-                    context.floated = get_specified!(get_box, float, value, error_reporter)
+                    context.floated = get_specified!(get_box, float, value, error_reporter.clone())
                                       != longhands::float::SpecifiedValue::none;
                 }
                 PropertyDeclaration::TextDecoration(ref value) => {
-                    context.text_decoration = get_specified!(get_text, text_decoration, value, error_reporter);
+                    context.text_decoration = get_specified!(get_text, text_decoration, value, error_reporter.clone());
                 }
                 PropertyDeclaration::OutlineStyle(ref value) => {
                     context.outline_style_present =
-                        match get_specified!(get_outline, outline_style, value, error_reporter) {
+                        match get_specified!(get_outline, outline_style, value, error_reporter.clone()) {
                             BorderStyle::none => false,
                             _ => true,
                         };
@@ -6590,7 +6597,7 @@ pub fn cascade(viewport_size: Size2D<Au>,
                 % for side in ["top", "right", "bottom", "left"]:
                     PropertyDeclaration::Border${side.capitalize()}Style(ref value) => {
                         context.border_${side}_present =
-                            match get_specified!(get_border, border_${side}_style, value, error_reporter) {
+                            match get_specified!(get_border, border_${side}_style, value, error_reporter.clone()) {
                                 BorderStyle::none | BorderStyle::hidden => false,
                                 _ => true,
                             };
@@ -6608,7 +6615,8 @@ pub fn cascade(viewport_size: Size2D<Au>,
                                                      parent_style,
                                                      cached_style,
                                                      custom_properties,
-                                                     &context), false)
+                                                     &context,
+                                                     error_reporter), false)
         }
         (_, _) => {}
     }
@@ -6652,7 +6660,8 @@ pub fn cascade(viewport_size: Size2D<Au>,
                                                           inherited_style,
                                                           &context,
                                                           &mut seen,
-                                                          &mut cacheable);
+                                                          &mut cacheable,
+                                                          error_reporter.clone());
             }
         }
     });

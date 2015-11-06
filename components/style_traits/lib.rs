@@ -27,4 +27,5 @@ pub mod viewport;
 
 pub trait ParseErrorReporter {
     fn report_error(&self);
+    fn clone(&self) -> Box<ParseErrorReporter + Send>;
 }
