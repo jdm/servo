@@ -6,17 +6,22 @@
 
 use dom::bindings::global::{GlobalRef, GlobalRoot, global_root_from_reflector};
 use dom::bindings::js::Root;
-use js::jsapi::{HandleObject, JSContext, JSObject};
+use heapsize::HeapSizeOf;
+use js::jsapi::{HandleObject, JSContext, JSObject, JS_updateMallocCounter};
 use std::cell::UnsafeCell;
 use std::ptr;
 
 /// Create the reflector for a new DOM object and yield ownership to the
 /// reflector.
-pub fn reflect_dom_object<T: Reflectable>(obj: Box<T>,
-                                          global: GlobalRef,
-                                          wrap_fn: fn(*mut JSContext, GlobalRef, Box<T>) -> Root<T>)
-                                          -> Root<T> {
-    wrap_fn(global.get_cx(), global, obj)
+pub fn reflect_dom_object<T>(obj: Box<T>,
+                             global: GlobalRef,
+                             wrap_fn: fn(*mut JSContext, GlobalRef, Box<T>) -> Root<T>)
+                             -> Root<T> where T: Reflectable + HeapSizeOf {
+    let cx = global.get_cx();
+    unsafe {
+        JS_updateMallocCounter(cx, obj.heap_size_of_children());
+    }
+    wrap_fn(cx, global, obj)
 }
 
 /// A struct to store a reference to the reflector of a DOM object.

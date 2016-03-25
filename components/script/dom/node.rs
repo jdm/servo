@@ -1285,7 +1285,7 @@ pub enum CloneChildrenFlag {
 fn as_uintptr<T>(t: &T) -> uintptr_t { t as *const T as uintptr_t }
 
 impl Node {
-    pub fn reflect_node<N: DerivedFrom<Node> + Reflectable>
+    pub fn reflect_node<N: DerivedFrom<Node> + Reflectable + HeapSizeOf>
             (node:      Box<N>,
              document:  &Document,
              wrap_fn:   extern "Rust" fn(*mut JSContext, GlobalRef, Box<N>) -> Root<N>)

@@ -56,7 +56,7 @@ use js::jsapi::{DOMProxyShadowsResult, HandleId, HandleObject, RootedValue};
 use js::jsapi::{DisableIncrementalGC, JS_AddExtraGCRootsTracer, JS_SetWrapObjectCallbacks};
 use js::jsapi::{GCDescription, GCProgress, JSGCInvocationKind, SetGCSliceCallback};
 use js::jsapi::{JSAutoRequest, JSGCStatus, JS_GetRuntime, JS_SetGCCallback, SetDOMCallbacks};
-use js::jsapi::{JSContext, JSRuntime, JSTracer};
+use js::jsapi::{JSContext, JSRuntime, JSTracer, JS_SetGCParameter, JSGCParamKey};
 use js::jsapi::{JSObject, SetPreserveWrapperCallback};
 use js::jsval::UndefinedValue;
 use js::rust::Runtime;
@@ -718,6 +718,31 @@ impl ScriptThread {
         unsafe {
             JS_AddExtraGCRootsTracer(runtime.rt(), Some(trace_rust_roots), ptr::null_mut());
             JS_AddExtraGCRootsTracer(runtime.rt(), Some(trace_refcounted_objects), ptr::null_mut());
+
+            JS_SetGCParameter(runtime.rt(), JSGCParamKey::JSGC_MAX_MALLOC_BYTES,
+                              128 * 1024 * 1024);
+            JS_SetGCParameter(runtime.rt(), JSGCParamKey::JSGC_HIGH_FREQUENCY_TIME_LIMIT,
+                              1000);
+            JS_SetGCParameter(runtime.rt(), JSGCParamKey::JSGC_LOW_FREQUENCY_HEAP_GROWTH,
+                              150);
+            JS_SetGCParameter(runtime.rt(), JSGCParamKey::JSGC_HIGH_FREQUENCY_HEAP_GROWTH_MIN,
+                              150);
+            JS_SetGCParameter(runtime.rt(), JSGCParamKey::JSGC_HIGH_FREQUENCY_HEAP_GROWTH_MAX,
+                              300);
+            JS_SetGCParameter(runtime.rt(), JSGCParamKey::JSGC_HIGH_FREQUENCY_LOW_LIMIT,
+                              100);
+            JS_SetGCParameter(runtime.rt(), JSGCParamKey::JSGC_HIGH_FREQUENCY_HIGH_LIMIT,
+                              500);
+            JS_SetGCParameter(runtime.rt(), JSGCParamKey::JSGC_ALLOCATION_THRESHOLD,
+                              30);
+            JS_SetGCParameter(runtime.rt(), JSGCParamKey::JSGC_DECOMMIT_THRESHOLD,
+                              32);
+            JS_SetGCParameter(runtime.rt(), JSGCParamKey::JSGC_MIN_EMPTY_CHUNK_COUNT,
+                              1);
+            JS_SetGCParameter(runtime.rt(), JSGCParamKey::JSGC_MAX_EMPTY_CHUNK_COUNT,
+                              30);
+            JS_SetGCParameter(runtime.rt(), JSGCParamKey::JSGC_COMPACTING_ENABLED,
+                              true as u32);
         }
 
         // Needed for debug assertions about whether GC is running.
