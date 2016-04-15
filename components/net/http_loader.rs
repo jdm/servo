@@ -2,8 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-
 use brotli::Decompressor;
+use content_blocker_parser::RuleList;
 use cookie;
 use cookie_storage::CookieStorage;
 use devtools_traits::{ChromeToDevtoolsControlMsg, DevtoolsControlMsg, HttpRequest as DevtoolsHttpRequest};
@@ -127,6 +127,7 @@ pub struct HttpState {
     pub hsts_list: Arc<RwLock<HSTSList>>,
     pub cookie_jar: Arc<RwLock<CookieStorage>>,
     pub auth_cache: Arc<RwLock<HashMap<Url, AuthCacheEntry>>>,
+    pub blocked_content: Arc<Option<RuleList>>,
 }
 
 impl HttpState {
@@ -135,6 +136,7 @@ impl HttpState {
             hsts_list: Arc::new(RwLock::new(HSTSList::new())),
             cookie_jar: Arc::new(RwLock::new(CookieStorage::new())),
             auth_cache: Arc::new(RwLock::new(HashMap::new())),
+            blocked_content: Arc::new(None),
         }
     }
 }

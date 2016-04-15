@@ -5,6 +5,7 @@
 //! A thread that takes a URL and streams back the binary data.
 
 use about_loader;
+use content_blocker::BLOCKED_CONTENT_RULES;
 use cookie;
 use cookie_storage::CookieStorage;
 use data_loader;
@@ -348,7 +349,8 @@ impl ResourceManager {
                 let http_state = HttpState {
                     hsts_list: self.hsts_list.clone(),
                     cookie_jar: self.cookie_jar.clone(),
-                    auth_cache: self.auth_cache.clone()
+                    auth_cache: self.auth_cache.clone(),
+                    blocked_content: BLOCKED_CONTENT_RULES.clone(),
                 };
                 http_loader::factory(self.user_agent.clone(),
                                      http_state,
