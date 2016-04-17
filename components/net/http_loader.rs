@@ -3,7 +3,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use brotli::Decompressor;
-use content_blocker_parser::RuleList;
+use content_blocker_parser::process_rules_for_request;
+use content_blocker_parser::{RuleList, Reaction, ResourceType, LoadType, Request as CBRequest};
 use cookie;
 use cookie_storage::CookieStorage;
 use devtools_traits::{ChromeToDevtoolsControlMsg, DevtoolsControlMsg, HttpRequest as DevtoolsHttpRequest};
@@ -159,6 +160,9 @@ fn load_for_consumer(load_data: LoadData,
     match load::<WrappedHttpRequest, TFDProvider>(load_data, &ui_provider, &http_state,
                                      devtools_chan, &factory,
                                      user_agent, &cancel_listener) {
+        Err(LoadError::ContentBlocked(url)) => {
+            send_error(url, "request blocked".to_owned(), start_chan)
+        }
         Err(LoadError::UnsupportedScheme(url)) => {
             let s = format!("{} request, but we don't support that scheme", &*url.scheme);
             send_error(url, s, start_chan)
@@ -342,6 +346,7 @@ pub enum LoadError {
     MaxRedirects(Url),
     ConnectionAborted(String),
     Cancelled(Url, String),
+    ContentBlocked(Url),
 }
 
 fn set_default_accept_encoding(headers: &mut Headers) {
@@ -534,7 +539,8 @@ pub fn modify_request_headers(headers: &mut Headers,
                               user_agent: &str,
                               cookie_jar: &Arc<RwLock<CookieStorage>>,
                               auth_cache: &Arc<RwLock<HashMap<Url, AuthCacheEntry>>>,
-                              load_data: &LoadData) {
+                              load_data: &LoadData,
+                              block_cookies: bool) {
     // Ensure that the host header is set from the original url
     let host = Host {
         hostname: url.serialize_host().unwrap(),
@@ -557,7 +563,9 @@ pub fn modify_request_headers(headers: &mut Headers,
 
     // https://fetch.spec.whatwg.org/#concept-http-network-or-cache-fetch step 11
     if load_data.credentials_flag {
-        set_request_cookies(url.clone(), headers, cookie_jar);
+        if !block_cookies {
+            set_request_cookies(url.clone(), headers, cookie_jar);
+        }
 
         // https://fetch.spec.whatwg.org/#http-network-or-cache-fetch step 12
         set_auth_header(headers, url, auth_cache);
@@ -766,7 +774,25 @@ pub fn load<A, B>(load_data: LoadData,
             return Err(LoadError::Cancelled(doc_url, "load cancelled".to_owned()));
         }
 
-        info!("requesting {}", doc_url.serialize());
+        let mut block_cookies = false;
+        let serialized = doc_url.serialize();
+        if let Some(ref rules) = *http_state.blocked_content {
+            let request = CBRequest {
+                url: &serialized,
+                resource_type: to_resource_type(&load_data.context),
+                load_type: LoadType::FirstParty, //FIXME need request origin
+            };
+            let actions = process_rules_for_request(rules, &request);
+            for action in actions {
+                match action {
+                    Reaction::Block => return Err(LoadError::ContentBlocked(doc_url)),
+                    Reaction::BlockCookies => block_cookies = true,
+                    Reaction::HideMatchingElements(_) => (),
+                }
+            }
+        }
+
+        info!("requesting {}", serialized);
 
         // Avoid automatically preserving request headers when redirects occur.
         // See https://bugzilla.mozilla.org/show_bug.cgi?id=401564 and
@@ -784,7 +810,7 @@ pub fn load<A, B>(load_data: LoadData,
 
         modify_request_headers(&mut request_headers, &doc_url,
                                &user_agent, &http_state.cookie_jar,
-                               &http_state.auth_cache, &load_data);
+                               &http_state.auth_cache, &load_data, block_cookies);
 
         //if there is a new auth header then set the request headers with it
         if let Some(ref auth_header) = new_auth_header {
@@ -946,5 +972,19 @@ fn is_cert_verify_error(error: &OpensslError) -> bool {
             function == "SSL3_GET_SERVER_CERTIFICATE" &&
             reason == "certificate verify failed"
         }
+    }
+}
+
+fn to_resource_type(context: &LoadContext) -> ResourceType {
+    match *context {
+        LoadContext::Browsing => ResourceType::Document,
+        LoadContext::Image => ResourceType::Image,
+        LoadContext::AudioVideo => ResourceType::Media,
+        LoadContext::Plugin => ResourceType::Raw,
+        LoadContext::Style => ResourceType::StyleSheet,
+        LoadContext::Script => ResourceType::Script,
+        LoadContext::Font => ResourceType::Font,
+        LoadContext::TextTrack => ResourceType::Media,
+        LoadContext::CacheManifest => ResourceType::Raw,
     }
 }

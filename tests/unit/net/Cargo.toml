@@ -30,6 +30,7 @@ path = "../../../components/devtools_traits"
 git = "https://github.com/servo/ipc-channel"
 
 [dependencies]
+content-blocker = "0.1"
 cookie = "0.2"
 hyper = "0.8"
 url = {version = "0.5.7", features = ["heap_size"]}
