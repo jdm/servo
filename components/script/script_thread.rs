@@ -38,7 +38,7 @@ use dom::element::Element;
 use dom::event::{Event, EventBubbles, EventCancelable};
 use dom::htmlanchorelement::HTMLAnchorElement;
 use dom::node::{Node, NodeDamage, window_from_node};
-use dom::servohtmlparser::{ParserContext, ParserRoot};
+use dom::servohtmlparser::{ParserContext, ParserRoot, ServoHTMLParser};
 use dom::uievent::UIEvent;
 use dom::window::{ReflowReason, ScriptHelpers, Window};
 use dom::worker::TrustedWorkerAddress;
@@ -69,7 +69,7 @@ use net_traits::storage_thread::StorageThread;
 use net_traits::{AsyncResponseTarget, ControlMsg, LoadConsumer, LoadContext, Metadata, ResourceThread};
 use network_listener::NetworkListener;
 use page::{Frame, IterablePage, Page};
-use parse::html::{ParseContext, parse_html};
+use parse::html::{ParseContext, parse_html, ParserOperation};
 use parse::xml::{self, parse_xml};
 use profile_traits::mem::{self, OpaqueSender, Report, ReportKind, ReportsChan};
 use profile_traits::time::{self, ProfilerCategory, profile};
@@ -220,6 +220,7 @@ pub enum MainThreadScriptMsg {
     Navigate(PipelineId, LoadData),
     /// Tasks that originate from the DOM manipulation task source
     DOMManipulation(DOMManipulationTask),
+    Parser(Trusted<ServoHTMLParser>, ParserOperation),
 }
 
 impl OpaqueSender<CommonScriptMsg> for Box<ScriptChan + Send> {
@@ -923,6 +924,8 @@ impl ScriptThread {
                 self.collect_reports(reports_chan),
             MainThreadScriptMsg::DOMManipulation(msg) =>
                 msg.handle_msg(self),
+            MainThreadScriptMsg::Parser(parser, msg) =>
+                self.handle_parser(parser, msg),
         }
     }
 
@@ -1123,6 +1126,11 @@ impl ScriptThread {
 
         let ConstellationChan(ref chan) = self.constellation_chan;
         chan.send(ConstellationMsg::LoadComplete(pipeline)).unwrap();
+    }
+
+    fn handle_parser(&self, parser: Trusted<ServoHTMLParser>, msg: ParserOperation) {
+        let parser = parser.root();
+        parser.invoke(msg);
     }
 
     fn collect_reports(&self, reports_chan: ReportsChan) {

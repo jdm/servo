@@ -9,7 +9,7 @@ use dom::bindings::codegen::Bindings::DocumentBinding::DocumentMethods;
 use dom::bindings::codegen::Bindings::HTMLTemplateElementBinding::HTMLTemplateElementMethods;
 use dom::bindings::codegen::Bindings::NodeBinding::NodeMethods;
 use dom::bindings::inheritance::{Castable, CharacterDataTypeId, NodeTypeId};
-use dom::bindings::js::{JS, RootedReference};
+use dom::bindings::js::{JS, Root, RootedReference};
 use dom::characterdata::CharacterData;
 use dom::comment::Comment;
 use dom::document::Document;
@@ -34,81 +34,201 @@ use html5ever::tree_builder::{NextParserState, NodeOrText, QuirksMode, TreeSink}
 use msg::constellation_msg::PipelineId;
 use parse::Parser;
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::io::{self, Write};
 use string_cache::QualName;
 use url::Url;
 use util::str::DOMString;
 
-fn insert(parent: &Node, reference_child: Option<&Node>, child: NodeOrText<JS<Node>>) {
-    match child {
-        NodeOrText::AppendNode(n) => {
-            assert!(parent.InsertBefore(&n, reference_child).is_ok());
-        },
-        NodeOrText::AppendText(t) => {
-            // FIXME(ajeffrey): convert directly from tendrils to DOMStrings
-            let s: String = t.into();
-            let text = Text::new(DOMString::from(s), &parent.owner_doc());
-            assert!(parent.InsertBefore(text.upcast(), reference_child).is_ok());
+pub enum ServoNodeOrText {
+    Node(usize),
+    Text(String),
+}
+
+pub struct ServoAttribute {
+    name: QualName,
+    value: String,
+}
+
+pub enum ParserOperation {
+    GetTemplateContents(usize, usize),
+    CreateElement(QualName, Vec<ServoAttribute>, usize),
+    CreateComment(String, usize),
+    Insert(usize, Option<usize>, ServoNodeOrText),
+    AppendDoctypeToDocument(String, String, String),
+    AddAttrsIfMissing(usize, Vec<ServoAttribute>),
+    RemoveFromParent(usize),
+    MarkScriptAlreadyStarted(usize),
+    CompleteScript(usize),
+    ReparentChild(usize, usize),
+}
+
+pub fn process_op(nodes: &mut HashMap<usize, JS<Node>>, op: ParserOperation) {
+    let document = Root::from_ref(&**nodes.get(&0).unwrap());
+    let document = document.downcast::<Document>().unwrap();
+    match op {
+        ParserOperation::GetTemplateContents(target, contents) => {
+            let target = Root::from_ref(&**nodes.get(&target).unwrap());
+            let template = target.downcast::<HTMLTemplateElement>()
+                                 .expect("tried to get template contents of \
+                                          non-HTMLTemplateElement in HTML parsing");
+            assert!(nodes.insert(contents, JS::from_ref(template.Content().upcast())).is_none());
+        }
+
+        ParserOperation::CreateElement(name, attrs, id) => {
+            let elem = Element::create(name, None, &*document,
+                                       ElementCreator::ParserCreated);
+
+            for attr in attrs {
+                elem.set_attribute_from_parser(attr.name,
+                                               DOMString::from(attr.value),
+                                               None);
+            }
+
+            nodes.insert(id, JS::from_rooted(&Root::upcast(elem)));
+        }
+
+        ParserOperation::CreateComment(text, id) => {
+            let comment = Comment::new(DOMString::from(text), &*document);
+            nodes.insert(id, JS::from_rooted(&Root::upcast(comment)));
+        }
+
+        ParserOperation::Insert(parent, reference_child, new_node) => {
+            let parent = &**nodes.get(&parent).unwrap();
+            let reference_child = reference_child.map(|r| &**nodes.get(&r).unwrap());
+            match new_node {
+                ServoNodeOrText::Node(n) => {
+                    let n = &**nodes.get(&n).unwrap();
+                    assert!(parent.InsertBefore(&n, reference_child).is_ok());
+                }
+                ServoNodeOrText::Text(t) => {
+                    let text = Text::new(DOMString::from(t), &parent.owner_doc());
+                    assert!(parent.InsertBefore(text.upcast(), reference_child).is_ok());
+                }
+            }
+        }
+
+        ParserOperation::AppendDoctypeToDocument(name, public_id, system_id) => {
+            let doctype = DocumentType::new(
+                DOMString::from(name), Some(DOMString::from(public_id)),
+                Some(DOMString::from(system_id)), document);
+            document.upcast::<Node>().AppendChild(doctype.upcast()).expect("Appending failed");
+        }
+
+        ParserOperation::AddAttrsIfMissing(id, attrs) => {
+            let target = &**nodes.get(&id).unwrap();
+            let elem = target.downcast::<Element>()
+                             .expect("tried to set attrs on non-Element in HTML parsing");
+            for attr in attrs {
+                elem.set_attribute_from_parser(attr.name, DOMString::from(attr.value), None);
+            }
+        }
+
+        ParserOperation::RemoveFromParent(target) => {
+            let target = &**nodes.get(&target).unwrap();
+            if let Some(ref parent) = target.GetParentNode() {
+                parent.RemoveChild(&*target).unwrap();
+            }
+        }
+
+        ParserOperation::MarkScriptAlreadyStarted(node) => {
+            let node = &**nodes.get(&node).unwrap();
+            let script = node.downcast::<HTMLScriptElement>();
+            script.map(|script| script.mark_already_started());
+        }
+
+        ParserOperation::CompleteScript(node) => {
+            let node = &**nodes.get(&node).unwrap();
+            let script = node.downcast::<HTMLScriptElement>();
+            if let Some(script) = script {
+                let _ = script.prepare();
+            }
+        }
+
+        ParserOperation::ReparentChild(node, new_parent) => {
+            let node = &**nodes.get(&node).unwrap();
+            let new_parent = &**nodes.get(&new_parent).unwrap();
+            while let Some(ref child) = node.GetFirstChild() {
+                new_parent.AppendChild(child.r()).unwrap();
+            }
         }
     }
+}
+
+#[derive(Clone, PartialEq)]
+pub struct ParseNode {
+    pub id: usize,
+}
+
+#[derive(JSTraceable, HeapSizeOf)]
+pub struct ParseNodeData {
+    pub qual_name: Option<QualName>,
+    pub parent: Option<usize>,
 }
 
 impl<'a> TreeSink for servohtmlparser::Sink {
     type Output = Self;
     fn finish(self) -> Self { self }
 
-    type Handle = JS<Node>;
+    type Handle = ParseNode;
 
-    fn get_document(&mut self) -> JS<Node> {
-        JS::from_ref(self.document.upcast())
+    fn get_document(&mut self) -> ParseNode {
+        ParseNode {
+            id: 0
+        }
     }
 
-    fn get_template_contents(&self, target: JS<Node>) -> JS<Node> {
-        let template = target.downcast::<HTMLTemplateElement>()
-            .expect("tried to get template contents of non-HTMLTemplateElement in HTML parsing");
-        JS::from_ref(template.Content().upcast())
+    fn get_template_contents(&self, target: ParseNode) -> ParseNode {
+        let contents = self.new_parse_node();
+        self.enqueue(ParserOperation::GetTemplateContents(target.id, contents.id));
+        contents
     }
 
-    fn same_node(&self, x: JS<Node>, y: JS<Node>) -> bool {
+    fn same_node(&self, x: ParseNode, y: ParseNode) -> bool {
         x == y
     }
 
-    fn elem_name(&self, target: JS<Node>) -> QualName {
-        let elem = target.downcast::<Element>()
-            .expect("tried to get name of non-Element in HTML parsing");
-        QualName {
-            ns: elem.namespace().clone(),
-            local: elem.local_name().clone(),
-        }
+    fn elem_name(&self, target: ParseNode) -> QualName {
+        self.parse_data
+            .borrow()
+            .get(&target.id)
+            .unwrap()
+            .qual_name
+            .clone()
+            .expect("tried to get name of non-Element in HTML parsing")
     }
 
     fn create_element(&mut self, name: QualName, attrs: Vec<Attribute>)
-            -> JS<Node> {
-        let elem = Element::create(name, None, &*self.document,
-                                   ElementCreator::ParserCreated);
-
-        for attr in attrs {
-            elem.set_attribute_from_parser(attr.name, DOMString::from(String::from(attr.value)), None);
-        }
-
-        JS::from_ref(elem.upcast())
+                      -> ParseNode {
+        let node = self.new_parse_node();
+        self.parse_data.borrow_mut().get_mut(&node.id).unwrap().qual_name = Some(name.clone());
+        let attrs = attrs.into_iter().map(|a| ServoAttribute { name: a.name, value: a.value.into() }).collect();
+        self.enqueue(ParserOperation::CreateElement(name, attrs, node.id));
+        node
     }
 
-    fn create_comment(&mut self, text: StrTendril) -> JS<Node> {
-        let comment = Comment::new(DOMString::from(String::from(text)), &*self.document);
-        JS::from_ref(comment.upcast())
+    fn create_comment(&mut self, text: StrTendril) -> ParseNode {
+        let node = self.new_parse_node();
+        self.enqueue(ParserOperation::CreateComment(String::from(text), node.id));
+        node
     }
 
     fn append_before_sibling(&mut self,
-            sibling: JS<Node>,
-            new_node: NodeOrText<JS<Node>>) -> Result<(), NodeOrText<JS<Node>>> {
-        // If there is no parent, return the node to the parser.
-        let parent = match sibling.GetParentNode() {
+            sibling: ParseNode,
+            new_node: NodeOrText<ParseNode>) -> Result<(), NodeOrText<ParseNode>> {
+        // If there is no parent return the node to the parser
+        let parent = match self.parse_data.borrow().get(&sibling.id).unwrap().parent {
             Some(p) => p,
             None => return Err(new_node),
         };
-
-        insert(&parent, Some(&*sibling), new_node);
+        if let NodeOrText::AppendNode(ref n) = new_node {
+            self.parse_data.borrow_mut().get_mut(&n.id).unwrap().parent = Some(parent);
+        }
+        let new_node = match new_node {
+            NodeOrText::AppendNode(n) => ServoNodeOrText::Node(n.id),
+            NodeOrText::AppendText(t) => ServoNodeOrText::Text(t.into()),
+        };
+        self.enqueue(ParserOperation::Insert(parent, Some(sibling.id), new_node));
         Ok(())
     }
 
@@ -120,52 +240,48 @@ impl<'a> TreeSink for servohtmlparser::Sink {
         self.document.set_quirks_mode(mode);
     }
 
-    fn append(&mut self, parent: JS<Node>, child: NodeOrText<JS<Node>>) {
+    fn append(&mut self, parent: ParseNode, child: NodeOrText<ParseNode>) {
         // FIXME(#3701): Use a simpler algorithm and merge adjacent text nodes
-        insert(&parent, None, child);
+        let child = match child {
+            NodeOrText::AppendNode(n) => ServoNodeOrText::Node(n.id),
+            NodeOrText::AppendText(t) => ServoNodeOrText::Text(t.into()),
+        };
+        self.enqueue(ParserOperation::Insert(parent.id, None, child));
     }
 
     fn append_doctype_to_document(&mut self, name: StrTendril, public_id: StrTendril,
                                   system_id: StrTendril) {
-        let doc = &*self.document;
-        let doctype = DocumentType::new(
-            DOMString::from(String::from(name)), Some(DOMString::from(String::from(public_id))),
-            Some(DOMString::from(String::from(system_id))), doc);
-        doc.upcast::<Node>().AppendChild(doctype.upcast()).expect("Appending failed");
+        self.enqueue(ParserOperation::AppendDoctypeToDocument(name.into(),
+                                                              public_id.into(),
+                                                              system_id.into()));
     }
 
-    fn add_attrs_if_missing(&mut self, target: JS<Node>, attrs: Vec<Attribute>) {
-        let elem = target.downcast::<Element>()
-            .expect("tried to set attrs on non-Element in HTML parsing");
-        for attr in attrs {
-            elem.set_attribute_from_parser(attr.name, DOMString::from(String::from(attr.value)), None);
-        }
+    fn add_attrs_if_missing(&mut self, target: ParseNode, attrs: Vec<Attribute>) {
+        let attrs = attrs.into_iter().map(|a| ServoAttribute { name: a.name, value: a.value.into() }).collect();
+        self.enqueue(ParserOperation::AddAttrsIfMissing(target.id, attrs));
     }
 
-    fn remove_from_parent(&mut self, target: JS<Node>) {
-        if let Some(ref parent) = target.GetParentNode() {
-            parent.RemoveChild(&*target).unwrap();
-        }
+    fn remove_from_parent(&mut self, target: ParseNode) {
+        self.parse_data.borrow_mut().get_mut(&target.id).unwrap().parent = None;
+        self.enqueue(ParserOperation::RemoveFromParent(target.id));
     }
 
-    fn mark_script_already_started(&mut self, node: JS<Node>) {
-        let script = node.downcast::<HTMLScriptElement>();
-        script.map(|script| script.mark_already_started());
+    fn mark_script_already_started(&mut self, node: ParseNode) {
+        self.enqueue(ParserOperation::MarkScriptAlreadyStarted(node.id));
     }
 
-    fn complete_script(&mut self, node: JS<Node>) -> NextParserState {
-        let script = node.downcast::<HTMLScriptElement>();
-        if let Some(script) = script {
-            return script.prepare();
-        }
+    fn complete_script(&mut self, node: ParseNode) -> NextParserState {
+        self.enqueue(ParserOperation::CompleteScript(node.id));
         NextParserState::Continue
     }
 
-    fn reparent_children(&mut self, node: JS<Node>, new_parent: JS<Node>) {
-        while let Some(ref child) = node.GetFirstChild() {
-            new_parent.AppendChild(child.r()).unwrap();
+    fn reparent_children(&mut self, node: ParseNode, new_parent: ParseNode) {
+        for data in self.parse_data.borrow_mut().values_mut() {
+            if data.parent == Some(node.id) {
+                data.parent = Some(new_parent.id);
+            }
         }
-
+        self.enqueue(ParserOperation::ReparentChild(node.id, new_parent.id));
     }
 }
 

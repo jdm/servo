@@ -12,6 +12,7 @@
 #![feature(custom_derive)]
 #![feature(fnbox)]
 #![feature(iter_arith)]
+#![feature(map_values_mut)]
 #![feature(mpsc_select)]
 #![feature(nonzero)]
 #![feature(on_unimplemented)]

@@ -9,9 +9,10 @@ use document_loader::LoadType;
 use dom::bindings::cell::DOMRefCell;
 use dom::bindings::codegen::Bindings::ServoHTMLParserBinding;
 use dom::bindings::global::GlobalRef;
+use dom::bindings::inheritance::Castable;
 use dom::bindings::js::{JS, Root};
 use dom::bindings::refcounted::Trusted;
-use dom::bindings::reflector::{Reflector, reflect_dom_object};
+use dom::bindings::reflector::{Reflector, Reflectable, reflect_dom_object};
 use dom::bindings::trace::JSTraceable;
 use dom::document::Document;
 use dom::node::Node;
@@ -28,11 +29,13 @@ use js::jsapi::JSTracer;
 use msg::constellation_msg::{PipelineId, SubpageId};
 use net_traits::{AsyncResponseListener, Metadata, NetworkError};
 use network_listener::PreInvoke;
+use parse::html::{ParseNode, ParseNodeData, process_op, ParserOperation};
 use parse::Parser;
 use script_runtime::ScriptChan;
-use script_thread::ScriptThread;
+use script_thread::{MainThreadScriptMsg, ScriptThread};
 use std::cell::Cell;
 use std::cell::UnsafeCell;
+use std::collections::HashMap;
 use std::default::Default;
 use std::ptr;
 use url::Url;
@@ -43,6 +46,51 @@ use util::resource_files::read_resource_file;
 pub struct Sink {
     pub base_url: Option<Url>,
     pub document: JS<Document>,
+    pub nodes: HashMap<usize, JS<Node>>,
+    // FIXME: interior mutability only needed until html5ever is updated to make
+    //        get_template_contents mutable.
+    pub parse_data: DOMRefCell<HashMap<usize, ParseNodeData>>,
+    next_parse_node_id: Cell<usize>,
+    pending_parse_ops: Cell<usize>,
+}
+
+impl Sink {
+    fn new(base_url: Option<Url>, document: &Document) -> Sink {
+        Sink {
+            base_url: base_url,
+            document: JS::from_ref(document),
+            nodes: HashMap::new(),
+            parse_data: DOMRefCell::new(HashMap::new()),
+            // 0 is reserved for the root document
+            next_parse_node_id: Cell::new(1),
+            pending_parse_ops: Cell::new(0),
+        }
+    }
+
+    pub fn new_parse_node(&self) -> ParseNode {
+        let id = self.next_parse_node_id.get();
+        let data = ParseNodeData { parent: None, qual_name: None };
+        assert!(self.parse_data.borrow_mut().insert(id, data).is_none());
+        self.next_parse_node_id.set(self.next_parse_node_id.get() + 1);
+        ParseNode {
+            id: id,
+        }
+    }
+
+    pub fn enqueue(&self, op: ParserOperation) {
+        self.pending_parse_ops.set(self.pending_parse_ops.get() + 1);
+        let parser = self.document.get_current_parser().unwrap();
+        let parser = match parser.r() {
+            ParserRef::HTML(parser) => Trusted::new(parser,
+                                                    self.document.global().r().script_chan()),
+            ParserRef::XML(_) => panic!("async XML parsing actions unsupported"),
+        };
+        self.document
+            .window()
+            .main_thread_script_chan()
+            .send(MainThreadScriptMsg::Parser(parser, op))
+            .unwrap();
+    }
 }
 
 /// FragmentContext is used only to pass this group of related values
@@ -53,7 +101,7 @@ pub struct FragmentContext<'a> {
     pub form_elem: Option<&'a Node>,
 }
 
-pub type Tokenizer = tokenizer::Tokenizer<TreeBuilder<JS<Node>, Sink>>;
+pub type Tokenizer = tokenizer::Tokenizer<TreeBuilder<ParseNode, Sink>>;
 
 #[must_root]
 #[derive(JSTraceable, HeapSizeOf)]
@@ -365,6 +413,7 @@ pub struct ServoHTMLParser {
     /// The pipeline associated with this parse, unavailable if this parse does not
     /// correspond to a page load.
     pipeline: Option<PipelineId>,
+    finished: Cell<bool>,
 }
 
 impl<'a> Parser for &'a ServoHTMLParser {
@@ -379,15 +428,10 @@ impl<'a> Parser for &'a ServoHTMLParser {
     fn finish(self) {
         assert!(!self.suspended.get());
         assert!(self.pending_input.borrow().is_empty());
+        self.finished.set(true);
 
         self.tokenizer.borrow_mut().end();
         debug!("finished parsing");
-
-        self.document.set_current_parser(None);
-
-        if let Some(pipeline) = self.pipeline {
-            ScriptThread::parsing_complete(pipeline);
-        }
     }
 }
 
@@ -395,10 +439,9 @@ impl ServoHTMLParser {
     #[allow(unrooted_must_root)]
     pub fn new(base_url: Option<Url>, document: &Document, pipeline: Option<PipelineId>)
                -> Root<ServoHTMLParser> {
-        let sink = Sink {
-            base_url: base_url,
-            document: JS::from_ref(document),
-        };
+        let mut sink = Sink::new(base_url, document);
+        sink.nodes.insert(0, JS::from_ref(document.upcast()));
+        sink.parse_data.borrow_mut().insert(0, ParseNodeData { qual_name: None, parent: None });
 
         let tb = TreeBuilder::new(sink, TreeBuilderOpts {
             ignore_missing_rules: true,
@@ -415,6 +458,7 @@ impl ServoHTMLParser {
             suspended: Cell::new(false),
             last_chunk_received: Cell::new(false),
             pipeline: pipeline,
+            finished: Cell::new(false),
         };
 
         reflect_dom_object(box parser, GlobalRef::Window(document.window()),
@@ -422,12 +466,9 @@ impl ServoHTMLParser {
     }
 
     #[allow(unrooted_must_root)]
-    pub fn new_for_fragment(base_url: Option<Url>, document: &Document,
-                            fragment_context: FragmentContext) -> Root<ServoHTMLParser> {
-        let sink = Sink {
-            base_url: base_url,
-            document: JS::from_ref(document),
-        };
+    pub fn new_for_fragment(_base_url: Option<Url>, _document: &Document,
+                            _fragment_context: FragmentContext) -> Root<ServoHTMLParser> {
+        /*let sink = Sink::new(base_url, document);
 
         let tb_opts = TreeBuilderOpts {
             ignore_missing_rules: true,
@@ -455,7 +496,8 @@ impl ServoHTMLParser {
         };
 
         reflect_dom_object(box parser, GlobalRef::Window(document.window()),
-                           ServoHTMLParserBinding::Wrap)
+                           ServoHTMLParserBinding::Wrap)*/
+        panic!()
     }
 
     #[inline]
@@ -475,6 +517,19 @@ impl ServoHTMLParser {
         &self.pending_input
     }
 
+    pub fn invoke(&self, op: ParserOperation) {
+        let mut tokenizer = self.tokenizer.borrow_mut();
+        let sink = tokenizer.sink_mut().sink_mut();
+        process_op(&mut sink.nodes, op);
+        sink.pending_parse_ops.set(sink.pending_parse_ops.get() - 1);
+
+        if sink.pending_parse_ops.get() == 0 && self.finished.get() {
+            self.document.set_current_parser(None);
+            if let Some(pipeline) = self.pipeline {
+                ScriptThread::parsing_complete(pipeline);
+            }
+        }
+    }
 }
 
 
@@ -535,27 +590,28 @@ impl ServoHTMLParser {
     }
 }
 
+#[allow(dead_code)]
 struct Tracer {
     trc: *mut JSTracer,
 }
 
 impl tree_builder::Tracer for Tracer {
-    type Handle = JS<Node>;
+    type Handle = ParseNode;
     #[allow(unrooted_must_root)]
-    fn trace_handle(&self, node: &JS<Node>) {
-        node.trace(self.trc);
+    fn trace_handle(&self, _node: &ParseNode) {
+        //node.trace(self.trc);
     }
 }
 
 impl JSTraceable for Tokenizer {
-    fn trace(&self, trc: *mut JSTracer) {
-        let tracer = Tracer {
+    fn trace(&self, _trc: *mut JSTracer) {
+        /*let tracer = Tracer {
             trc: trc,
         };
         let tracer = &tracer as &tree_builder::Tracer<Handle=JS<Node>>;
 
         let tree_builder = self.sink();
         tree_builder.trace_handles(tracer);
-        tree_builder.sink().trace(trc);
+        tree_builder.sink().trace(trc);*/
     }
 }
