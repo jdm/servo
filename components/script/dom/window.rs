@@ -67,7 +67,7 @@ use script_layout_interface::TrustedNodeAddress;
 use script_layout_interface::message::{Msg, Reflow, ReflowQueryType, ScriptReflow};
 use script_layout_interface::reporter::CSSErrorReporter;
 use script_layout_interface::rpc::{ContentBoxResponse, ContentBoxesResponse, LayoutRPC};
-use script_layout_interface::rpc::{MarginStyleResponse, ResolvedStyleResponse};
+use script_layout_interface::rpc::{MarginStyleResponse, ResolvedStyleResponse, TextPreparationResponse};
 use script_runtime::{CommonScriptMsg, ScriptChan, ScriptPort, ScriptThreadEventCategory, maybe_take_panic_result};
 use script_thread::{MainThreadScriptChan, MainThreadScriptMsg, Runnable, RunnableWrapper};
 use script_thread::SendableMainThreadScriptChan;
@@ -1399,6 +1399,13 @@ impl Window {
         self.layout_rpc.margin_style()
     }
 
+    pub fn prepare_text_query(&self, text: String, max_width: Option<f32>) -> TextPreparationResponse {
+        self.reflow(ReflowGoal::ForScriptQuery,
+                    ReflowQueryType::TextPreparationQuery(text, max_width),
+                    ReflowReason::Query);
+        self.layout_rpc.prepared_text()
+    }
+
     #[allow(unsafe_code)]
     pub fn init_browsing_context(&self, browsing_context: &BrowsingContext) {
         assert!(self.browsing_context.get().is_none());
@@ -1813,6 +1820,7 @@ fn debug_reflow_events(id: PipelineId, goal: &ReflowGoal, query_type: &ReflowQue
         ReflowQueryType::ResolvedStyleQuery(_, _, _) => "\tResolvedStyleQuery",
         ReflowQueryType::OffsetParentQuery(_n) => "\tOffsetParentQuery",
         ReflowQueryType::MarginStyleQuery(_n) => "\tMarginStyleQuery",
+        ReflowQueryType::TextPreparationQuery(..) => "\tTextPreparationQuery",
     });
 
     debug_msg.push_str(match *reason {

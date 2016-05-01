@@ -33,6 +33,7 @@ use dom::htmlcanvaselement::utils as canvas_utils;
 use dom::htmlimageelement::HTMLImageElement;
 use dom::imagedata::ImageData;
 use dom::node::{Node, NodeDamage, window_from_node};
+use dom::textmetrics::TextMetrics;
 use euclid::matrix2d::Matrix2D;
 use euclid::point::Point2D;
 use euclid::rect::Rect;
@@ -1326,12 +1327,41 @@ impl CanvasRenderingContext2DMethods for CanvasRenderingContext2D {
                 .unwrap()
         }
     }
+
+    fn MeasureText(&self, text: DOMString) -> Root<TextMetrics> {
+        let width = prepare_text_algorithm(text, &*self.canvas, None);
+        TextMetrics::new(self.global().r(), width)
+    }
 }
 
 impl Drop for CanvasRenderingContext2D {
     fn drop(&mut self) {
         self.ipc_renderer.send(CanvasMsg::Common(CanvasCommonMsg::Close)).unwrap();
     }
+}
+
+
+// https://html.spec.whatwg.org/multipage/#text-preparation-algorithm
+fn prepare_text_algorithm(text: DOMString,
+                          canvas: &HTMLCanvasElement,
+                          max_width: Option<f32>)
+                          -> f32 {
+    // Step 1
+    if max_width.unwrap_or(0.) < 0. {
+        return 0.;
+    }
+
+    // TODO Step 2
+    //let text = text.replace(&[' ', '\t', '\n', '\r'], " ");
+
+    // TODO Step 3
+    // TODO Step 4
+
+    // Step 5-8
+    let response = window_from_node(canvas).prepare_text_query(String::from(text), max_width);
+
+    // Step 9
+    response.width
 }
 
 pub fn parse_color(string: &str) -> Result<RGBA, ()> {

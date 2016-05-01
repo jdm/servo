@@ -37,6 +37,7 @@ pub trait LayoutRPC {
     fn offset_parent(&self) -> OffsetParentResponse;
     /// Query layout for the resolve values of the margin properties for an element.
     fn margin_style(&self) -> MarginStyleResponse;
+    fn prepared_text(&self) -> TextPreparationResponse;
 
     fn nodes_from_point(&self, page_point: Point2D<f32>, client_point: Point2D<f32>) -> Vec<UntrustedNodeAddress>;
 }
@@ -72,6 +73,19 @@ impl OffsetParentResponse {
         OffsetParentResponse {
             node_address: None,
             rect: Rect::zero(),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct TextPreparationResponse {
+    pub width: f32,
+}
+
+impl Default for TextPreparationResponse {
+    fn default() -> TextPreparationResponse {
+        TextPreparationResponse {
+            width: 0.,
         }
     }
 }

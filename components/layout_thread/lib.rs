@@ -73,7 +73,7 @@ use layout::parallel;
 use layout::query::{LayoutRPCImpl, LayoutThreadData, process_content_box_request, process_content_boxes_request};
 use layout::query::{process_margin_style_query, process_node_overflow_request, process_resolved_style_request};
 use layout::query::{process_node_geometry_request, process_node_layer_id_request, process_node_scroll_area_request};
-use layout::query::process_offset_parent_query;
+use layout::query::{process_offset_parent_query, process_prepare_text_query};
 use layout::sequential;
 use layout::traversal::RecalcStyleAndConstructFlows;
 use layout::webrender_helpers::{WebRenderDisplayListConverter, WebRenderFrameBuilder};
@@ -90,7 +90,8 @@ use script_layout_interface::{OpaqueStyleAndLayoutData, PartialStyleAndLayoutDat
 use script_layout_interface::message::{Msg, NewLayoutThreadInfo, Reflow, ReflowQueryType, ScriptReflow};
 use script_layout_interface::reporter::CSSErrorReporter;
 use script_layout_interface::restyle_damage::{REFLOW, REFLOW_OUT_OF_FLOW, REPAINT, STORE_OVERFLOW};
-use script_layout_interface::rpc::{LayoutRPC, MarginStyleResponse, NodeOverflowResponse, OffsetParentResponse};
+use script_layout_interface::rpc::{LayoutRPC, MarginStyleResponse, NodeOverflowResponse};
+use script_layout_interface::rpc::{OffsetParentResponse, TextPreparationResponse};
 use script_layout_interface::wrapper_traits::LayoutNode;
 use script_traits::{ConstellationControlMsg, LayoutControlMsg, LayoutMsg as ConstellationMsg};
 use script_traits::{StackingContextScrollState, UntrustedNodeAddress};
@@ -476,6 +477,7 @@ impl LayoutThread {
                     offset_parent_response: OffsetParentResponse::empty(),
                     margin_style_response: MarginStyleResponse::empty(),
                     stacking_context_scroll_offsets: HashMap::new(),
+                    prepared_text_response: Default::default(),
                 })),
             error_reporter: CSSErrorReporter {
                 pipelineid: id,
@@ -1077,6 +1079,9 @@ impl LayoutThread {
                     ReflowQueryType::MarginStyleQuery(_) => {
                         rw_data.margin_style_response = MarginStyleResponse::empty();
                     },
+                    ReflowQueryType::TextPreparationQuery(..) => {
+                        //TODO
+                    },
                     ReflowQueryType::NoQuery => {}
                 }
                 return;
@@ -1282,6 +1287,9 @@ impl LayoutThread {
                 ReflowQueryType::MarginStyleQuery(node) => {
                     let node = unsafe { ServoLayoutNode::new(&node) };
                     rw_data.margin_style_response = process_margin_style_query(node);
+                },
+                ReflowQueryType::TextPreparationQuery(ref text, max_width) => {
+                    rw_data.prepared_text_response = process_prepare_text_query(text, max_width);
                 },
                 ReflowQueryType::NoQuery => {}
             }

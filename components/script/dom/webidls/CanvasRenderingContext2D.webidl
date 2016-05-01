@@ -155,7 +155,7 @@ interface CanvasText {
   //              optional unrestricted double maxWidth);
   //void strokeText(DOMString text, unrestricted double x, unrestricted double y,
   //                optional unrestricted double maxWidth);
-  //TextMetrics measureText(DOMString text);
+  TextMetrics measureText(DOMString text);
 };
 
 [NoInterfaceObject, Exposed=(Window,Worker)]

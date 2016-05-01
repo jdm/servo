@@ -105,6 +105,7 @@ pub enum ReflowQueryType {
     ResolvedStyleQuery(TrustedNodeAddress, Option<PseudoElement>, Atom),
     OffsetParentQuery(TrustedNodeAddress),
     MarginStyleQuery(TrustedNodeAddress),
+    TextPreparationQuery(String, Option<f32>),
 }
 
 /// Information needed for a reflow.

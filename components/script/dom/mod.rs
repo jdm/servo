@@ -395,6 +395,7 @@ pub mod testbindingproxy;
 pub mod text;
 pub mod textdecoder;
 pub mod textencoder;
+pub mod textmetrics;
 pub mod touch;
 pub mod touchevent;
 pub mod touchlist;

@@ -20,6 +20,7 @@ use script_layout_interface::rpc::{HitTestResponse, LayoutRPC};
 use script_layout_interface::rpc::{MarginStyleResponse, NodeGeometryResponse};
 use script_layout_interface::rpc::{NodeLayerIdResponse, NodeOverflowResponse};
 use script_layout_interface::rpc::{OffsetParentResponse, ResolvedStyleResponse};
+use script_layout_interface::rpc::TextPreparationResponse;
 use script_layout_interface::wrapper_traits::{LayoutNode, ThreadSafeLayoutNode};
 use script_traits::LayoutMsg as ConstellationMsg;
 use script_traits::UntrustedNodeAddress;
@@ -83,6 +84,9 @@ pub struct LayoutThreadData {
 
     /// Scroll offsets of stacking contexts. This will only be populated if WebRender is in use.
     pub stacking_context_scroll_offsets: ScrollOffsetMap,
+
+    /// A queued response for prepared text.
+    pub prepared_text_response: TextPreparationResponse,
 }
 
 pub struct LayoutRPCImpl(pub Arc<Mutex<LayoutThreadData>>);
@@ -204,6 +208,12 @@ impl LayoutRPC for LayoutRPCImpl {
         let &LayoutRPCImpl(ref rw_data) = self;
         let rw_data = rw_data.lock().unwrap();
         rw_data.margin_style_response.clone()
+    }
+
+    fn prepared_text(&self) -> TextPreparationResponse {
+        let &LayoutRPCImpl(ref rw_data) = self;
+        let rw_data = rw_data.lock().unwrap();
+        rw_data.prepared_text_response.clone()
     }
 }
 
@@ -813,5 +823,12 @@ pub fn process_margin_style_query<N: LayoutNode>(requested_node: N)
         right: margin.margin_right,
         bottom: margin.margin_bottom,
         left: margin.margin_left,
+    }
+}
+
+pub fn process_prepare_text_query(_text: &str, _max_width: Option<f32>)
+                                  -> TextPreparationResponse {
+    TextPreparationResponse {
+        width: 0.,
     }
 }
