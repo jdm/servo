@@ -3,6 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use app_units::{Au, AU_PER_PX};
+use document_loader::LoadType;
 use dom::attr::Attr;
 use dom::bindings::cell::DOMRefCell;
 use dom::bindings::codegen::Bindings::HTMLImageElementBinding;
@@ -12,6 +13,7 @@ use dom::bindings::error::Fallible;
 use dom::bindings::inheritance::Castable;
 use dom::bindings::js::{LayoutJS, Root};
 use dom::bindings::refcounted::Trusted;
+use dom::bindings::reflector::Reflectable;
 use dom::bindings::str::DOMString;
 use dom::document::Document;
 use dom::element::{AttributeMutation, Element, RawLayoutElementHelpers};
@@ -22,13 +24,17 @@ use dom::node::{Node, NodeDamage, document_from_node, window_from_node};
 use dom::values::UNSIGNED_LONG_MAX;
 use dom::virtualmethods::VirtualMethods;
 use html5ever_atoms::LocalName;
+use hyper::http::RawStatus;
 use ipc_channel::ipc;
 use ipc_channel::router::ROUTER;
 use net_traits::image::base::{Image, ImageMetadata};
 use net_traits::image_cache_thread::{ImageResponder, ImageResponse};
+use net_traits::request::{RequestInit, Type as RequestType};
+use net_traits::{FetchResponseListener, FetchMetadata, Metadata, NetworkError};
+use network_listener::{NetworkListener, PreInvoke};
 use script_thread::Runnable;
 use std::i32;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use style::attr::{AttrValue, LengthOrPercentageOrAuto};
 use task_source::TaskSource;
 use url::Url;
@@ -117,7 +123,7 @@ impl Runnable for ImageResponseHandlerRunnable {
     }
 }
 
-/*/// The context required for asynchronously loading an external image.
+/// The context required for asynchronously loading an external image.
 struct ImageContext {
     /// The element that initiated the request.
     elem: Trusted<HTMLImageElement>,
@@ -131,13 +137,19 @@ struct ImageContext {
     status: Result<(), NetworkError>
 }
 
-impl AsyncResponseListener for ImageContext {
-    fn headers_available(&mut self, metadata: Result<Metadata, NetworkError>) {
-        self.metadata = metadata.ok();
+impl FetchResponseListener for ImageContext {
+    fn process_request_body(&mut self) {}
+    fn process_request_eof(&mut self) {}
+
+    fn process_response(&mut self, metadata: Result<FetchMetadata, NetworkError>) {
+        self.metadata = metadata.ok().map(|meta| match meta {
+            FetchMetadata::Unfiltered(m) => m,
+            FetchMetadata::Filtered { unsafe_, .. } => unsafe_
+        });
 
         let status_code = self.metadata.as_ref().and_then(|m| {
             match m.status {
-                Some(RawStatus(c, _)) => Some(c),
+                Some((c, _)) => Some(c),
                 _ => None,
             }
         }).unwrap_or(0);
@@ -149,27 +161,23 @@ impl AsyncResponseListener for ImageContext {
         };
     }
 
-    fn data_available(&mut self, payload: Vec<u8>) {
+    fn process_response_chunk(&mut self, mut payload: Vec<u8>) {
         if self.status.is_ok() {
-            let mut payload = payload;
             self.data.append(&mut payload);
         }
     }
 
-    fn response_complete(&mut self, status: Result<(), NetworkError>) {
-        let load = status.and(self.status.clone()).map(|_| {
-            let data = mem::replace(&mut self.data, vec!());
-            let metadata = self.metadata.take().unwrap();
-            (metadata, data)
-        });
+    fn process_response_eof(&mut self, response: Result<(), NetworkError>) {
         let elem = self.elem.root();
-
-        let document = document_from_node(elem.r());
+        let document = document_from_node(&*elem);
+        let window = document.window();
+        let image_cache = window.image_cache_thread();
+        image_cache.store_complete_image_bytes(self.url.clone(), self.data.clone());
         document.finish_load(LoadType::Image(self.url.clone()));
     }
 }
 
-impl PreInvoke for ImageContext {}*/
+impl PreInvoke for ImageContext {}
 
 impl HTMLImageElement {
     /// Makes the local `image` member match the status of the `src` attribute and starts
@@ -191,9 +199,9 @@ impl HTMLImageElement {
                     self.current_request.borrow_mut().source_url = Some(src);
 
                     let trusted_node = Trusted::new(self);
-                    let (responder_sender, responder_receiver) = ipc::channel().unwrap();
+                    //let (responder_sender, responder_receiver) = ipc::channel().unwrap();
                     let task_source = window.networking_task_source();
-                    let wrapper = window.get_runnable_wrapper();
+                    /*let wrapper = window.get_runnable_wrapper();
                     ROUTER.add_route(responder_receiver.to_opaque(), box move |message| {
                         // Return the image via a message to the script thread, which marks the element
                         // as dirty and triggers a reflow.
@@ -201,7 +209,7 @@ impl HTMLImageElement {
                         let runnable = box ImageResponseHandlerRunnable::new(
                             trusted_node.clone(), image_response);
                         let _ = task_source.queue_with_wrapper(runnable, &wrapper);
-                    });
+                    });*/
 
                     /// srm912: This needs to be replaced by the commented code below
                     ///         A new ImageContext needs to be created for the NetworkListener
@@ -210,36 +218,37 @@ impl HTMLImageElement {
                     ///         OR 
                     ///         Do we need to use the ImageRequest struct that was created earlier
                     ///         since it also has the relevant attributes such as data vector, state an
-                    image_cache.request_image_and_metadata(img_url,
+                    /*image_cache.request_image_and_metadata(img_url,
                                               window.image_cache_chan(),
-                                              Some(ImageResponder::new(responder_sender)));
-
-                    /*let elem = Trusted::new(self);
+                                              Some(ImageResponder::new(responder_sender)));*/
 
                     let context = Arc::new(Mutex::new(ImageContext {
-                        elem: elem,
-                        media: Some(media),
+                        elem: trusted_node,
                         data: vec!(),
                         metadata: None,
-                        url: url.clone(),
+                        url: img_url.clone(),
+                        status: Ok(())
                     }));
 
                     let (action_sender, action_receiver) = ipc::channel().unwrap();
                     let listener = NetworkListener {
                         context: context,
-                        script_chan: document.window().networking_task_source(),
-                    };
-                    let response_target = AsyncResponseTarget {
-                        sender: action_sender,
+                        task_source: task_source,
+                        wrapper: Some(document.window().get_runnable_wrapper()),
                     };
                     ROUTER.add_route(action_receiver.to_opaque(), box move |message| {
-                        listener.notify(message.to().unwrap());
+                        listener.notify_fetch(message.to().unwrap());
                     });
 
-                    if self.parser_inserted.get() {
-                        document.increment_script_blocking_stylesheet_count();
-                    }
-                    document.load_async(LoadType::Stylesheet(url), response_target);*/
+                    let request = RequestInit {
+                        url: img_url.clone(),
+                        origin: document.url().clone(),
+                        type_: RequestType::Image,
+                        pipeline_id: Some(document.global().pipeline_id()),
+                        .. RequestInit::default()
+                    };
+
+                    document.fetch_async(LoadType::Image(img_url), request, action_sender);
                 } else {
                     // https://html.spec.whatwg.org/multipage/#update-the-image-data
                     // Step 11 (error substeps)
