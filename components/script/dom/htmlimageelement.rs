@@ -24,8 +24,7 @@ use dom::node::{Node, NodeDamage, document_from_node, window_from_node};
 use dom::values::UNSIGNED_LONG_MAX;
 use dom::virtualmethods::VirtualMethods;
 use html5ever_atoms::LocalName;
-use hyper::http::RawStatus;
-use ipc_channel::ipc;
+use ipc_channel::ipc::{self, IpcSender};
 use ipc_channel::router::ROUTER;
 use net_traits::image::base::{Image, ImageMetadata};
 use net_traits::image_cache_thread::{ImageResponder, ImageResponse};
@@ -134,7 +133,9 @@ struct ImageContext {
     /// The initial URL requested.
     url: Url,
     /// Indicates whether the request failed, and why
-    status: Result<(), NetworkError>
+    status: Result<(), NetworkError>,
+    ///
+    responder: IpcSender<ImageResponse>,
 }
 
 impl FetchResponseListener for ImageContext {
@@ -167,12 +168,16 @@ impl FetchResponseListener for ImageContext {
         }
     }
 
-    fn process_response_eof(&mut self, response: Result<(), NetworkError>) {
+    fn process_response_eof(&mut self, _response: Result<(), NetworkError>) {
         let elem = self.elem.root();
         let document = document_from_node(&*elem);
         let window = document.window();
         let image_cache = window.image_cache_thread();
         image_cache.store_complete_image_bytes(self.url.clone(), self.data.clone());
+        let responder = self.responder.clone();
+        image_cache.request_image_and_metadata(self.url.clone(),
+                                               window.image_cache_chan(),
+                                               Some(ImageResponder::new(responder)));
         document.finish_load(LoadType::Image(self.url.clone()));
     }
 }
@@ -185,7 +190,6 @@ impl HTMLImageElement {
     fn update_image(&self, value: Option<(DOMString, Url)>) {
         let document = document_from_node(self);
         let window = document.window();
-        let image_cache = window.image_cache_thread();
         match value {
             None => {
                 self.current_request.borrow_mut().parsed_url = None;
@@ -199,9 +203,9 @@ impl HTMLImageElement {
                     self.current_request.borrow_mut().source_url = Some(src);
 
                     let trusted_node = Trusted::new(self);
-                    //let (responder_sender, responder_receiver) = ipc::channel().unwrap();
+                    let (responder_sender, responder_receiver) = ipc::channel().unwrap();
                     let task_source = window.networking_task_source();
-                    /*let wrapper = window.get_runnable_wrapper();
+                    let wrapper = window.get_runnable_wrapper();
                     ROUTER.add_route(responder_receiver.to_opaque(), box move |message| {
                         // Return the image via a message to the script thread, which marks the element
                         // as dirty and triggers a reflow.
@@ -209,32 +213,22 @@ impl HTMLImageElement {
                         let runnable = box ImageResponseHandlerRunnable::new(
                             trusted_node.clone(), image_response);
                         let _ = task_source.queue_with_wrapper(runnable, &wrapper);
-                    });*/
-
-                    /// srm912: This needs to be replaced by the commented code below
-                    ///         A new ImageContext needs to be created for the NetworkListener
-                    ///         which needs to implement the AsyncResponseListener and PreInvoke
-                    ///         traits 
-                    ///         OR 
-                    ///         Do we need to use the ImageRequest struct that was created earlier
-                    ///         since it also has the relevant attributes such as data vector, state an
-                    /*image_cache.request_image_and_metadata(img_url,
-                                              window.image_cache_chan(),
-                                              Some(ImageResponder::new(responder_sender)));*/
+                    });
 
                     let context = Arc::new(Mutex::new(ImageContext {
-                        elem: trusted_node,
+                        elem: Trusted::new(self),
                         data: vec!(),
                         metadata: None,
                         url: img_url.clone(),
-                        status: Ok(())
+                        status: Ok(()),
+                        responder: responder_sender,
                     }));
 
                     let (action_sender, action_receiver) = ipc::channel().unwrap();
                     let listener = NetworkListener {
                         context: context,
-                        task_source: task_source,
-                        wrapper: Some(document.window().get_runnable_wrapper()),
+                        task_source: window.networking_task_source(),
+                        wrapper: Some(window.get_runnable_wrapper()),
                     };
                     ROUTER.add_route(action_receiver.to_opaque(), box move |message| {
                         listener.notify_fetch(message.to().unwrap());
