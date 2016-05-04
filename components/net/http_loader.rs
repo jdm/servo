@@ -31,6 +31,8 @@ use net_traits::{CookieSource, IncludeSubdomains, LoadConsumer, LoadContext, Loa
 use net_traits::{Metadata, NetworkError};
 use openssl::ssl::error::{SslError, OpensslError};
 use openssl::ssl::{SSL_OP_NO_SSLV2, SSL_OP_NO_SSLV3, SSL_VERIFY_PEER, SslContext, SslMethod};
+use profile_traits::time::{ProfilerCategory, profile, ProfilerChan, TimerMetadata};
+use profile_traits::time::{TimerMetadataReflowType, TimerMetadataFrameType};
 use resource_thread::{CancellationListener, send_error, start_sending_sniffed_opt, AuthCache, AuthCacheEntry};
 use std::borrow::ToOwned;
 use std::boxed::FnBox;
@@ -84,6 +86,7 @@ pub fn create_http_connector() -> Arc<Pool<Connector>> {
 pub fn factory(user_agent: String,
                http_state: HttpState,
                devtools_chan: Option<Sender<DevtoolsControlMsg>>,
+               profiler_chan: ProfilerChan,
                connector: Arc<Pool<Connector>>)
                -> Box<FnBox(LoadData,
                             LoadConsumer,
@@ -91,14 +94,21 @@ pub fn factory(user_agent: String,
                             CancellationListener) + Send> {
     box move |load_data: LoadData, senders, classifier, cancel_listener| {
         spawn_named(format!("http_loader for {}", load_data.url), move || {
-            load_for_consumer(load_data,
-                              senders,
-                              classifier,
-                              connector,
-                              http_state,
-                              devtools_chan,
-                              cancel_listener,
-                              user_agent)
+            let metadata = TimerMetadata {
+                url: load_data.url.as_str().into(),
+                iframe: TimerMetadataFrameType::RootWindow,
+                incremental: TimerMetadataReflowType::FirstReflow,
+            };
+            profile(ProfilerCategory::NetHTTPRequestResponse, Some(metadata), profiler_chan, || {
+                load_for_consumer(load_data,
+                                  senders,
+                                  classifier,
+                                  connector,
+                                  http_state,
+                                  devtools_chan,
+                                  cancel_listener,
+                                  user_agent)
+            })
         })
     }
 }
