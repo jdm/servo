@@ -137,7 +137,7 @@ impl Worker {
         let _ac = JSAutoCompartment::new(global.r().get_cx(), target.reflector().get_jsobject().get());
         let mut message = RootedValue::new(global.r().get_cx(), UndefinedValue());
         data.read(global.r(), message.handle_mut());
-        MessageEvent::dispatch_jsval(target, global.r(), message.handle());
+        MessageEvent::dispatch_jsval(target, global.r(), None, None, message.handle());
     }
 
     pub fn dispatch_simple_error(address: TrustedWorkerAddress) {

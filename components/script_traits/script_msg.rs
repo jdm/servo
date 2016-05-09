@@ -8,6 +8,7 @@ use IFrameLoadInfo;
 use MouseButton;
 use MouseEventType;
 use MozBrowserEvent;
+use StructuredCloneBuffer;
 use canvas_traits::CanvasMsg;
 use euclid::point::Point2D;
 use euclid::size::Size2D;
@@ -83,4 +84,6 @@ pub enum ScriptMsg {
     SetFinalUrl(PipelineId, Url),
     /// Check if an alert dialog box should be presented
     Alert(PipelineId, String, IpcSender<bool>),
+    /// Invoke the asynchronous postMessage steps for the given pipeline
+    PostMessage(PipelineId, PipelineId, String, StructuredCloneBuffer),
 }

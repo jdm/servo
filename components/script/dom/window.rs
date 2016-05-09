@@ -11,13 +11,14 @@ use dom::bindings::codegen::Bindings::EventHandlerBinding::{EventHandlerNonNull,
 use dom::bindings::codegen::Bindings::FunctionBinding::Function;
 use dom::bindings::codegen::Bindings::WindowBinding::{ScrollBehavior, ScrollToOptions};
 use dom::bindings::codegen::Bindings::WindowBinding::{self, FrameRequestCallback, WindowMethods};
-use dom::bindings::error::{Error, Fallible, report_pending_exception};
-use dom::bindings::global::GlobalRef;
+use dom::bindings::error::{Error, Fallible, ErrorResult, report_pending_exception};
+use dom::bindings::global::{GlobalRef, global_root_from_context};
 use dom::bindings::inheritance::Castable;
 use dom::bindings::js::RootedReference;
 use dom::bindings::js::{JS, MutNullableHeap, Root};
 use dom::bindings::num::Finite;
 use dom::bindings::reflector::Reflectable;
+use dom::bindings::structuredclone::StructuredCloneData;
 use dom::bindings::utils::{GlobalStaticData, WindowProxyHandler};
 use dom::browsingcontext::BrowsingContext;
 use dom::console::Console;
@@ -38,6 +39,7 @@ use ipc_channel::ipc::{self, IpcSender};
 use js::jsapi::{Evaluate2, MutableHandleValue};
 use js::jsapi::{HandleValue, JSContext};
 use js::jsapi::{JSAutoCompartment, JSAutoRequest, JS_GC, JS_GetRuntime, SetWindowProxy};
+use js::jsval::{ObjectValue, JSVal};
 use js::rust::CompileOptionsWrapper;
 use js::rust::Runtime;
 use layout_interface::{ContentBoxResponse, ContentBoxesResponse, ResolvedStyleResponse, ScriptReflow};
@@ -56,7 +58,7 @@ use profile_traits::mem;
 use reporter::CSSErrorReporter;
 use rustc_serialize::base64::{FromBase64, STANDARD, ToBase64};
 use script_runtime::{ScriptChan, ScriptPort};
-use script_thread::SendableMainThreadScriptChan;
+use script_thread::{AutoEntryScript, SendableMainThreadScriptChan, entry_settings_pipeline};
 use script_thread::{MainThreadScriptChan, MainThreadScriptMsg, RunnableWrapper};
 use script_traits::{ConstellationControlMsg, UntrustedNodeAddress};
 use script_traits::{DocumentState, MsDuration, ScriptToCompositorMsg, TimerEvent, TimerEventId};
@@ -565,9 +567,24 @@ impl WindowMethods for Window {
         self.Window()
     }
 
+    #[allow(unsafe_code)]
     // https://html.spec.whatwg.org/multipage/#dom-parent
-    fn Parent(&self) -> Root<Window> {
-        self.parent().unwrap_or(self.Window())
+    fn Parent(&self, _cx: *mut JSContext) -> JSVal {
+        let same_origin_parent = self.parent();
+        if let Some(parent) = same_origin_parent {
+            return unsafe {
+                ObjectValue(&**parent.reflector().get_jsobject())
+            };
+        }
+
+        let cross_origin_parent = self.browsing_context().parent();
+        if !cross_origin_parent.is_null_or_undefined() {
+            return cross_origin_parent;
+        }
+
+        unsafe {
+            ObjectValue(&**self.Window().reflector().get_jsobject())
+        }
     }
 
     // https://html.spec.whatwg.org/multipage/#dom-top
@@ -596,6 +613,9 @@ impl WindowMethods for Window {
 
     // https://html.spec.whatwg.org/multipage/#handler-window-onstorage
     event_handler!(storage, GetOnstorage, SetOnstorage);
+
+    // https://html.spec.whatwg.org/multipage/#handler-window-onmessage
+    event_handler!(message, GetOnmessage, SetOnmessage);
 
     // https://developer.mozilla.org/en-US/docs/Web/API/Window/screen
     fn Screen(&self) -> Root<Screen> {
@@ -629,6 +649,16 @@ impl WindowMethods for Window {
     fn CancelAnimationFrame(&self, ident: u32) {
         let doc = self.Document();
         doc.cancel_animation_frame(ident);
+    }
+
+    // https://html.spec.whatwg.org/multipage/#dom-window-postmessage
+    fn PostMessage(&self,
+                   cx: *mut JSContext,
+                   message: HandleValue,
+                   origin: DOMString,
+                   _transfer: HandleValue)
+                   -> ErrorResult {
+        post_message(cx, message, origin, _transfer, self.pipeline())
     }
 
     // https://html.spec.whatwg.org/multipage/#dom-window-captureevents
@@ -848,6 +878,7 @@ impl<'a, T: Reflectable> ScriptHelpers for &'a T {
     fn evaluate_script_on_global_with_result(self, code: &str, filename: &str,
                                              rval: MutableHandleValue) {
         let global = self.global();
+        let _aes = AutoEntryScript::new(global.r().pipeline());
         let cx = global.r().get_cx();
         let _ar = JSAutoRequest::new(cx);
         let globalhandle = global.r().reflector().get_jsobject();
@@ -1515,6 +1546,27 @@ impl Window {
     pub fn live_devtools_updates(&self) -> bool {
         return self.devtools_wants_updates.get();
     }
+}
+
+pub fn post_message(cx: *mut JSContext,
+                    message: HandleValue,
+                    origin: DOMString,
+                    _transfer: HandleValue,
+                    destination: PipelineId)
+                    -> ErrorResult {
+    // Step 1
+    if origin != DOMString::from("*") &&
+       origin != DOMString::from("/") &&
+       Url::parse(&origin).is_err() {
+        return Err(Error::Syntax);
+    }
+
+    let data = try!(StructuredCloneData::write(cx, message));
+    let source = entry_settings_pipeline();
+    let msg = ConstellationMsg::PostMessage(destination, source, String::from(origin), data.steal());
+    let source_global = global_root_from_context(cx);
+    let _ = source_global.r().constellation_chan().0.send(msg);
+    Ok(())
 }
 
 fn should_move_clip_rect(clip_rect: Rect<Au>, new_viewport: Rect<f32>) -> bool {

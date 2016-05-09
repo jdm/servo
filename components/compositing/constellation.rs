@@ -48,7 +48,7 @@ use rand::{random, Rng, SeedableRng, StdRng};
 #[cfg(not(target_os = "windows"))]
 use sandboxing;
 use script_traits::{AnimationState, CompositorEvent, ConstellationControlMsg};
-use script_traits::{DocumentState, LayoutControlMsg};
+use script_traits::{DocumentState, LayoutControlMsg, StructuredCloneBuffer};
 use script_traits::{IFrameLoadInfo, IFrameSandboxState, TimerEventRequest};
 use script_traits::{LayoutMsg as FromLayoutMsg, ScriptMsg as FromScriptMsg, ScriptThreadFactory};
 use script_traits::{MozBrowserEvent, MozBrowserErrorType};
@@ -809,6 +809,10 @@ impl<LTF: LayoutThreadFactory, STF: ScriptThreadFactory> Constellation<LTF, STF>
                 debug!("constellation got Alert message");
                 self.handle_alert(pipeline_id, message, sender);
             }
+            Request::Script(FromScriptMsg::PostMessage(destination, source, origin, message)) => {
+                debug!("constellation got PostMessage message");
+                self.handle_postmessage(destination, source, origin, message);
+            }
 
 
             // Messages from layout thread
@@ -1119,6 +1123,21 @@ impl<LTF: LayoutThreadFactory, STF: ScriptThreadFactory> Constellation<LTF, STF>
         let result = sender.send(display_alert_dialog);
         if let Err(e) = result {
             self.handle_send_error(pipeline_id, e);
+        }
+    }
+
+    fn handle_postmessage(&mut self,
+                          destination: PipelineId,
+                          source: PipelineId,
+                          origin: String,
+                          message: StructuredCloneBuffer) {
+        let script_chan = match self.pipelines.get(&destination) {
+            Some(pipeline) => pipeline.script_chan.clone(),
+            None => return warn!("Pipeline {:?} PostMessage after closure.", destination),
+        };
+        let msg = ConstellationControlMsg::PostMessage(destination, source, origin, message);
+        if let Err(e) = script_chan.send(msg) {
+            self.handle_send_error(destination, e);
         }
     }
 

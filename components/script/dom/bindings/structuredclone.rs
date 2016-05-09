@@ -9,9 +9,10 @@ use dom::bindings::error::{Error, Fallible};
 use dom::bindings::global::GlobalRef;
 use js::jsapi::{HandleValue, MutableHandleValue};
 use js::jsapi::{JSContext, JS_ReadStructuredClone, JS_STRUCTURED_CLONE_VERSION};
-use js::jsapi::{JS_ClearPendingException, JS_WriteStructuredClone};
+use js::jsapi::{JS_ClearPendingException, JS_WriteStructuredClone, JS_ClearStructuredClone};
 use libc::size_t;
-use std::ptr;
+use script_traits::StructuredCloneBuffer;
+use std::{mem, ptr};
 
 /// A buffer for a structured clone.
 pub struct StructuredCloneData {
@@ -58,6 +59,32 @@ impl StructuredCloneData {
                                            ptr::null(),
                                            ptr::null_mut()));
         }
+    }
+
+    /// Create a StructuredCloneData value from a buffer obtained via the `steal` method.
+    pub fn adopt(mut buf: StructuredCloneBuffer) -> StructuredCloneData {
+        let data = buf.0.as_mut_ptr() as *mut u64;
+        let nbytes = buf.0.len();
+        mem::forget(buf);
+        StructuredCloneData {
+            nbytes: nbytes,
+            data: data,
+        }
+    }
+
+    /// Copy the buffer contents into a vector and free the original buffer.
+    pub fn steal(self) -> StructuredCloneBuffer {
+        let mut buf = Vec::with_capacity(self.nbytes);
+        unsafe {
+            buf.set_len(self.nbytes);
+            ptr::copy(self.data as *mut u8, buf.as_mut_ptr(), self.nbytes);
+            assert!(JS_ClearStructuredClone(self.data,
+                                            self.nbytes,
+                                            ptr::null(),
+                                            ptr::null_mut(),
+                                            true));
+        }
+        StructuredCloneBuffer(buf)
     }
 }
 

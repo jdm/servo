@@ -8,10 +8,11 @@ use dom::bindings::codegen::Bindings::MessageEventBinding::MessageEventMethods;
 use dom::bindings::error::Fallible;
 use dom::bindings::global::GlobalRef;
 use dom::bindings::inheritance::Castable;
-use dom::bindings::js::Root;
+use dom::bindings::js::{Root, JS};
 use dom::bindings::reflector::reflect_dom_object;
 use dom::event::Event;
 use dom::eventtarget::EventTarget;
+use dom::window::Window;
 use js::jsapi::{RootedValue, HandleValue, Heap, JSContext};
 use js::jsval::JSVal;
 use std::default::Default;
@@ -24,6 +25,7 @@ pub struct MessageEvent {
     data: Heap<JSVal>,
     origin: DOMString,
     lastEventId: DOMString,
+    source: Option<JS<Window>>,
 }
 
 impl MessageEvent {
@@ -31,18 +33,21 @@ impl MessageEvent {
         MessageEvent::new_initialized(global,
                                       HandleValue::undefined(),
                                       DOMString::new(),
-                                      DOMString::new())
+                                      DOMString::new(),
+                                      None)
     }
 
     pub fn new_initialized(global: GlobalRef,
                            data: HandleValue,
                            origin: DOMString,
-                           lastEventId: DOMString) -> Root<MessageEvent> {
+                           lastEventId: DOMString,
+                           source: Option<&Window>) -> Root<MessageEvent> {
         let mut ev = box MessageEvent {
             event: Event::new_inherited(),
             data: Heap::default(),
             origin: origin,
             lastEventId: lastEventId,
+            source: source.map(JS::from_ref),
         };
         ev.data.set(data.get());
         reflect_dom_object(ev, global, MessageEventBinding::Wrap)
@@ -50,9 +55,10 @@ impl MessageEvent {
 
     pub fn new(global: GlobalRef, type_: Atom,
                bubbles: bool, cancelable: bool,
-               data: HandleValue, origin: DOMString, lastEventId: DOMString)
+               data: HandleValue, origin: DOMString, lastEventId: DOMString,
+               source: Option<&Window>)
                -> Root<MessageEvent> {
-        let ev = MessageEvent::new_initialized(global, data, origin, lastEventId);
+        let ev = MessageEvent::new_initialized(global, data, origin, lastEventId, source);
         {
             let event = ev.upcast::<Event>();
             event.init_event(type_, bubbles, cancelable);
@@ -69,7 +75,8 @@ impl MessageEvent {
         let data = RootedValue::new(global.get_cx(), init.data);
         let ev = MessageEvent::new(global, Atom::from(type_), init.parent.bubbles, init.parent.cancelable,
                                    data.handle(),
-                                   init.origin.clone(), init.lastEventId.clone());
+                                   init.origin.clone(), init.lastEventId.clone(),
+                                   init.source.as_ref().map(|s| &**s));
         Ok(ev)
     }
 }
@@ -77,10 +84,13 @@ impl MessageEvent {
 impl MessageEvent {
     pub fn dispatch_jsval(target: &EventTarget,
                           scope: GlobalRef,
+                          origin: Option<DOMString>,
+                          source: Option<&Window>,
                           message: HandleValue) {
         let messageevent = MessageEvent::new(
             scope, atom!("message"), false, false, message,
-            DOMString::new(), DOMString::new());
+            origin.unwrap_or(DOMString::new()), DOMString::new(),
+            source);
         messageevent.upcast::<Event>().fire(target);
     }
 }
@@ -105,4 +115,10 @@ impl MessageEventMethods for MessageEvent {
     fn IsTrusted(&self) -> bool {
         self.event.IsTrusted()
     }
+
+    // https://html.spec.whatwg.org/multipage/#dom-messageevent-source
+    fn GetSource(&self) -> Option<Root<Window>> {
+        self.source.as_ref().map(|s| Root::from_ref(&**s))
+    }
+
 }

@@ -16,6 +16,7 @@ use js::jsapi::{JS_BeginRequest, JS_EndRequest};
 use js::jsapi::{JS_GetProperty, JS_IsExceptionPending, JS_ReportPendingException};
 use js::jsapi::{JS_RestoreFrameChain, JS_SaveFrameChain};
 use js::jsval::{JSVal, UndefinedValue};
+use script_thread::AutoEntryScript;
 use std::default::Default;
 use std::ffi::CString;
 use std::intrinsics::return_address;
@@ -160,6 +161,7 @@ pub struct CallSetup {
     old_compartment: *mut JSCompartment,
     /// The exception handling used for the call.
     handling: ExceptionHandling,
+    _aes: AutoEntryScript,
 }
 
 impl CallSetup {
@@ -182,6 +184,7 @@ impl CallSetup {
             cx: cx,
             old_compartment: unsafe { JS_EnterCompartment(cx, callback.callback()) },
             handling: handling,
+            _aes: AutoEntryScript::new(global.r().pipeline()),
         }
     }
 

@@ -2770,6 +2770,11 @@ impl DocumentMethods for Document {
         // Step 5
         elements
     }
+
+    // https://html.spec.whatwg.org/multipage/#dom-document-referrer
+    fn Referrer(&self) -> DOMString {
+        DOMString::new()
+    }
 }
 
 fn update_with_current_time_ms(marker: &Cell<u64>) {

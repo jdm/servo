@@ -8,7 +8,7 @@ interface MessageEvent : Event {
   readonly attribute any data;
   readonly attribute DOMString origin;
   readonly attribute DOMString lastEventId;
-  //readonly attribute (WindowProxy or MessagePort)? source;
+  readonly attribute /*(*/Window /*or MessagePort)*/? source;
   //readonly attribute MessagePort[]? ports;
 };
 
@@ -16,7 +16,6 @@ dictionary MessageEventInit : EventInit {
   any data = null;
   DOMString origin = "";
   DOMString lastEventId = "";
-  //DOMString channel;
-  //(WindowProxy or MessagePort)? source;
+  /*(*/Window /*or MessagePort)*/? source = null;
   //sequence<MessagePort> ports;
 };

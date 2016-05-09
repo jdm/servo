@@ -35,7 +35,7 @@
   readonly attribute Window top;
   //         attribute any opener;
   //readonly attribute WindowProxy parent;
-  readonly attribute Window parent;
+  readonly attribute any parent;
   readonly attribute Element? frameElement;
   //WindowProxy open(optional DOMString url = "about:blank", optional DOMString target = "_blank",
   //                 optional DOMString features = "", optional boolean replace = false);
@@ -59,6 +59,8 @@
   void cancelAnimationFrame(unsigned long handle);
 
   //void postMessage(any message, DOMString targetOrigin, optional sequence<Transferable> transfer);
+  [Throws]
+  void postMessage(any message, DOMString targetOrigin, optional any transfer);
 
   // also has obsolete members
 };

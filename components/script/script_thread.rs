@@ -30,6 +30,8 @@ use dom::bindings::inheritance::Castable;
 use dom::bindings::js::{JS, MutNullableHeap, Root, RootCollection};
 use dom::bindings::js::{RootCollectionPtr, RootedReference};
 use dom::bindings::refcounted::{LiveDOMReferences, Trusted};
+use dom::bindings::reflector::Reflectable;
+use dom::bindings::structuredclone::StructuredCloneData;
 use dom::bindings::trace::JSTraceable;
 use dom::bindings::utils::WRAP_CALLBACKS;
 use dom::browsingcontext::BrowsingContext;
@@ -37,6 +39,7 @@ use dom::document::{Document, DocumentProgressHandler, DocumentSource, FocusType
 use dom::element::Element;
 use dom::event::{Event, EventBubbles, EventCancelable};
 use dom::htmlanchorelement::HTMLAnchorElement;
+use dom::messageevent::MessageEvent;
 use dom::node::{Node, NodeDamage, window_from_node};
 use dom::servohtmlparser::ParserContext;
 use dom::uievent::UIEvent;
@@ -52,7 +55,7 @@ use hyper::mime::{Mime, SubLevel, TopLevel};
 use ipc_channel::ipc::{self, IpcSender};
 use ipc_channel::router::ROUTER;
 use js::glue::GetWindowProxyClass;
-use js::jsapi::{DOMProxyShadowsResult, HandleId, HandleObject, RootedValue};
+use js::jsapi::{DOMProxyShadowsResult, HandleId, HandleObject, RootedValue, JSAutoCompartment};
 use js::jsapi::{JSAutoRequest, JSContext, JS_SetWrapObjectCallbacks, JSTracer, SetWindowProxyClass};
 use js::jsval::UndefinedValue;
 use js::rust::Runtime;
@@ -79,7 +82,7 @@ use script_runtime::{CommonScriptMsg, ScriptChan, ScriptThreadEventCategory};
 use script_runtime::{ScriptPort, StackRootTLS, new_rt_and_cx, get_reports};
 use script_traits::CompositorEvent::{KeyEvent, MouseButtonEvent, MouseMoveEvent, ResizeEvent};
 use script_traits::CompositorEvent::{TouchEvent, TouchpadPressureEvent};
-use script_traits::{CompositorEvent, ConstellationControlMsg, EventResult};
+use script_traits::{CompositorEvent, ConstellationControlMsg, EventResult, StructuredCloneBuffer};
 use script_traits::{InitialScriptState, MouseButton, MouseEventType, MozBrowserEvent, NewLayoutInfo};
 use script_traits::{LayoutMsg, OpaqueScriptLayoutChannel, ScriptMsg as ConstellationMsg};
 use script_traits::{ScriptThreadFactory, ScriptToCompositorMsg, TimerEvent, TimerEventRequest, TimerSource};
@@ -111,6 +114,25 @@ use webdriver_handlers;
 
 thread_local!(pub static STACK_ROOTS: Cell<Option<RootCollectionPtr>> = Cell::new(None));
 thread_local!(static SCRIPT_THREAD_ROOT: RefCell<Option<*const ScriptThread>> = RefCell::new(None));
+thread_local!(static SCRIPT_SETTINGS_STACK: RefCell<Vec<PipelineId>> = RefCell::new(vec![]));
+
+pub struct AutoEntryScript;
+impl AutoEntryScript {
+    pub fn new(pipeline: PipelineId) -> AutoEntryScript {
+        SCRIPT_SETTINGS_STACK.with(|stack| stack.borrow_mut().push(pipeline));
+        AutoEntryScript
+    }
+}
+
+impl Drop for AutoEntryScript {
+    fn drop(&mut self) {
+        SCRIPT_SETTINGS_STACK.with(|stack| stack.borrow_mut().pop().unwrap());
+    }
+}
+
+pub fn entry_settings_pipeline() -> PipelineId {
+    SCRIPT_SETTINGS_STACK.with(|stack| stack.borrow().last().unwrap().clone())
+}
 
 pub unsafe fn trace_thread(tr: *mut JSTracer) {
     SCRIPT_THREAD_ROOT.with(|root| {
@@ -910,6 +932,8 @@ impl ScriptThread {
                 self.handle_framed_content_changed(containing_pipeline_id, subpage_id),
             ConstellationControlMsg::ReportCSSError(pipeline_id, filename, line, column, msg) =>
                 self.handle_css_error_reporting(pipeline_id, filename, line, column, msg),
+            ConstellationControlMsg::PostMessage(destination, source, origin, message) =>
+                self.handle_postmessage(destination, source, origin, message),
         }
     }
 
@@ -1487,6 +1511,8 @@ impl ScriptThread {
         ROUTER.route_ipc_receiver_to_mpsc_sender(ipc_timer_event_port,
                                                  self.timer_event_chan.clone());
 
+        let parent_id = incomplete.parent_info.as_ref().map(|info| info.0.clone());
+
         // Create the window and document objects.
         let window = Window::new(self.js_runtime.clone(),
                                  page.clone(),
@@ -1514,7 +1540,9 @@ impl ScriptThread {
                                  incomplete.window_size);
 
         let frame_element = frame_element.r().map(Castable::upcast);
-        let browsing_context = BrowsingContext::new(&window, frame_element);
+        let browsing_context = BrowsingContext::new(&window,
+                                                    frame_element,
+                                                    parent_id);
         window.init_browsing_context(&browsing_context);
 
         let last_modified = metadata.headers.as_ref().and_then(|headers| {
@@ -1965,6 +1993,35 @@ impl ScriptThread {
                     css_error)).unwrap();
              }
         }
+    }
+
+    fn handle_postmessage(&self,
+                          destination: PipelineId,
+                          source: PipelineId,
+                          origin: String,
+                          message: StructuredCloneBuffer) {
+        let page = match self.root_page().find(destination) {
+            Some(page) => page,
+            None => return,
+        };
+
+        let source = self.root_page().find(source).map(|p| p.window());
+
+        let window = page.window();
+        let cx = window.get_cx();
+
+        let _ar = JSAutoRequest::new(cx);
+        let globalhandle = window.reflector().get_jsobject();
+        let _ac = JSAutoCompartment::new(cx, globalhandle.get());
+
+        let data = StructuredCloneData::adopt(message);
+        let mut message = RootedValue::new(cx, UndefinedValue());
+        data.read(GlobalRef::Window(&*window), message.handle_mut());
+        MessageEvent::dispatch_jsval(window.upcast(),
+                                     GlobalRef::Window(&*window),
+                                     Some(DOMString::from(origin)),
+                                     source.r(),
+                                     message.handle());
     }
 }
 

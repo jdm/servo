@@ -614,7 +614,7 @@ impl Runnable for MessageReceivedTask {
                     }
                 },
             }
-            MessageEvent::dispatch_jsval(ws.upcast(), global.r(), message.handle());
+            MessageEvent::dispatch_jsval(ws.upcast(), global.r(), None, None, message.handle());
         }
     }
 }

@@ -150,6 +150,8 @@ pub enum ConstellationControlMsg {
     FramedContentChanged(PipelineId, SubpageId),
     /// Report an error from a CSS parser for the given pipeline
     ReportCSSError(PipelineId, String, usize, usize, String),
+    /// Route the asynchronous postMessage steps to the appropriate destination pipeline
+    PostMessage(PipelineId, PipelineId, String, StructuredCloneBuffer),
 }
 
 /// Used to determine if a script has any pending asynchronous activity.
@@ -500,3 +502,7 @@ impl MozBrowserErrorType {
         }
     }
 }
+
+/// A sendable buffer for a structured clone operation.
+#[derive(Serialize, Deserialize)]
+pub struct StructuredCloneBuffer(pub Vec<u8>);

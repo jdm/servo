@@ -352,7 +352,8 @@ impl DedicatedWorkerGlobalScope {
                                                  scope.reflector().get_jsobject().get());
                 let mut message = RootedValue::new(scope.get_cx(), UndefinedValue());
                 data.read(GlobalRef::Worker(scope), message.handle_mut());
-                MessageEvent::dispatch_jsval(target, GlobalRef::Worker(scope), message.handle());
+                MessageEvent::dispatch_jsval(target, GlobalRef::Worker(scope),
+                                             None, None, message.handle());
             },
             WorkerScriptMsg::Common(CommonScriptMsg::RunnableMsg(_, runnable)) => {
                 runnable.handler()

@@ -3,24 +3,52 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use dom::bindings::cell::DOMRefCell;
-use dom::bindings::conversions::{ToJSValConvertible, root_from_handleobject};
-use dom::bindings::js::{JS, Root, RootedReference};
+use dom::bindings::conversions::StringificationBehavior;
+use dom::bindings::conversions::{ToJSValConvertible, root_from_handleobject, FromJSValConvertible};
+use dom::bindings::js::{JS, Root, RootedReference, MutHeapJSVal};
 use dom::bindings::proxyhandler::{fill_property_descriptor, get_property_descriptor};
 use dom::bindings::reflector::{Reflectable, Reflector};
 use dom::bindings::utils::WindowProxyHandler;
 use dom::bindings::utils::get_array_index_from_id;
 use dom::document::Document;
 use dom::element::Element;
-use dom::window::Window;
-use js::JSCLASS_IS_GLOBAL;
+use dom::window::{Window, post_message};
 use js::glue::{CreateWrapperProxyHandler, ProxyTraps, NewWindowProxy};
 use js::glue::{GetProxyPrivate, SetProxyExtra};
+use js::jsapi::JSPropertySpec;
 use js::jsapi::{Handle, HandleId, HandleObject, HandleValue, JSAutoCompartment, JSAutoRequest};
 use js::jsapi::{JSContext, JSPROP_READONLY, JSErrNum, JSObject, PropertyDescriptor, JS_DefinePropertyById};
-use js::jsapi::{JS_ForwardGetPropertyTo, JS_ForwardSetPropertyTo, JS_GetClass};
-use js::jsapi::{JS_GetOwnPropertyDescriptorById, JS_HasPropertyById, MutableHandle};
-use js::jsapi::{MutableHandleValue, ObjectOpResult, RootedObject, RootedValue};
-use js::jsval::{UndefinedValue, PrivateValue};
+use js::jsapi::{JSJitInfo, JSFunctionSpec, JSNativeWrapper, JS_SetReservedSlot, JS_GetReservedSlot};
+use js::jsapi::{JSPROP_ENUMERATE, JSCLASS_RESERVED_SLOTS_SHIFT, JSPROP_SHARED};
+use js::jsapi::{JS_ForwardGetPropertyTo, JS_ForwardSetPropertyTo, JS_GetClass, JSClass};
+use js::jsapi::{JS_GetOwnPropertyDescriptorById, JS_HasPropertyById, MutableHandle, CallArgs};
+use js::jsapi::{MutableHandleValue, ObjectOpResult, RootedObject, RootedValue, JS_NewObject};
+use js::jsval::{UndefinedValue, PrivateValue, ObjectValue, JSVal};
+use js::rust::{define_methods, define_properties};
+use js::{JSCLASS_IS_GLOBAL, JSCLASS_RESERVED_SLOTS_MASK};
+use libc;
+use msg::constellation_msg::PipelineId;
+use std::os;
+
+static CROSS_ORIGIN_CLASS: JSClass = JSClass {
+    name: b"Window\0" as *const u8 as *const libc::c_char,
+    flags:
+        // JSCLASS_HAS_RESERVED_SLOTS(1)
+        (1 & JSCLASS_RESERVED_SLOTS_MASK) << JSCLASS_RESERVED_SLOTS_SHIFT,
+    addProperty: None,
+    delProperty: None,
+    getProperty: None,
+    setProperty: None,
+    enumerate: None,
+    resolve: None,
+    mayResolve: None,
+    finalize: None,
+    call: None,
+    hasInstance: None,
+    construct: None,
+    trace: None,
+    reserved: [0 as *mut os::raw::c_void; 23]
+};
 
 #[dom_struct]
 pub struct BrowsingContext {
@@ -28,20 +56,84 @@ pub struct BrowsingContext {
     history: DOMRefCell<Vec<SessionHistoryEntry>>,
     active_index: usize,
     frame_element: Option<JS<Element>>,
+    #[ignore_heap_size_of = "spidermonkey type"]
+    parent: MutHeapJSVal,
+    parent_pipeline: Option<PipelineId>,
 }
 
+#[allow(unsafe_code)]
+unsafe extern "C" fn parent_(_cx: *mut JSContext, argc: libc::c_uint, vp: *mut JSVal) -> bool {
+    let args = CallArgs::from_vp(vp, argc);
+    *args.rval() = args.thisv().get();
+    assert!(!(*args.rval()).is_undefined());
+    return true;
+}
+
+#[allow(unsafe_code)]
+unsafe extern fn post_message_(cx: *mut JSContext, argc: libc::c_uint, vp: *mut JSVal) -> bool {
+    let args = CallArgs::from_vp(vp, argc);
+    let thisobj = args.thisv().to_object();
+    let context_value = JS_GetReservedSlot(thisobj, 0).to_private();
+    let browsing_context = &*(context_value as *const BrowsingContext);
+    let destination = browsing_context.parent_pipeline.unwrap();
+    let message = args.get(0);
+    let origin = if let Ok(v) = FromJSValConvertible::from_jsval(cx, args.get(1), StringificationBehavior::Default) {
+        v
+    } else {
+        return false;
+    };
+    let transfer = args.get(2);
+    post_message(cx, message, origin, transfer, destination).is_ok()
+}
+
+const SMETHOD_SPECS: &'static [JSFunctionSpec] = &[
+    JSFunctionSpec {
+        name: b"postMessage\0" as *const u8 as *const libc::c_char,
+        call: JSNativeWrapper { op: Some(post_message_), info: 0 as *const JSJitInfo },
+        nargs: 3,
+        flags: (JSPROP_ENUMERATE) as u16,
+        selfHostedName: 0 as *const libc::c_char
+    },
+    JSFunctionSpec {
+        name: 0 as *const libc::c_char,
+        call: JSNativeWrapper { op: None, info: 0 as *const JSJitInfo },
+        nargs: 0,
+        flags: 0,
+        selfHostedName: 0 as *const libc::c_char
+    }
+];
+
+const SATTRIBUTE_SPECS: &'static [JSPropertySpec] = &[
+    JSPropertySpec {
+        name: b"parent\0" as *const u8 as *const libc::c_char,
+        flags: (JSPROP_ENUMERATE | JSPROP_SHARED) as u8,
+        getter: JSNativeWrapper { op: Some(parent_), info: 0 as *const JSJitInfo },
+        setter: JSNativeWrapper { op: None, info: 0 as *const JSJitInfo },
+    },
+    JSPropertySpec {
+        name: 0 as *const libc::c_char,
+        flags: 0,
+        getter: JSNativeWrapper { op: None, info: 0 as *const JSJitInfo },
+        setter: JSNativeWrapper { op: None, info: 0 as *const JSJitInfo },
+    },
+];
+
 impl BrowsingContext {
-    pub fn new_inherited(frame_element: Option<&Element>) -> BrowsingContext {
+    pub fn new_inherited(frame_element: Option<&Element>,
+                         parent_pipeline: Option<PipelineId>) -> BrowsingContext {
         BrowsingContext {
             reflector: Reflector::new(),
             history: DOMRefCell::new(vec![]),
             active_index: 0,
             frame_element: frame_element.map(JS::from_ref),
+            parent: MutHeapJSVal::new(),
+            parent_pipeline: parent_pipeline,
         }
     }
 
     #[allow(unsafe_code)]
-    pub fn new(window: &Window, frame_element: Option<&Element>) -> Root<BrowsingContext> {
+    pub fn new(window: &Window, frame_element: Option<&Element>, parent_pipeline: Option<PipelineId>)
+               -> Root<BrowsingContext> {
         unsafe {
             let WindowProxyHandler(handler) = window.windowproxy_handler();
             assert!(!handler.is_null());
@@ -56,14 +148,30 @@ impl BrowsingContext {
                 NewWindowProxy(cx, parent, handler));
             assert!(!window_proxy.ptr.is_null());
 
-            let object = box BrowsingContext::new_inherited(frame_element);
+            let create_cross_origin_parent = parent_pipeline.is_some() && frame_element.is_none();
+
+            let object = box BrowsingContext::new_inherited(frame_element, parent_pipeline);
 
             let raw = Box::into_raw(object);
             SetProxyExtra(window_proxy.ptr, 0, &PrivateValue(raw as *const _));
 
             (*raw).init_reflector(window_proxy.ptr);
 
-            Root::from_ref(&*raw)
+            let context = Root::from_ref(&*raw);
+
+            if create_cross_origin_parent {
+                // Create a cross origin reflector with the browsing context reflector
+                // in its reserved slot.
+                let obj = RootedObject::new(cx, JS_NewObject(cx, &CROSS_ORIGIN_CLASS));
+                let obj = obj.handle();
+                assert!(!obj.is_null());
+                define_methods(cx, obj, SMETHOD_SPECS).unwrap();
+                define_properties(cx, obj, SATTRIBUTE_SPECS).unwrap();
+                JS_SetReservedSlot(*obj, 0, PrivateValue((&*context) as *const _ as *const libc::c_void));
+                context.parent.set(ObjectValue(&**obj));
+            }
+
+            context
         }
     }
 
@@ -83,6 +191,10 @@ impl BrowsingContext {
 
     pub fn frame_element(&self) -> Option<&Element> {
         self.frame_element.r()
+    }
+
+    pub fn parent(&self) -> JSVal {
+        self.parent.get()
     }
 
     pub fn window_proxy(&self) -> *mut JSObject {
