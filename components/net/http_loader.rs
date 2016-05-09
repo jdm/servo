@@ -19,7 +19,7 @@ use hyper::header::{Location, SetCookie, StrictTransportSecurity, UserAgent, qit
 use hyper::http::RawStatus;
 use hyper::method::Method;
 use hyper::mime::{Mime, SubLevel, TopLevel};
-use hyper::net::{Fresh, HttpsConnector, Openssl};
+use hyper::net::{Fresh, HttpsConnector, HttpConnector, Openssl};
 use hyper::status::{StatusClass, StatusCode};
 use log;
 use mime_classifier::MIMEClassifier;
@@ -43,7 +43,7 @@ use std::io::{self, Read, Write};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, RwLock};
 use time;
-use time::Tm;
+use time::{Tm, precise_time_ns};
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 use tinyfiledialogs;
 use url::{Url, Position};
@@ -99,16 +99,21 @@ pub fn factory(user_agent: String,
                 iframe: TimerMetadataFrameType::RootWindow,
                 incremental: TimerMetadataReflowType::FirstReflow,
             };
-            profile(ProfilerCategory::NetHTTPRequestResponse, Some(metadata), profiler_chan, || {
+            /*profile(ProfilerCategory::NetHTTPRequestResponse,
+                    Some(metadata.clone()),
+                    profiler_chan.clone(),
+                    || {*/
                 load_for_consumer(load_data,
                                   senders,
                                   classifier,
                                   connector,
                                   http_state,
                                   devtools_chan,
+                                  profiler_chan,
+                                  metadata,
                                   cancel_listener,
                                   user_agent)
-            })
+            //})
         })
     }
 }
@@ -118,17 +123,31 @@ pub enum ReadResult {
     EOF,
 }
 
+#[allow(unsafe_code)]
 pub fn read_block<R: Read>(reader: &mut R) -> Result<ReadResult, ()> {
-    let mut buf = vec![0; 1024];
-
-    match reader.read(&mut buf) {
-        Ok(len) if len > 0 => {
-            buf.truncate(len);
-            Ok(ReadResult::Payload(buf))
-        }
-        Ok(_) => Ok(ReadResult::EOF),
-        Err(_) => Err(()),
+    const BUFFER_SIZE: usize = 32768;
+    let mut buf = Vec::with_capacity(BUFFER_SIZE);
+    unsafe {
+        buf.set_len(BUFFER_SIZE);
     }
+    let mut nbytes = 0;
+
+    while nbytes < BUFFER_SIZE / 4 * 3 {
+        match reader.read(&mut buf[nbytes..]) {
+            Ok(len) if len > 0 => {
+                nbytes += len;
+                debug_assert!(nbytes < BUFFER_SIZE);
+            }
+            Ok(len) if nbytes > 0 && len == 0 => {
+                break;
+            }
+            Ok(_) => return Ok(ReadResult::EOF),
+            Err(_) => return Err(()),
+        }
+    }
+
+    buf.truncate(nbytes);
+    Ok(ReadResult::Payload(buf))
 }
 
 pub struct HttpState {
@@ -153,6 +172,8 @@ fn load_for_consumer(load_data: LoadData,
                      connector: Arc<Pool<Connector>>,
                      http_state: HttpState,
                      devtools_chan: Option<Sender<DevtoolsControlMsg>>,
+                     prof_chan: ProfilerChan,
+                     prof_metadata: TimerMetadata,
                      cancel_listener: CancellationListener,
                      user_agent: String) {
 
@@ -162,8 +183,9 @@ fn load_for_consumer(load_data: LoadData,
 
     let ui_provider = TFDProvider;
     match load(&load_data, &ui_provider, &http_state,
-               devtools_chan, &factory,
-               user_agent, &cancel_listener) {
+               devtools_chan, prof_chan.clone(),
+               prof_metadata.clone(),
+               &factory, user_agent, &cancel_listener) {
         Err(error) => {
             match error.error {
                 LoadErrorType::ConnectionAborted { .. } => unreachable!(),
@@ -176,7 +198,18 @@ fn load_for_consumer(load_data: LoadData,
         }
         Ok(mut load_response) => {
             let metadata = load_response.metadata.clone();
-            send_data(load_data.context, &mut load_response, start_chan, metadata, classifier, &cancel_listener)
+            /*profile(ProfilerCategory::NetHTTPReceiveBody,
+                    Some(prof_metadata),
+                    prof_chan,
+                    move || {*/
+                        send_data(load_data.context,
+                                  &mut load_response,
+                                  start_chan, metadata,
+                                  classifier,
+                                  &cancel_listener,
+                                  prof_metadata,
+                                  prof_chan)
+                    //})
         }
     }
 }
@@ -252,7 +285,14 @@ impl HttpRequestFactory for NetworkHttpRequestFactory {
 
     fn create(&self, url: Url, method: Method, headers: Headers)
               -> Result<WrappedHttpRequest, LoadError> {
-        let connection = Request::with_connector(method, url.clone(), &*self.connector);
+        let mut context = SslContext::new(SslMethod::Sslv23).unwrap();
+        context.set_verify(SSL_VERIFY_PEER, None);
+        context.set_CA_file(&resources_dir_path().join("certs")).unwrap();
+
+        let connector = HttpsConnector::new(Openssl { context: Arc::new(context) });
+        let connection = Request::with_connector(method, url.clone(), &connector);
+        //let connection = Request::with_connector(method, url.clone(), &HttpConnector);
+        //let connection = Request::with_connector(method, url.clone(), &*self.connector);
 
         if let Err(HttpError::Ssl(ref error)) = connection {
             let error: &(Error + Send + 'static) = &**error;
@@ -698,6 +738,8 @@ pub fn obtain_response<A>(request_factory: &HttpRequestFactory<R=A>,
                           pipeline_id: &Option<PipelineId>,
                           iters: u32,
                           devtools_chan: &Option<Sender<DevtoolsControlMsg>>,
+                          profiler_chan: ProfilerChan,
+                          prof_metadata: TimerMetadata,
                           request_id: &str)
                           -> Result<A::R, LoadError> where A: HttpRequest + 'static  {
 
@@ -741,14 +783,23 @@ pub fn obtain_response<A>(request_factory: &HttpRequestFactory<R=A>,
             info!("{:?}", data);
         }
 
-        let req = try!(request_factory.create(connection_url.clone(), method.clone(),
-                                              headers.clone()));
+        let req = try!(profile(ProfilerCategory::NetHTTPConnect,
+                               Some(prof_metadata.clone()),
+                               profiler_chan.clone(),
+                               || {
+                                   request_factory.create(connection_url.clone(),
+                                                          method.clone(),
+                                                          headers.clone())
+                               }));
 
         if cancel_listener.is_cancelled() {
             return Err(LoadError::new(connection_url.clone(), LoadErrorType::Cancelled));
         }
 
-        let maybe_response = req.send(request_body);
+        let maybe_response = profile(ProfilerCategory::NetHTTPAwaitResponse,
+                                     Some(prof_metadata.clone()),
+                                     profiler_chan.clone(),
+                                     || req.send(request_body));
 
         if let Some(pipeline_id) = *pipeline_id {
             send_request_to_devtools(
@@ -800,6 +851,8 @@ pub fn load<A, B>(load_data: &LoadData,
                   ui_provider: &B,
                   http_state: &HttpState,
                   devtools_chan: Option<Sender<DevtoolsControlMsg>>,
+                  profiler_chan: ProfilerChan,
+                  prof_metadata: TimerMetadata,
                   request_factory: &HttpRequestFactory<R=A>,
                   user_agent: String,
                   cancel_listener: &CancellationListener)
@@ -875,7 +928,9 @@ pub fn load<A, B>(load_data: &LoadData,
 
         let response = try!(obtain_response(request_factory, &doc_url, &method, &request_headers,
                                             &cancel_listener, &load_data.data, &load_data.method,
-                                            &load_data.pipeline_id, iters, &devtools_chan, &request_id));
+                                            &load_data.pipeline_id, iters, &devtools_chan,
+                                            profiler_chan.clone(), prof_metadata.clone(),
+                                            &request_id));
 
         process_response_headers(&response, &doc_url, &http_state.cookie_jar, &http_state.hsts_list, &load_data);
 
@@ -981,9 +1036,15 @@ fn send_data<R: Read>(context: LoadContext,
                       start_chan: LoadConsumer,
                       metadata: Metadata,
                       classifier: Arc<MIMEClassifier>,
-                      cancel_listener: &CancellationListener) {
+                      cancel_listener: &CancellationListener,
+                      prof_metadata: TimerMetadata,
+                      prof_chan: ProfilerChan) {
     let (progress_chan, mut chunk) = {
-        let buf = match read_block(reader) {
+        let result = profile(ProfilerCategory::NetHTTPReceiveBody,
+                             Some(prof_metadata.clone()),
+                             prof_chan.clone(),
+                             || read_block(reader));
+        let buf = match result {
             Ok(ReadResult::Payload(buf)) => buf,
             _ => vec!(),
         };
@@ -1007,7 +1068,11 @@ fn send_data<R: Read>(context: LoadContext,
             return;
         }
 
-        chunk = match read_block(reader) {
+        let result = profile(ProfilerCategory::NetHTTPReceiveBody,
+                             Some(prof_metadata.clone()),
+                             prof_chan.clone(),
+                             || read_block(reader));
+        chunk = match result {
             Ok(ReadResult::Payload(buf)) => buf,
             Ok(ReadResult::EOF) | Err(_) => break,
         };

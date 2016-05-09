@@ -4,6 +4,7 @@
 
 #![feature(box_syntax)]
 #![feature(fnbox)]
+#![feature(lookup_host)]
 #![feature(mpsc_select)]
 #![feature(plugin)]
 #![feature(plugin)]

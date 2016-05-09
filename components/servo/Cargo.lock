@@ -23,7 +23,6 @@ dependencies = [
  "layout 0.0.1",
  "layout_tests 0.0.1",
  "libc 0.2.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "msg 0.0.1",
  "net 0.0.1",
  "net_tests 0.0.1",

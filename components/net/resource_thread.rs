@@ -22,7 +22,8 @@ use net_traits::ProgressMsg::Done;
 use net_traits::{AsyncResponseTarget, Metadata, ProgressMsg, ResourceThread, ResponseAction};
 use net_traits::{ControlMsg, CookieSource, LoadConsumer, LoadData, LoadResponse, ResourceId};
 use net_traits::{NetworkError, WebSocketCommunicate, WebSocketConnectData};
-use profile_traits::time::ProfilerChan;
+use profile_traits::time::{ProfilerCategory, profile, TimerMetadataReflowType};
+use profile_traits::time::{ProfilerChan, TimerMetadata, TimerMetadataFrameType};
 use rustc_serialize::json;
 use rustc_serialize::{Decodable, Encodable};
 use std::borrow::ToOwned;
@@ -32,10 +33,11 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
+use std::net::lookup_host;
 use std::path::Path;
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::sync::{Arc, RwLock};
-use url::Url;
+use url::{Url, Host};
 use util::opts;
 use util::prefs;
 use util::thread::spawn_named;
@@ -162,7 +164,7 @@ pub fn new_resource_thread(user_agent: String,
 
         let mut channel_manager = ResourceChannelManager {
             from_client: setup_port,
-            resource_manager: resource_manager
+            resource_manager: resource_manager,
         };
         channel_manager.start(setup_chan_clone);
     });
@@ -370,6 +372,7 @@ pub struct ResourceManager {
     connector: Arc<Pool<Connector>>,
     cancel_load_map: HashMap<ResourceId, Sender<()>>,
     next_resource_id: ResourceId,
+    lookup_sender: Sender<String>,
 }
 
 impl ResourceManager {
@@ -384,6 +387,23 @@ impl ResourceManager {
             read_json_from_file(&mut hsts_list, profile_dir, "hsts_list.json");
             read_json_from_file(&mut cookie_jar, profile_dir, "cookie_jar.json");
         }
+
+        let (lookup_sender, lookup_receiver) = channel::<String>();
+        let prof_chan = profiler_chan.clone();
+        spawn_named("HostLookup".to_owned(), move || {
+            while let Ok(host) = lookup_receiver.recv() {
+                /*let metadata = TimerMetadata {
+                    url: host.clone(),
+                    iframe: TimerMetadataFrameType::RootWindow,
+                    incremental: TimerMetadataReflowType::FirstReflow,
+                };
+                let _ = profile(ProfilerCategory::NetHostLookup,
+                                Some(metadata),
+                                prof_chan.clone(),
+                                || lookup_host(&host));*/
+            }
+        });
+
         ResourceManager {
             user_agent: user_agent,
             cookie_jar: Arc::new(RwLock::new(cookie_jar)),
@@ -395,6 +415,7 @@ impl ResourceManager {
             connector: create_http_connector(),
             cancel_load_map: HashMap::new(),
             next_resource_id: ResourceId(0),
+            lookup_sender: lookup_sender
         }
     }
 
@@ -441,6 +462,9 @@ impl ResourceManager {
             "chrome" => from_factory(chrome_loader::factory),
             "file" => from_factory(file_loader::factory),
             "http" | "https" | "view-source" => {
+                if let Some(Host::Domain(d)) = load_data.url.host() {
+                    self.lookup_sender.send(d.into());
+                }
                 let http_state = HttpState {
                     hsts_list: self.hsts_list.clone(),
                     cookie_jar: self.cookie_jar.clone(),

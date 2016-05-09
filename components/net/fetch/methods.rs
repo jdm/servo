@@ -836,7 +836,8 @@ fn http_network_fetch(request: Rc<Request>,
     let wrapped_response = obtain_response(&factory, &url, &request.method.borrow(),
                                            &request.headers.borrow(),
                                            &cancellation_listener, &None, &request.method.borrow(),
-                                           &None, request.redirect_count.get(), &None, "");
+                                           &None, request.redirect_count.get(), &None,
+                                           panic!(), panic!(), "");
 
     let mut response = Response::new();
     match wrapped_response {

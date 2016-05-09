@@ -27,8 +27,8 @@ energy-profiling = ["profile_traits/energy-profiling"]
 opt-level = 3
 codegen-units = 4
 # Uncomment to profile on Linux:
-# debug = true
-# lto = false
+debug = true
+lto = false
 
 [dev-dependencies]
 image = "0.9"
@@ -73,9 +73,6 @@ env_logger = "0.3"
 euclid = {version = "0.6.4", features = ["plugins"]}
 libc = "0.2"
 url = {version = "1.0.0", features = ["heap_size", "serde", "query_encoding"]}
-
-[target.'cfg(target_os = "android")'.dependencies]
-log = {version = "0.3", features = ["release_max_level_info"]}
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
 gaol = {git = "https://github.com/servo/gaol"}
