@@ -15,7 +15,7 @@ use heapsize::HeapSizeOf;
 use ipc_channel::ipc;
 use net_traits::image::base::Image;
 use net_traits::image_cache_thread::{ImageCacheChan, ImageCacheThread, ImageResponse, ImageState};
-use net_traits::image_cache_thread::{ImageOrMetadataAvailable, UsePlaceholder};
+use net_traits::image_cache_thread::{ImageOrMetadataAvailable, UsePlaceholder, ImageCacheResult};
 use parking_lot::RwLock;
 use std::cell::{RefCell, RefMut};
 use std::collections::HashMap;
@@ -149,7 +149,8 @@ impl SharedLayoutContext {
         loop {
             match sync_rx.recv() {
                 Err(_) => return None,
-                Ok(response) => {
+                Ok(ImageCacheResult::InitiateRequest(..)) => panic!("unexpected image requestor"),
+                Ok(ImageCacheResult::Response(response)) => {
                     match response.image_response {
                         ImageResponse::Loaded(image) | ImageResponse::PlaceholderLoaded(image) => {
                             return Some(image)

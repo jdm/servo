@@ -7,9 +7,9 @@ use ipc_channel::ipc::{self, IpcReceiver, IpcSender};
 use ipc_channel::router::ROUTER;
 use net_traits::{CoreResourceThread, NetworkError, fetch_async, FetchResponseMsg, FetchMetadata, Metadata};
 use net_traits::image::base::{Image, ImageMetadata, PixelFormat, load_from_memory};
+use net_traits::image_cache_thread::{ImageResponder, ImageCacheResultResponse};
 use net_traits::image_cache_thread::{ImageCacheChan, ImageCacheCommand, ImageCacheThread, ImageState};
 use net_traits::image_cache_thread::{ImageCacheResult, ImageOrMetadataAvailable, ImageResponse, UsePlaceholder};
-use net_traits::image_cache_thread::ImageResponder;
 use net_traits::request::{Destination, RequestInit, Type as RequestType};
 use std::borrow::ToOwned;
 use std::collections::HashMap;
@@ -209,6 +209,11 @@ impl ImageListener {
         }
     }
 
+    fn initiate_request(&self, responder: Option<ImageResponder>) {
+        let ImageCacheChan(ref sender) = self.sender;
+        let _ = sender.send(ImageCacheResult::InitiateRequest(responder));
+    }
+
     fn notify(&self, image_response: ImageResponse) {
         if !self.send_metadata_msg {
             if let ImageResponse::MetadataLoaded(_) = image_response {
@@ -217,11 +222,11 @@ impl ImageListener {
         }
 
         let ImageCacheChan(ref sender) = self.sender;
-        let msg = ImageCacheResult {
+        let msg = ImageCacheResultResponse {
             responder: self.responder.clone(),
             image_response: image_response,
         };
-        sender.send(msg).ok();
+        sender.send(ImageCacheResult::Response(msg)).ok();
     }
 }
 
@@ -515,7 +520,7 @@ impl ImageCache {
                      result_chan: ImageCacheChan,
                      responder: Option<ImageResponder>,
                      send_metadata_msg: bool) {
-        let image_listener = ImageListener::new(result_chan, responder, send_metadata_msg);
+        let image_listener = ImageListener::new(result_chan, responder.clone(), send_metadata_msg);
         // Let's avoid copying url everywhere.
         let ref_url = Arc::new(url);
 
@@ -528,14 +533,14 @@ impl ImageCache {
             None => {
                 // Check if the load is already pending
                 let (cache_result, load_key, mut pending_load) = self.pending_loads.get_cached(ref_url.clone());
-                pending_load.add_listener(image_listener);
                 match cache_result {
                     CacheResult::Miss => {
+                        image_listener.initiate_request(responder);
                         // A new load request! Request the load from
                         // the resource thread.
                         // https://html.spec.whatwg.org/multipage/#update-the-image-data
                         // step 12.
-                        let request = RequestInit {
+                        /*let request = RequestInit {
                             url: (*ref_url).clone(),
                             type_: RequestType::Image,
                             destination: Destination::Image,
@@ -567,12 +572,13 @@ impl ImageCache {
                                 action: action,
                                 key: load_key,
                             }).unwrap();
-                        });
+                        });*/
                     }
                     CacheResult::Hit => {
                         // Request is already on its way.
                     }
                 }
+                pending_load.add_listener(image_listener);
             }
         }
     }
