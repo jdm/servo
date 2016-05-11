@@ -422,7 +422,7 @@ impl UnprivilegedPipelineContent {
             constellation_chan: self.constellation_chan,
             scheduler_chan: self.scheduler_chan,
             bluetooth_thread: self.bluetooth_thread,
-            resource_threads: self.resource_threads,
+            resource_threads: self.resource_threads.clone(),
             image_cache_thread: self.image_cache_thread.clone(),
             time_profiler_chan: self.time_profiler_chan.clone(),
             mem_profiler_chan: self.mem_profiler_chan.clone(),
@@ -443,6 +443,7 @@ impl UnprivilegedPipelineContent {
                     self.font_cache_thread,
                     self.time_profiler_chan,
                     self.mem_profiler_chan,
+                    self.resource_threads,
                     self.layout_content_process_shutdown_chan,
                     self.webrender_api_sender,
                     self.prefs.get("layout.threads").expect("exists").value()

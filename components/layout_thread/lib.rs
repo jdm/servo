@@ -81,6 +81,7 @@ use layout_traits::LayoutThreadFactory;
 use msg::constellation_msg::PipelineId;
 use net_traits::image_cache_thread::{ImageCacheChan, ImageCacheResult, ImageCacheThread};
 use net_traits::image_cache_thread::UsePlaceholder;
+use net_traits::ResourceThreads;
 use parking_lot::RwLock;
 use profile_traits::mem::{self, Report, ReportKind, ReportsChan};
 use profile_traits::time::{self, TimerMetadata, profile};
@@ -91,7 +92,7 @@ use script_layout_interface::reporter::CSSErrorReporter;
 use script_layout_interface::rpc::{LayoutRPC, MarginStyleResponse, NodeOverflowResponse, OffsetParentResponse};
 use script_layout_interface::wrapper_traits::LayoutNode;
 use script_traits::{ConstellationControlMsg, LayoutControlMsg, LayoutMsg as ConstellationMsg};
-use script_traits::{StackingContextScrollState, UntrustedNodeAddress};
+use script_traits::{StackingContextScrollState, UntrustedNodeAddress, PendingResources};
 use selectors::Element;
 use std::borrow::ToOwned;
 use std::collections::HashMap;
@@ -157,6 +158,9 @@ pub struct LayoutThread {
     /// The channel on which messages can be sent to the script thread.
     script_chan: IpcSender<ConstellationControlMsg>,
 
+    /// The channel on which messages can be sent to the network thread.
+    pub resource_chan: ResourceThreads,
+
     /// The channel on which messages can be sent to the time profiler.
     time_profiler_chan: time::ProfilerChan,
 
@@ -185,6 +189,9 @@ pub struct LayoutThread {
 
     /// Receives newly-discovered animations.
     new_animations_receiver: Receiver<Animation>,
+
+    /// The number of images that have been requested but not yet loaded.
+    last_outstanding_image_count: usize,
 
     /// The number of Web fonts that have been requested but not yet loaded.
     outstanding_web_fonts: Arc<AtomicUsize>,
@@ -245,6 +252,7 @@ impl LayoutThreadFactory for LayoutThread {
               font_cache_thread: FontCacheThread,
               time_profiler_chan: time::ProfilerChan,
               mem_profiler_chan: mem::ProfilerChan,
+              resource_chan: ResourceThreads,
               content_process_shutdown_chan: IpcSender<()>,
               webrender_api_sender: webrender_traits::RenderApiSender,
               layout_threads: usize) {
@@ -261,6 +269,7 @@ impl LayoutThreadFactory for LayoutThread {
                                              pipeline_port,
                                              constellation_chan,
                                              script_chan,
+                                             resource_chan,
                                              image_cache_thread,
                                              font_cache_thread,
                                              time_profiler_chan,
@@ -372,6 +381,7 @@ impl LayoutThread {
            pipeline_port: IpcReceiver<LayoutControlMsg>,
            constellation_chan: IpcSender<ConstellationMsg>,
            script_chan: IpcSender<ConstellationControlMsg>,
+           resource_chan: ResourceThreads,
            image_cache_thread: ImageCacheThread,
            font_cache_thread: FontCacheThread,
            time_profiler_chan: time::ProfilerChan,
@@ -422,6 +432,7 @@ impl LayoutThread {
             pipeline_port: pipeline_receiver,
             script_chan: script_chan.clone(),
             constellation_chan: constellation_chan.clone(),
+            resource_chan: resource_chan,
             time_profiler_chan: time_profiler_chan,
             mem_profiler_chan: mem_profiler_chan,
             image_cache_thread: image_cache_thread,
@@ -435,6 +446,7 @@ impl LayoutThread {
             generation: 0,
             new_animations_sender: new_animations_sender,
             new_animations_receiver: new_animations_receiver,
+            last_outstanding_image_count: 0,
             outstanding_web_fonts: outstanding_web_fonts_counter,
             root_flow: None,
             running_animations: Arc::new(RwLock::new(HashMap::new())),
@@ -510,9 +522,12 @@ impl LayoutThread {
                 timer: self.timer.clone(),
             },
             image_cache_thread: Mutex::new(self.image_cache_thread.clone()),
+            pipeline: self.id.clone(),
+            resource_chan: Mutex::new(self.resource_chan.clone()),
             image_cache_sender: Mutex::new(self.image_cache_sender.clone()),
             font_cache_thread: Mutex::new(self.font_cache_thread.clone()),
             webrender_image_cache: self.webrender_image_cache.clone(),
+            outstanding_images: Arc::new(AtomicUsize::new(0)),
         }
     }
 
@@ -560,8 +575,8 @@ impl LayoutThread {
             Request::FromPipeline(LayoutControlMsg::GetCurrentEpoch(sender)) => {
                 self.handle_request_helper(Msg::GetCurrentEpoch(sender), possibly_locked_rw_data)
             },
-            Request::FromPipeline(LayoutControlMsg::GetWebFontLoadState(sender)) => {
-                self.handle_request_helper(Msg::GetWebFontLoadState(sender),
+            Request::FromPipeline(LayoutControlMsg::GetResourceLoadState(sender)) => {
+                self.handle_request_helper(Msg::GetResourceLoadState(sender),
                                            possibly_locked_rw_data)
             },
             Request::FromPipeline(LayoutControlMsg::ExitNow) => {
@@ -610,6 +625,7 @@ impl LayoutThread {
                                                      &mut *rw_data,
                                                      &mut layout_context);
 
+        //XXXjdm update count of outstanding images??
 
         true
     }
@@ -657,10 +673,15 @@ impl LayoutThread {
             Msg::AdvanceClockMs(how_many, do_tick) => {
                 self.handle_advance_clock_ms(how_many, possibly_locked_rw_data, do_tick);
             }
-            Msg::GetWebFontLoadState(sender) => {
+            Msg::GetResourceLoadState(sender) => {
                 let _rw_data = possibly_locked_rw_data.lock();
                 let outstanding_web_fonts = self.outstanding_web_fonts.load(Ordering::SeqCst);
-                sender.send(outstanding_web_fonts != 0).unwrap();
+                let outstanding_images = self.last_outstanding_image_count;
+                let pending = PendingResources {
+                    web_font: outstanding_web_fonts != 0,
+                    image: outstanding_images != 0,
+                };
+                sender.send(pending).unwrap();
             },
             Msg::CreateLayoutThread(info) => {
                 self.create_layout_thread(info)
@@ -739,6 +760,7 @@ impl LayoutThread {
                              self.font_cache_thread.clone(),
                              self.time_profiler_chan.clone(),
                              self.mem_profiler_chan.clone(),
+                             self.resource_chan.clone(),
                              info.content_process_shutdown_chan,
                              self.webrender_api.clone_sender(),
                              info.layout_threads);
@@ -1186,6 +1208,9 @@ impl LayoutThread {
                                                      Some(&document),
                                                      &mut rw_data,
                                                      &mut shared_layout_context);
+
+        self.last_outstanding_image_count =
+            shared_layout_context.outstanding_images.load(Ordering::SeqCst);
 
         self.respond_to_query_if_necessary(&data.query_type,
                                            &mut *rw_data,

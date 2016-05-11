@@ -13,14 +13,17 @@ use gfx::font_cache_thread::FontCacheThread;
 use gfx::font_context::FontContext;
 use heapsize::HeapSizeOf;
 use ipc_channel::ipc;
+use msg::constellation_msg::PipelineId;
 use net_traits::image::base::Image;
 use net_traits::image_cache_thread::{ImageCacheChan, ImageCacheThread, ImageResponse, ImageState};
 use net_traits::image_cache_thread::{ImageOrMetadataAvailable, UsePlaceholder, ImageCacheResult};
+use net_traits::{ResourceThreads, LoadContext};
 use parking_lot::RwLock;
 use std::cell::{RefCell, RefMut};
 use std::collections::HashMap;
 use std::hash::BuildHasherDefault;
 use std::rc::Rc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use style::context::{LocalStyleContext, StyleContext, SharedStyleContext};
 use url::Url;
@@ -73,6 +76,12 @@ pub struct SharedLayoutContext {
     /// Bits shared by the layout and style system.
     pub style_context: SharedStyleContext,
 
+    /// The pipeline this thread is associated with.
+    pub pipeline: PipelineId,
+
+    /// The shared resource thread.
+    pub resource_chan: Mutex<ResourceThreads>,
+
     /// The shared image cache thread.
     pub image_cache_thread: Mutex<ImageCacheThread>,
 
@@ -86,6 +95,9 @@ pub struct SharedLayoutContext {
     pub webrender_image_cache: Arc<RwLock<HashMap<(Url, UsePlaceholder),
                                                   WebRenderImageInfo,
                                                   BuildHasherDefault<FnvHasher>>>>,
+
+    /// The number of images that have been requested but not yet loaded.
+    pub outstanding_images: Arc<AtomicUsize>,
 }
 
 pub struct LayoutContext<'a> {
@@ -125,54 +137,12 @@ impl<'a> LayoutContext<'a> {
 }
 
 impl SharedLayoutContext {
-    fn get_or_request_image_synchronously(&self, url: Url, use_placeholder: UsePlaceholder)
-                                          -> Option<Arc<Image>> {
-        debug_assert!(opts::get().output_file.is_some() || opts::get().exit_after_load);
-
-        // See if the image is already available
-        let result = self.image_cache_thread.lock().unwrap()
-                                            .find_image(url.clone(), use_placeholder);
-
-        match result {
-            Ok(image) => return Some(image),
-            Err(ImageState::LoadError) => {
-                // Image failed to load, so just return nothing
-                return None
-            }
-            Err(_) => {}
-        }
-
-        // If we are emitting an output file, then we need to block on
-        // image load or we risk emitting an output file missing the image.
-        let (sync_tx, sync_rx) = ipc::channel().unwrap();
-        self.image_cache_thread.lock().unwrap().request_image(url, ImageCacheChan(sync_tx), None);
-        loop {
-            match sync_rx.recv() {
-                Err(_) => return None,
-                Ok(ImageCacheResult::InitiateRequest(..)) => panic!("unexpected image requestor"),
-                Ok(ImageCacheResult::Response(response)) => {
-                    match response.image_response {
-                        ImageResponse::Loaded(image) | ImageResponse::PlaceholderLoaded(image) => {
-                            return Some(image)
-                        }
-                        ImageResponse::None | ImageResponse::MetadataLoaded(_) => {}
-                    }
-                }
-            }
-        }
-    }
-
     pub fn get_or_request_image_or_meta(&self, url: Url, use_placeholder: UsePlaceholder)
                                 -> Option<ImageOrMetadataAvailable> {
-        // If we are emitting an output file, load the image synchronously.
-        if opts::get().output_file.is_some() || opts::get().exit_after_load {
-            return self.get_or_request_image_synchronously(url, use_placeholder)
-                       .map(|img| ImageOrMetadataAvailable::ImageAvailable(img));
-        }
         // See if the image is already available
         let result = self.image_cache_thread.lock().unwrap()
-                                            .find_image_or_metadata(url.clone(),
-                                                                    use_placeholder);
+                         .find_image_or_metadata(url.clone(),
+                                                 use_placeholder);
         match result {
             Ok(image_or_metadata) => Some(image_or_metadata),
             // Image failed to load, so just return nothing
@@ -182,11 +152,15 @@ impl SharedLayoutContext {
                 let sender = self.image_cache_sender.lock().unwrap().clone();
                 self.image_cache_thread.lock().unwrap()
                                        .request_image_and_metadata(url, sender, None);
+                self.outstanding_images.fetch_add(1, Ordering::SeqCst);
                 None
             }
             // Image has been requested, is still pending. Return no image for this paint loop.
             // When the image loads it will trigger a reflow and/or repaint.
-            Err(ImageState::Pending) => None,
+            Err(ImageState::Pending) => {
+                self.outstanding_images.fetch_add(1, Ordering::SeqCst);
+                None
+            }
         }
     }
 

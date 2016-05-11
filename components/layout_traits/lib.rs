@@ -22,6 +22,7 @@ use gfx::font_cache_thread::FontCacheThread;
 use ipc_channel::ipc::{IpcReceiver, IpcSender};
 use msg::constellation_msg::PipelineId;
 use net_traits::image_cache_thread::ImageCacheThread;
+use net_traits::ResourceThreads;
 use profile_traits::{mem, time};
 use script_traits::{ConstellationControlMsg, LayoutControlMsg};
 use script_traits::LayoutMsg as ConstellationMsg;
@@ -43,6 +44,7 @@ pub trait LayoutThreadFactory {
               font_cache_thread: FontCacheThread,
               time_profiler_chan: time::ProfilerChan,
               mem_profiler_chan: mem::ProfilerChan,
+              resource_chan: ResourceThreads,
               content_process_shutdown_chan: IpcSender<()>,
               webrender_api_sender: webrender_traits::RenderApiSender,
               layout_threads: usize);

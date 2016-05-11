@@ -211,7 +211,7 @@ impl ImageListener {
 
     fn initiate_request(&self, responder: Option<ImageResponder>) {
         let ImageCacheChan(ref sender) = self.sender;
-        let _ = sender.send(ImageCacheResult::InitiateRequest(responder));
+        sender.send(ImageCacheResult::InitiateRequest(responder)).unwrap();
     }
 
     fn notify(&self, image_response: ImageResponse) {
@@ -535,44 +535,47 @@ impl ImageCache {
                 let (cache_result, load_key, mut pending_load) = self.pending_loads.get_cached(ref_url.clone());
                 match cache_result {
                     CacheResult::Miss => {
-                        image_listener.initiate_request(responder);
-                        // A new load request! Request the load from
-                        // the resource thread.
-                        // https://html.spec.whatwg.org/multipage/#update-the-image-data
-                        // step 12.
-                        /*let request = RequestInit {
-                            url: (*ref_url).clone(),
-                            type_: RequestType::Image,
-                            destination: Destination::Image,
-                            origin: (*ref_url).clone(),
-                            .. RequestInit::default()
-                        };
-
-                        let progress_sender = self.progress_sender.clone();
-                        fetch_async(request, &self.core_resource_thread, move |action| {
-                            let action = match action {
-                                FetchResponseMsg::ProcessRequestBody |
-                                FetchResponseMsg::ProcessRequestEOF => return,
-                                FetchResponseMsg::ProcessResponse(meta_result) => {
-                                    ResponseAction::HeadersAvailable(meta_result.map(|m| {
-                                        match m {
-                                            FetchMetadata::Unfiltered(m) => m,
-                                            FetchMetadata::Filtered { unsafe_, .. } => unsafe_
-                                        }
-                                    }))
-                                }
-                                FetchResponseMsg::ProcessResponseChunk(new_bytes) => {
-                                    ResponseAction::DataAvailable(new_bytes)
-                                }
-                                FetchResponseMsg::ProcessResponseEOF(response) => {
-                                    ResponseAction::ResponseComplete(response)
-                                }
+                        if responder.is_some() {
+                            image_listener.initiate_request(responder);
+                        } else {
+                            // A new load request! Request the load from
+                            // the resource thread.
+                            // https://html.spec.whatwg.org/multipage/#update-the-image-data
+                            // step 12.
+                            let request = RequestInit {
+                                url: (*ref_url).clone(),
+                                type_: RequestType::Image,
+                                destination: Destination::Image,
+                                origin: (*ref_url).clone(),
+                                .. RequestInit::default()
                             };
-                            progress_sender.send(ResourceLoadInfo {
-                                action: action,
-                                key: load_key,
-                            }).unwrap();
-                        });*/
+
+                            let progress_sender = self.progress_sender.clone();
+                            fetch_async(request, &self.core_resource_thread, move |action| {
+                                let action = match action {
+                                    FetchResponseMsg::ProcessRequestBody |
+                                    FetchResponseMsg::ProcessRequestEOF => return,
+                                    FetchResponseMsg::ProcessResponse(meta_result) => {
+                                        ResponseAction::HeadersAvailable(meta_result.map(|m| {
+                                            match m {
+                                                FetchMetadata::Unfiltered(m) => m,
+                                                FetchMetadata::Filtered { unsafe_, .. } => unsafe_
+                                            }
+                                        }))
+                                    }
+                                    FetchResponseMsg::ProcessResponseChunk(new_bytes) => {
+                                        ResponseAction::DataAvailable(new_bytes)
+                                    }
+                                    FetchResponseMsg::ProcessResponseEOF(response) => {
+                                        ResponseAction::ResponseComplete(response)
+                                    }
+                                };
+                                progress_sender.send(ResourceLoadInfo {
+                                    action: action,
+                                    key: load_key,
+                                }).unwrap();
+                            });
+                        }
                     }
                     CacheResult::Hit => {
                         // Request is already on its way.

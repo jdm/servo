@@ -12,7 +12,7 @@ use msg::constellation_msg::PipelineId;
 use net_traits::image_cache_thread::ImageCacheThread;
 use profile_traits::mem::ReportsChan;
 use rpc::LayoutRPC;
-use script_traits::{ConstellationControlMsg, LayoutControlMsg};
+use script_traits::{ConstellationControlMsg, LayoutControlMsg, PendingResources};
 use script_traits::{LayoutMsg as ConstellationMsg, StackingContextScrollState, WindowSizeData};
 use servo_atoms::Atom;
 use std::sync::Arc;
@@ -71,7 +71,7 @@ pub enum Msg {
 
     /// Asks the layout thread whether any Web fonts have yet to load (if true, loads are pending;
     /// false otherwise).
-    GetWebFontLoadState(IpcSender<bool>),
+    GetResourceLoadState(IpcSender<PendingResources>),
 
     /// Creates a new layout thread.
     ///
