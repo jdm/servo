@@ -3,7 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 use app_units::{Au, AU_PER_PX};
-use document_loader::LoadType;
+use document_loader::{LoadType, LoadBlocker};
 use dom::attr::Attr;
 use dom::bindings::cell::DOMRefCell;
 use dom::bindings::codegen::Bindings::HTMLImageElementBinding;
@@ -47,10 +47,12 @@ enum State {
     Broken,
 }
 #[derive(JSTraceable, HeapSizeOf)]
+#[must_root]
 struct ImageRequest {
     state: State,
     parsed_url: Option<Url>,
     source_url: Option<DOMString>,
+    blocker: Option<LoadBlocker>,
     #[ignore_heap_size_of = "Arc"]
     image: Option<Arc<Image>>,
     metadata: Option<ImageMetadata>,
@@ -95,6 +97,8 @@ impl Runnable for ImageRequestRunnable {
 
         let document = document_from_node(&*element);
         let window = window_from_node(&*element);
+
+        //LoadBlocker::terminate(&mut element.current_request.borrow_mut().blocker);
         
         let context = Arc::new(Mutex::new(ImageContext {
             elem: trusted_node,
@@ -174,6 +178,8 @@ impl Runnable for ImageResponseHandlerRunnable {
             element.upcast::<EventTarget>().fire_event(atom!("error"));
         }
 
+        LoadBlocker::terminate(&mut element.current_request.borrow_mut().blocker);
+
         // Trigger reflow
         let window = window_from_node(&*document);
         window.add_pending_reflow();
@@ -232,10 +238,10 @@ impl FetchResponseListener for ImageContext {
         let window = document.window();
         let image_cache = window.image_cache_thread();
         image_cache.store_complete_image_bytes(self.url.clone(), self.data.clone());
-        let responder = self.responder.clone();
+        /*let responder = self.responder.clone();
         image_cache.request_image_and_metadata(self.url.clone(),
                                                window.image_cache_chan(),
-                                               Some(ImageResponder::new(responder)));
+                                               Some(ImageResponder::new(responder)));*/
         document.finish_load(LoadType::Image(self.url.clone()));
     }
 }
@@ -252,6 +258,7 @@ impl HTMLImageElement {
             None => {
                 self.current_request.borrow_mut().parsed_url = None;
                 self.current_request.borrow_mut().source_url = None;
+                LoadBlocker::terminate(&mut self.current_request.borrow_mut().blocker);
                 self.current_request.borrow_mut().image = None;
             }
             Some((src, base_url)) => {
@@ -259,6 +266,8 @@ impl HTMLImageElement {
                 if let Ok(img_url) = img_url {
                     self.current_request.borrow_mut().parsed_url = Some(img_url.clone());
                     self.current_request.borrow_mut().source_url = Some(src);
+                    self.current_request.borrow_mut().blocker =
+                        Some(LoadBlocker::new(&*document, LoadType::Image(img_url.clone())));
 
                     let trusted_node = Trusted::new(self);
                     let (responder_sender, responder_receiver) = ipc::channel().unwrap();
@@ -328,6 +337,7 @@ impl HTMLImageElement {
             }
         }
     }
+
     fn new_inherited(local_name: LocalName, prefix: Option<DOMString>, document: &Document) -> HTMLImageElement {
         HTMLImageElement {
             htmlelement: HTMLElement::new_inherited(local_name, prefix, document),
@@ -336,14 +346,16 @@ impl HTMLImageElement {
                 parsed_url: None,
                 source_url: None,
                 image: None,
-                metadata: None
+                metadata: None,
+                blocker: None,
             }),
             pending_request: DOMRefCell::new(ImageRequest {
                 state: State::Unavailable,
                 parsed_url: None,
                 source_url: None,
                 image: None,
-                metadata: None
+                metadata: None,
+                blocker: None,
             }),
         }
     }

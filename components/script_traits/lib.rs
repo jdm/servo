@@ -245,6 +245,9 @@ pub enum ConstellationControlMsg {
     /// Notifies the script thread that a new Web font has been loaded, and thus the page should be
     /// reflowed.
     WebFontLoaded(PipelineId),
+    /// Notifies the script thread that a new image has been loaded, and thus the page should be
+    /// reflowed.
+    ImageLoaded(PipelineId),
     /// Cause a `load` event to be dispatched at the appropriate frame element.
     DispatchFrameLoadEvent {
         /// The frame that has been marked as loaded.
@@ -260,7 +263,9 @@ pub enum ConstellationControlMsg {
     /// Report an error from a CSS parser for the given pipeline
     ReportCSSError(PipelineId, String, usize, usize, String),
     /// Reload the given page.
-    Reload(PipelineId)
+    Reload(PipelineId),
+    ///
+    AnyImagesOutstanding(PipelineId, IpcSender<bool>),
 }
 
 impl fmt::Debug for ConstellationControlMsg {
@@ -291,7 +296,9 @@ impl fmt::Debug for ConstellationControlMsg {
             DispatchFrameLoadEvent { .. } => "DispatchFrameLoadEvent",
             FramedContentChanged(..) => "FramedContentChanged",
             ReportCSSError(..) => "ReportCSSError",
-            Reload(..) => "Reload"
+            Reload(..) => "Reload",
+            AnyImagesOutstanding(..) => "AnyImagesOutstanding",
+            ImageLoaded(..) => "ImageLoaded",
         })
     }
 }

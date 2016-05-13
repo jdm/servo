@@ -980,6 +980,8 @@ impl ScriptThread {
                 self.handle_transition_event(unsafe_node, name, duration),
             ConstellationControlMsg::WebFontLoaded(pipeline_id) =>
                 self.handle_web_font_loaded(pipeline_id),
+            ConstellationControlMsg::ImageLoaded(pipeline_id) =>
+                self.handle_image_loaded(pipeline_id),
             ConstellationControlMsg::DispatchFrameLoadEvent {
                 target: frame_id, parent: parent_id, child: child_id } =>
                 self.handle_frame_load_event(parent_id, frame_id, child_id),
@@ -991,6 +993,8 @@ impl ScriptThread {
                 self.handle_reload(pipeline_id),
             ConstellationControlMsg::ExitPipeline(pipeline_id) =>
                 self.handle_exit_pipeline_msg(pipeline_id),
+            ConstellationControlMsg::AnyImagesOutstanding(pipeline_id, sender) =>
+                self.handle_any_images_outstanding(pipeline_id, sender),
             msg @ ConstellationControlMsg::AttachLayout(..) |
             msg @ ConstellationControlMsg::Viewport(..) |
             msg @ ConstellationControlMsg::SetScrollState(..) |
@@ -1589,6 +1593,13 @@ impl ScriptThread {
         }
     }
 
+    /// Handles a image being loaded. Does nothing if the page no longer exists.
+    fn handle_image_loaded(&self, pipeline_id: PipelineId) {
+        if let Some(ref page) = self.documents.borrow().find_document(pipeline_id)  {
+            self.rebuild_and_force_reflow(page, ReflowReason::ImageLoaded);
+        }
+    }
+
     /// Notify the containing document of a child frame that has completed loading.
     fn handle_frame_load_event(&self, parent_id: PipelineId, frame_id: FrameId, child_id: PipelineId) {
         match self.documents.borrow().find_iframe(parent_id, frame_id) {
@@ -2137,6 +2148,14 @@ impl ScriptThread {
     fn handle_reload(&self, pipeline_id: PipelineId) {
         if let Some(window) = self.documents.borrow().find_window(pipeline_id) {
             window.Location().Reload();
+        }
+    }
+
+    fn handle_any_images_outstanding(&self, pipeline_id: PipelineId, sender: IpcSender<bool>) {
+        if let Some(window) = self.documents.borrow().find_window(pipeline_id) {
+            let _ = sender.send(window.get_pending_reflow_count() != 0);
+        } else {
+            let _ = sender.send(false);
         }
     }
 
