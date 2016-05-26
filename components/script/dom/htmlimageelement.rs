@@ -26,10 +26,10 @@ use dom::virtualmethods::VirtualMethods;
 use html5ever_atoms::LocalName;
 use ipc_channel::ipc::{self, IpcSender};
 use ipc_channel::router::ROUTER;
+use net_traits::{FetchResponseListener, FetchMetadata, Metadata, NetworkError};
 use net_traits::image::base::{Image, ImageMetadata};
 use net_traits::image_cache_thread::{ImageResponder, ImageResponse, ImageListenerResponse};
 use net_traits::request::{RequestInit, Type as RequestType};
-use net_traits::{FetchResponseListener, FetchMetadata, Metadata, NetworkError};
 use network_listener::{NetworkListener, PreInvoke};
 use script_thread::Runnable;
 use std::i32;
@@ -99,7 +99,7 @@ impl Runnable for ImageRequestRunnable {
         let window = window_from_node(&*element);
 
         //LoadBlocker::terminate(&mut element.current_request.borrow_mut().blocker);
-        
+
         let context = Arc::new(Mutex::new(ImageContext {
             elem: trusted_node,
             data: vec!(),

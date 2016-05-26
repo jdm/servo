@@ -14,17 +14,17 @@ use gfx::font_context::FontContext;
 use heapsize::HeapSizeOf;
 use ipc_channel::ipc;
 use msg::constellation_msg::PipelineId;
+use net_traits::{ResourceThreads, LoadContext};
 use net_traits::image::base::Image;
 use net_traits::image_cache_thread::{ImageCacheChan, ImageCacheThread, ImageResponse, ImageState};
 use net_traits::image_cache_thread::{ImageOrMetadataAvailable, UsePlaceholder, ImageCacheResult};
-use net_traits::{ResourceThreads, LoadContext};
 use parking_lot::RwLock;
 use std::cell::{RefCell, RefMut};
 use std::collections::HashMap;
 use std::hash::BuildHasherDefault;
 use std::rc::Rc;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use style::context::{LocalStyleContext, StyleContext, SharedStyleContext};
 use url::Url;
 use util::opts;
@@ -159,7 +159,7 @@ impl SharedLayoutContext {
                 //self.shared.outstanding_images.fetch_add(1, Ordering::SeqCst);
                 None
             }
-        }        
+        }
     }
 
     pub fn get_or_request_image_or_meta(&self, url: Url, use_placeholder: UsePlaceholder)
