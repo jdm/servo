@@ -393,6 +393,12 @@ pub struct ScriptThread {
     content_process_shutdown_chan: IpcSender<()>,
 
     panic_chan: IpcSender<PanicMsg>,
+
+    performing_a_microtask_checkpoint: Cell<bool>,
+
+    microtask_queue: Receiver<Box<Runnable + Send>>,
+
+    microtask_sender: Sender<Box<Runnable + Send>>,
 }
 
 /// In the event of thread panic, all data on the stack runs its destructor. However, there
@@ -524,15 +530,29 @@ impl ScriptThread {
 
     // https://html.spec.whatwg.org/multipage/#await-a-stable-state
     pub fn await_stable_state<T: Runnable + Send + 'static>(task: T) {
-        //TODO use microtasks when they exist
-        SCRIPT_THREAD_ROOT.with(|root| {
-            if let Some(script_thread) = *root.borrow() {
-                let script_thread = unsafe { &*script_thread };
-                let _ = script_thread.chan.send(CommonScriptMsg::RunnableMsg(
-                    ScriptThreadEventCategory::DomEvent,
-                    box task));
-            }
-        });
+        queue_a_microtask(box task);
+    }
+
+    fn queue_a_microtask(&self, task: Box<Runnable + Send>) {
+        let _ = self.microtask_sender.send(task);
+    }
+
+    fn perform_a_microtask_checkpoint(&self) {
+        if self.performing_a_microtask_checkpoint.get() {
+            return;
+        }
+
+        // Step 1
+        self.performing_a_microtask_checkpoint.set(true);
+
+        // Step 2
+        while let Ok(task) = self.microtask_queue.try_recv() {
+            // Step 5
+            task.handler();
+        }
+
+        // Step 9
+        self.performing_a_microtask_checkpoint.set(false);
     }
 
     /// Creates a new script thread.
@@ -564,6 +584,8 @@ impl ScriptThread {
 
         // Ask the router to proxy IPC messages from the control port to us.
         let control_port = ROUTER.route_ipc_receiver_to_new_mpsc_receiver(state.control_port);
+
+        let (microtask_sender, microtask_queue) = channel();
 
         ScriptThread {
             browsing_context: MutNullableHeap::new(None),
@@ -608,6 +630,11 @@ impl ScriptThread {
             timer_event_port: timer_event_port,
 
             content_process_shutdown_chan: state.content_process_shutdown_chan,
+
+            microtask_queue: microtask_queue,
+            microtask_sender: microtask_sender,
+
+            performing_a_microtask_checkpoint: Cell::new(false),
         }
     }
 
@@ -807,6 +834,8 @@ impl ScriptThread {
             if let Some(retval) = result {
                 return retval
             }
+
+            self.perform_a_microtask_checkpoint();
         }
 
         // Issue batched reflows on any pages that require it (e.g. if images loaded)
@@ -2082,4 +2111,22 @@ pub fn get_browsing_context(context: &BrowsingContext,
 
 fn dom_last_modified(tm: &Tm) -> String {
     tm.to_local().strftime("%m/%d/%Y %H:%M:%S").unwrap().to_string()
+}
+
+pub fn perform_a_microtask_checkpoint() {
+    SCRIPT_THREAD_ROOT.with(|root| {
+        if let Some(script_thread) = *root.borrow() {
+            let script_thread = unsafe { &*script_thread };
+            script_thread.perform_a_microtask_checkpoint();
+        }
+    });
+}
+
+pub fn queue_a_microtask(task: Box<Runnable + Send>) {
+    SCRIPT_THREAD_ROOT.with(|root| {
+        if let Some(script_thread) = *root.borrow() {
+            let script_thread = unsafe { &*script_thread };
+            script_thread.queue_a_microtask(task);
+        }
+    });
 }

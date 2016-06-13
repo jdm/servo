@@ -20,7 +20,7 @@ use js::jsapi::{JSJitCompilerOption, JS_SetOffthreadIonCompilationEnabled, JS_Se
 use js::jsapi::{JSObject, RuntimeOptionsRef, SetPreserveWrapperCallback};
 use js::rust::Runtime;
 use profile_traits::mem::{Report, ReportKind, ReportsChan};
-use script_thread::{Runnable, STACK_ROOTS, trace_thread};
+use script_thread::{Runnable, STACK_ROOTS, trace_thread, perform_a_microtask_checkpoint};
 use std::cell::{Ref, RefCell, Cell};
 use std::io::{Write, stdout};
 use std::marker::PhantomData;
@@ -429,18 +429,33 @@ fn trace_context_stack(tr: *mut JSTracer) {
     });
 }
 
-pub struct AutoExecutionStack;
+pub struct AutoExecutionStack<'a> {
+    global: GlobalRef<'a>,
+}
 
-impl AutoExecutionStack {
-    pub fn new(global: GlobalRef) -> AutoExecutionStack {
+impl<'a> AutoExecutionStack<'a> {
+    pub fn new(global: GlobalRef<'a>) -> AutoExecutionStack<'a> {
         ExecutionContextStack::push(global);
-        AutoExecutionStack
+        AutoExecutionStack {
+            global: global,
+        }
     }
 }
 
-impl Drop for AutoExecutionStack {
+// https://html.spec.whatwg.org/multipage/#clean-up-after-running-script
+impl<'a> Drop for AutoExecutionStack<'a> {
     fn drop(&mut self) {
+        // Step 2
+        let counter = self.global.entrance_counter();
+        counter.set(counter.get() - 1);
+
+        // Step 3
         ExecutionContextStack::pop();
+
+        // Step 5
+        if ExecutionContextStack::is_empty() {
+            perform_a_microtask_checkpoint();
+        }
     }
 }
 
