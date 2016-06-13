@@ -22,9 +22,11 @@ use msg::constellation_msg::{PipelineId, PanicMsg};
 use net_traits::filemanager_thread::FileManagerThreadMsg;
 use net_traits::{ResourceThreads, CoreResourceThread, RequestSource, IpcSend};
 use profile_traits::{mem, time};
-use script_runtime::{CommonScriptMsg, ScriptChan, ScriptPort};
+use script_runtime::{CommonScriptMsg, ScriptChan, ScriptPort, EnvironmentSettingsObject};
 use script_thread::{MainThreadScriptChan, ScriptThread};
 use script_traits::{MsDuration, ScriptMsg as ConstellationMsg, TimerEventRequest};
+use std::cell::Cell;
+use std::rc::Rc;
 use task_source::dom_manipulation::DOMManipulationTaskSource;
 use timers::{OneshotTimerCallback, OneshotTimerHandle};
 use url::Url;
@@ -295,6 +297,22 @@ impl<'a> GlobalRef<'a> {
         match *self {
             GlobalRef::Window(ref window) => window.panic_chan(),
             GlobalRef::Worker(ref worker) => worker.panic_chan(),
+        }
+    }
+
+    ///
+    pub fn settings_object(&self) -> Box<EnvironmentSettingsObject> {
+        match *self {
+            GlobalRef::Window(ref window) => window.settings_object(),
+            GlobalRef::Worker(ref _worker) => unimplemented!(),
+        }
+    }
+
+    ///
+    pub fn entrance_counter(&self) -> Rc<Cell<u32>> {
+        match *self {
+            GlobalRef::Window(ref window) => window.entrance_counter(),
+            GlobalRef::Worker(ref _worker) => unimplemented!(),
         }
     }
 }

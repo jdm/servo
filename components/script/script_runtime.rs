@@ -5,12 +5,14 @@
 //! The script runtime contains common traits and structs commonly used by the
 //! script thread, the dom, and the worker threads.
 
-use dom::bindings::js::{RootCollection, RootCollectionPtr, trace_roots};
+use dom::bindings::global::{GlobalRef, GlobalRoot, global_root_from_object};
+use dom::bindings::js::{RootCollection, RootCollectionPtr, Root, trace_roots};
 use dom::bindings::refcounted::{LiveDOMReferences, TrustedReference, trace_refcounted_objects};
-use dom::bindings::trace::trace_traceables;
+use dom::bindings::trace::{JSTraceable, trace_traceables};
 use dom::bindings::utils::DOM_CALLBACKS;
+use dom::document::Document;
 use js::glue::CollectServoSizes;
-use js::jsapi::{DisableIncrementalGC, GCDescription, GCProgress};
+use js::jsapi::{DisableIncrementalGC, GCDescription, GCProgress, Heap};
 use js::jsapi::{JSContext, JS_GetRuntime, JSRuntime, JSTracer, SetDOMCallbacks, SetGCSliceCallback};
 use js::jsapi::{JSGCInvocationKind, JSGCStatus, JS_AddExtraGCRootsTracer, JS_SetGCCallback};
 use js::jsapi::{JSGCMode, JSGCParamKey, JS_SetGCParameter, JS_SetGlobalJitCompilerOption};
@@ -19,11 +21,12 @@ use js::jsapi::{JSObject, RuntimeOptionsRef, SetPreserveWrapperCallback};
 use js::rust::Runtime;
 use profile_traits::mem::{Report, ReportKind, ReportsChan};
 use script_thread::{Runnable, STACK_ROOTS, trace_thread};
-use std::cell::Cell;
+use std::cell::{Ref, RefCell, Cell};
 use std::io::{Write, stdout};
 use std::marker::PhantomData;
 use std::os;
 use std::ptr;
+use std::rc::Rc;
 use time::{Tm, now};
 use util::opts;
 use util::prefs::get_pref;
@@ -379,6 +382,7 @@ unsafe extern fn trace_rust_roots(tr: *mut JSTracer, _data: *mut os::raw::c_void
     trace_thread(tr);
     trace_traceables(tr);
     trace_roots(tr);
+    trace_context_stack(tr);
     debug!("done custom root handler");
 }
 
@@ -401,3 +405,118 @@ unsafe fn set_gc_zeal_options(cx: *mut JSContext) {
 #[allow(unsafe_code)]
 #[cfg(not(feature = "debugmozjs"))]
 unsafe fn set_gc_zeal_options(_: *mut JSContext) {}
+
+pub trait EnvironmentSettingsObject {
+    /*fn realm_execution_context(&self) -> Rc<RealmExecutionContext>;
+    fn responsible_browsing_context(&self) -> Option<Root<BrowsingContext>>;
+    fn responsible_event_loop(&self) -> Box<ScriptChan + Send>;*/
+    fn responsible_document(&self) -> Option<Root<Document>>;
+    /*fn api_url_character_encoding(&self) -> &'static Encoding;
+    fn api_base_url(&self) -> URL;
+    fn origin(&self) -> Origin;
+    fn creation_url(&self) -> URL;
+    fn https_state(&self) -> HttpsState;
+    fn referrer_policy(&self) -> ReferrerPolicy;*/
+}
+
+thread_local!(static EXECUTION_CONTEXT_STACK: RefCell<ExecutionContextStack> =
+              RefCell::new(ExecutionContextStack::new()));
+
+fn trace_context_stack(tr: *mut JSTracer) {
+    EXECUTION_CONTEXT_STACK.with(|stack| {
+        debug!("tracing entries of context stack");
+        stack.borrow().trace(tr);
+    });
+}
+
+pub struct AutoExecutionStack;
+
+impl AutoExecutionStack {
+    pub fn new(global: GlobalRef) -> AutoExecutionStack {
+        ExecutionContextStack::push(global);
+        AutoExecutionStack
+    }
+}
+
+impl Drop for AutoExecutionStack {
+    fn drop(&mut self) {
+        ExecutionContextStack::pop();
+    }
+}
+
+#[derive(JSTraceable)]
+#[allow(unrooted_must_root)]
+pub struct ExecutionContextStack {
+    stack: Vec<ExecutionContext>,
+}
+
+impl ExecutionContextStack {
+    pub fn new() -> ExecutionContextStack {
+        ExecutionContextStack {
+            stack: vec![],
+        }
+    }
+
+    #[allow(unrooted_must_root)]
+    pub fn push(global: GlobalRef) {
+        EXECUTION_CONTEXT_STACK.with(|this| {
+            let mut this = this.borrow_mut();
+            let mut context = ExecutionContext {
+                global: Default::default(),
+                entrance_counter: global.entrance_counter(),
+            };
+            context.global.set(global.reflector().get_jsobject().get());
+            this.stack.push(context);
+        })
+    }
+
+    pub fn pop() {
+        EXECUTION_CONTEXT_STACK.with(|this| {
+            let _ = this.borrow_mut().stack.pop();
+        })
+    }
+
+    pub fn entry_execution_context<F, T>(f: F) -> T where F: Fn(&ExecutionContext) -> T {
+        EXECUTION_CONTEXT_STACK.with(|this| {
+            let this = this.borrow();
+            assert!(!this.stack.is_empty());
+            f(this.stack
+                  .iter()
+                  .rev()
+                  .find(|context| context.entrance_counter() > 0)
+                  .expect("couldn't find valid entry context"))
+        })
+    }
+
+    pub fn incumbent_execution_context<F, T>(f: F) -> T where F: Fn(&ExecutionContext) -> T {
+        EXECUTION_CONTEXT_STACK.with(|this| {
+            let this = this.borrow();
+            assert!(!this.stack.is_empty());
+            f(this.stack.last().unwrap())
+        })
+    }
+
+    pub fn is_empty() -> bool {
+        EXECUTION_CONTEXT_STACK.with(|this| {
+            this.borrow().stack.is_empty()
+        })
+    }
+}
+
+impl ExecutionContext {
+    #[allow(unsafe_code)]
+    pub unsafe fn global(&self) -> GlobalRoot {
+        global_root_from_object(self.global.get())
+    }
+
+    pub fn entrance_counter(&self) -> u32 {
+        self.entrance_counter.get()
+    }
+}
+
+#[must_root]
+#[derive(JSTraceable)]
+pub struct ExecutionContext {
+    global: Heap<*mut JSObject>,
+    entrance_counter: Rc<Cell<u32>>,
+}

@@ -77,7 +77,7 @@ use parse::html::{ParseContext, parse_html};
 use parse::xml::{self, parse_xml};
 use profile_traits::mem::{self, OpaqueSender, Report, ReportKind, ReportsChan};
 use profile_traits::time::{self, ProfilerCategory, profile};
-use script_runtime::{CommonScriptMsg, ScriptChan, ScriptThreadEventCategory};
+use script_runtime::{CommonScriptMsg, ScriptChan, ScriptThreadEventCategory, ExecutionContext};
 use script_runtime::{ScriptPort, StackRootTLS, new_rt_and_cx, get_reports};
 use script_traits::CompositorEvent::{KeyEvent, MouseButtonEvent, MouseMoveEvent, ResizeEvent};
 use script_traits::CompositorEvent::{TouchEvent, TouchpadPressureEvent};

@@ -5546,6 +5546,7 @@ class CGBindingRoot(CGThing):
             'js::glue::AppendToAutoIdVector',
             'js::rust::{GCMethods, define_methods, define_properties}',
             'dom::bindings',
+            'dom::bindings::global::global_root_from_context',
             'dom::bindings::global::{GlobalRef, global_root_from_object, global_root_from_reflector}',
             'dom::bindings::interface::{InterfaceConstructorBehavior, NonCallbackInterfaceObjectClass}',
             'dom::bindings::interface::{create_callback_interface_object, create_interface_prototype_object}',
@@ -5589,6 +5590,7 @@ class CGBindingRoot(CGThing):
             'dom::bindings::trace::RootedVec',
             'dom::bindings::weakref::{DOM_WEAK_SLOT, WeakBox, WeakReferenceable}',
             'mem::heap_size_of_raw_self_and_children',
+            'script_runtime::AutoExecutionStack',
             'libc',
             'util::prefs',
             'std::borrow::ToOwned',
@@ -6075,6 +6077,9 @@ class CallbackMethod(CallbackMember):
             replacements["argc"] = "0"
         return string.Template(
             "${getCallable}"
+            "//XXXjdm How do we guarantee we're using the right global here?\n"
+            "let global = global_root_from_context(cx);\n"
+            "let _aes = AutoExecutionStack::new(global.r());\n"
             "let rootedThis = RootedObject::new(cx, ${thisObj});\n"
             "let ok = JS_CallFunctionValue(\n"
             "    cx, rootedThis.handle(), callable.handle(),\n"

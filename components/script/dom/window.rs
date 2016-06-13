@@ -15,10 +15,11 @@ use dom::bindings::codegen::Bindings::FunctionBinding::Function;
 use dom::bindings::codegen::Bindings::WindowBinding::{ScrollBehavior, ScrollToOptions};
 use dom::bindings::codegen::Bindings::WindowBinding::{self, FrameRequestCallback, WindowMethods};
 use dom::bindings::error::{Error, ErrorResult, Fallible, report_pending_exception};
-use dom::bindings::global::{GlobalRef, global_root_from_object};
+use dom::bindings::global::{GlobalRef, global_root_from_object, global_root_from_context};
 use dom::bindings::inheritance::Castable;
 use dom::bindings::js::{JS, MutNullableHeap, Root};
 use dom::bindings::num::Finite;
+use dom::bindings::refcounted::Trusted;
 use dom::bindings::reflector::Reflectable;
 use dom::bindings::str::DOMString;
 use dom::bindings::utils::{GlobalStaticData, WindowProxyHandler};
@@ -59,7 +60,7 @@ use profile_traits::time::{ProfilerCategory, TimerMetadata, TimerMetadataFrameTy
 use profile_traits::time::{ProfilerChan, TimerMetadataReflowType, profile};
 use reporter::CSSErrorReporter;
 use rustc_serialize::base64::{FromBase64, STANDARD, ToBase64};
-use script_runtime::{ScriptChan, ScriptPort};
+use script_runtime::{ScriptChan, ScriptPort, AutoExecutionStack, EnvironmentSettingsObject};
 use script_thread::SendableMainThreadScriptChan;
 use script_thread::{MainThreadScriptChan, MainThreadScriptMsg, RunnableWrapper};
 use script_traits::{ConstellationControlMsg, UntrustedNodeAddress};
@@ -266,6 +267,9 @@ pub struct Window {
 
     #[ignore_heap_size_of = "Defined in ipc-channel"]
     panic_chan: IpcSender<PanicMsg>,
+
+    #[ignore_heap_size_of = "Unclear ownership for Rc"]
+    entrance_counter: Rc<Cell<u32>>,
 }
 
 impl Window {
@@ -873,6 +877,7 @@ impl<'a, T: Reflectable> ScriptHelpers for &'a T {
     fn evaluate_script_on_global_with_result(self, code: &str, filename: &str,
                                              rval: MutableHandleValue) {
         let global = self.global();
+        let _aes = AutoExecutionStack::new(global.r());
         let metadata = TimerMetadata {
             url: if filename.is_empty() {
                 global.r().get_url().as_str().into()
@@ -903,7 +908,7 @@ impl<'a, T: Reflectable> ScriptHelpers for &'a T {
                     }
                 }
             }
-        )
+        );
     }
 }
 
@@ -1640,12 +1645,34 @@ impl Window {
             ignore_further_async_events: Arc::new(AtomicBool::new(false)),
             error_reporter: error_reporter,
             panic_chan: panic_chan,
+            entrance_counter: Rc::new(Cell::new(0)),
         };
 
         WindowBinding::Wrap(runtime.cx(), win)
     }
     pub fn live_devtools_updates(&self) -> bool {
         return self.devtools_wants_updates.get();
+    }
+
+    pub fn settings_object(&self) -> Box<EnvironmentSettingsObject> {
+        let obj = WindowSettingsObject {
+            window: Trusted::new(self),
+        };
+        box obj
+    }
+
+    pub fn entrance_counter(&self) -> Rc<Cell<u32>> {
+        self.entrance_counter.clone()
+    }
+}
+
+struct WindowSettingsObject {
+    window: Trusted<Window>,
+}
+
+impl EnvironmentSettingsObject for WindowSettingsObject {
+    fn responsible_document(&self) -> Option<Root<Document>> {
+        Some(self.window.root().Document())
     }
 }
 
