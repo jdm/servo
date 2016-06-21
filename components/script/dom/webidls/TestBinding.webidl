@@ -455,4 +455,9 @@ interface TestBinding {
   static void funcControlledStaticMethodEnabled();
   [Func="TestBinding::condition_satisfied"]
   const unsigned short funcControlledConstEnabled = 0;
+
+  Promise<DOMString> returnPromise();
+  readonly attribute Promise<boolean> promiseAttribute;
+  void acceptPromise(Promise<DOMString> string);
+  void acceptNullablePromise(Promise<DOMString>? string);
 };
