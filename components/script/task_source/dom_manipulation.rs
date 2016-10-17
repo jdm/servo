@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+use async::{AsyncAction, ToAsync};
 use dom::bindings::inheritance::Castable;
 use dom::bindings::refcounted::Trusted;
 use dom::event::{EventBubbles, EventCancelable, EventRunnable, SimpleEventRunnable};
@@ -61,5 +62,9 @@ impl DOMManipulationTask {
         if !self.0.is_cancelled() {
             self.0.main_thread_handler(script_thread);
         }
+    }
+
+    pub fn do_soon<F, T>(&self, f: F, args: T) where F: Fn(T::Output) + Send + 'static, T: ToAsync {
+        do_soon(f, args, &self.0)
     }
 }

@@ -317,8 +317,9 @@ impl HTMLMediaElement {
 
     fn queue_fire_simple_event(&self, type_: &'static str) {
         let win = window_from_node(self);
-        let task = box FireSimpleEventTask::new(self, type_);
-        let _ = win.dom_manipulation_task_source().queue(task, win.upcast());
+        win.dom_manipulation_task_source().do_soon(|(name, element)| {
+            element.root().fire_simple_event(name);
+        }, (type_, self))
     }
 
     fn fire_simple_event(&self, type_: &str) {
@@ -786,29 +787,6 @@ impl VirtualMethods for HTMLMediaElement {
         if context.tree_in_doc {
             ScriptThread::await_stable_state(PauseIfNotInDocumentTask::new(self));
         }
-    }
-}
-
-struct FireSimpleEventTask {
-    elem: Trusted<HTMLMediaElement>,
-    type_: &'static str,
-}
-
-impl FireSimpleEventTask {
-    fn new(target: &HTMLMediaElement, type_: &'static str) -> FireSimpleEventTask {
-        FireSimpleEventTask {
-            elem: Trusted::new(target),
-            type_: type_,
-        }
-    }
-}
-
-impl Runnable for FireSimpleEventTask {
-    fn name(&self) -> &'static str { "FireSimpleEventTask" }
-
-    fn handler(self: Box<FireSimpleEventTask>) {
-        let elem = self.elem.root();
-        elem.fire_simple_event(self.type_);
     }
 }
 
