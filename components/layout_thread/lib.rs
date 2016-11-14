@@ -87,16 +87,19 @@ use profile_traits::time::{self, TimerMetadata, profile};
 use profile_traits::time::{TimerMetadataFrameType, TimerMetadataReflowType};
 use script::layout_wrapper::{ServoLayoutDocument, ServoLayoutNode};
 use script_layout_interface::{OpaqueStyleAndLayoutData, PartialStyleAndLayoutData};
-use script_layout_interface::message::{Msg, NewLayoutThreadInfo, Reflow, ReflowQueryType, ScriptReflow};
+use script_layout_interface::wrapper_traits::PseudoElementType;
+use script_layout_interface::message::{Msg, NewLayoutThreadInfo, Reflow, ReflowQueryType};
+use script_layout_interface::message::{ScriptReflow, TextDirection};
 use script_layout_interface::reporter::CSSErrorReporter;
 use script_layout_interface::restyle_damage::{REFLOW, REFLOW_OUT_OF_FLOW, REPAINT, STORE_OVERFLOW};
+use script_layout_interface::restyle_damage::RestyleDamage;
 use script_layout_interface::rpc::{LayoutRPC, MarginStyleResponse, NodeOverflowResponse};
 use script_layout_interface::rpc::{OffsetParentResponse, TextPreparationResponse};
 use script_layout_interface::wrapper_traits::LayoutNode;
 use script_traits::{ConstellationControlMsg, LayoutControlMsg, LayoutMsg as ConstellationMsg};
 use script_traits::{StackingContextScrollState, UntrustedNodeAddress};
 use std::borrow::ToOwned;
-use std::collections::HashMap;
+use std::collections::{HashMap, LinkedList};
 use std::hash::BuildHasherDefault;
 use std::ops::{Deref, DerefMut};
 use std::process;
@@ -112,6 +115,7 @@ use style::logical_geometry::LogicalPoint;
 use style::media_queries::{Device, MediaType};
 use style::parallel::WorkQueueData;
 use style::parser::ParserContextExtraData;
+use style::properties::ServoComputedValues;
 use style::refcell::RefCell;
 use style::selector_matching::Stylist;
 use style::stylesheets::{CSSRuleIteratorExt, Origin, Stylesheet, UserAgentStylesheets};
@@ -659,6 +663,8 @@ impl LayoutThread {
                         self.time_profiler_chan.clone(),
                         || self.handle_reflow(&data, possibly_locked_rw_data));
             },
+            Msg::PrepareText(text, dir, max_width) =>
+                self.prepare_text(possibly_locked_rw_data, text, dir, max_width),
             Msg::TickAnimations => self.tick_all_animations(possibly_locked_rw_data),
             Msg::ReflowWithNewlyLoadedWebFont => {
                 self.reflow_with_newly_loaded_web_font(possibly_locked_rw_data)
@@ -1079,9 +1085,6 @@ impl LayoutThread {
                     ReflowQueryType::MarginStyleQuery(_) => {
                         rw_data.margin_style_response = MarginStyleResponse::empty();
                     },
-                    ReflowQueryType::TextPreparationQuery(..) => {
-                        //TODO
-                    },
                     ReflowQueryType::NoQuery => {}
                 }
                 return;
@@ -1288,9 +1291,6 @@ impl LayoutThread {
                     let node = unsafe { ServoLayoutNode::new(&node) };
                     rw_data.margin_style_response = process_margin_style_query(node);
                 },
-                ReflowQueryType::TextPreparationQuery(ref text, max_width) => {
-                    rw_data.prepared_text_response = process_prepare_text_query(text, max_width);
-                },
                 ReflowQueryType::NoQuery => {}
             }
         }
@@ -1409,6 +1409,27 @@ impl LayoutThread {
                                                      None,
                                                      &mut *rw_data,
                                                      &mut layout_context);
+    }
+
+    fn prepare_text(&mut self,
+                    possibly_locked_rw_data: &mut RwData<'a, 'b>,
+                    text: String,
+                    dir: TextDirection,
+                    max_width: Option<f64>) {
+        let unscanned = box UnscannedTextFragmentInfo::new(text, None);
+        let info = SpecificFragmentInfo::UnscannedText(unscanned);
+        let style = Arc::new(ServoComputedValues::initial_values().clone());
+        let fragment = Fragment::from_opaque_node_and_style(
+            OpaqueNode(0),
+            PseudoElementType::Normal,
+            style.clone(),
+            style,
+            RestyleDamage::empty(),
+            info);
+        let mut fragments = LinkedList::new();
+        fragments.push_back(fragment);
+        let mut scanner = TextRunScanner::new();
+        let scanned_fragments = scanner.scan_for_runs(panic!(), fragments);
     }
 
     fn reflow_with_newly_loaded_web_font<'a, 'b>(&mut self, possibly_locked_rw_data: &mut RwData<'a, 'b>) {

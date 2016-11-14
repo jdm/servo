@@ -79,13 +79,13 @@ impl OffsetParentResponse {
 
 #[derive(Clone)]
 pub struct TextPreparationResponse {
-    pub width: f32,
+    pub inline_box: Rect<f32>,
 }
 
 impl Default for TextPreparationResponse {
     fn default() -> TextPreparationResponse {
         TextPreparationResponse {
-            width: 0.,
+            inline_box: Default::default(),
         }
     }
 }

@@ -826,9 +826,9 @@ pub fn process_margin_style_query<N: LayoutNode>(requested_node: N)
     }
 }
 
-pub fn process_prepare_text_query(_text: &str, _max_width: Option<f32>)
+/*pub fn process_prepare_text_query(_text: &str, _max_width: Option<f32>)
                                   -> TextPreparationResponse {
     TextPreparationResponse {
-        width: 0.,
+        inline_box: Rect::new(0., 0., 0., 0.),
     }
-}
+}*/

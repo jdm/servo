@@ -23,6 +23,12 @@ use style::stylesheets::Stylesheet;
 use url::Url;
 use util::ipc::OptionalOpaqueIpcSender;
 
+/// Direction of given text when being laid out
+pub enum TextDirection {
+    Ltr,
+    Rtl,
+}
+
 /// Asynchronous messages that script can send to layout.
 pub enum Msg {
     /// Adds the given stylesheet to the document.
@@ -33,6 +39,9 @@ pub enum Msg {
 
     /// Requests a reflow.
     Reflow(ScriptReflow),
+
+    /// Measure dimensions of the given string in the given direction, with an optional maximum width
+    PrepareText(String, TextDirection, Option<f64>),
 
     /// Get an RPC interface.
     GetRPC(Sender<Box<LayoutRPC + Send>>),
@@ -105,7 +114,6 @@ pub enum ReflowQueryType {
     ResolvedStyleQuery(TrustedNodeAddress, Option<PseudoElement>, Atom),
     OffsetParentQuery(TrustedNodeAddress),
     MarginStyleQuery(TrustedNodeAddress),
-    TextPreparationQuery(String, Option<f32>),
 }
 
 /// Information needed for a reflow.
