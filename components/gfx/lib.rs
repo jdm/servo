@@ -15,6 +15,7 @@
 
 #![deny(unsafe_code)]
 
+#[cfg(any(target_os = "linux", target_os = "android"))]
 extern crate alloc;
 extern crate app_units;
 #[allow(unused_extern_crates)]

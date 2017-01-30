@@ -14,3 +14,8 @@ opt-level = 3
 # Uncomment to profile on Linux:
 # debug = true
 # lto = false
+
+[replace]
+"libc:0.2.18" = {path = "/Users/jdm/src/libc"}
+"memchr:1.0.1" = {path = "/Users/jdm/src/rust-memchr"}
+"alloc-jemalloc-dmd:0.0.0" = {path = "/Users/jdm/src/alloc-jemalloc"}

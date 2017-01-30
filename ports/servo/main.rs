@@ -17,6 +17,7 @@
 
 #![feature(start, core_intrinsics)]
 
+extern crate alloc_jemalloc_dmd;
 #[cfg(target_os = "android")]
 #[macro_use]
 extern crate android_glue;

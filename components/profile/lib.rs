@@ -11,7 +11,7 @@
 
 #[allow(unused_extern_crates)]
 #[cfg(not(target_os = "windows"))]
-extern crate alloc_jemalloc;
+extern crate alloc_jemalloc_dmd;
 extern crate heartbeats_simple;
 extern crate ipc_channel;
 #[cfg(not(target_os = "windows"))]

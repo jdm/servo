@@ -20,6 +20,7 @@ serde_derive = "0.8"
 serde_json = "0.8"
 servo_config = {path = "../config", features = ["servo"]}
 time = "0.1.12"
+alloc-jemalloc-dmd = {git = "https://github.com/jdm/alloc-jemalloc"}
 
 [target.'cfg(target_os = "macos")'.dependencies]
 task_info = {path = "../../support/rust-task_info"}
