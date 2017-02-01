@@ -28,13 +28,13 @@ promise_test(function() {
   });
 }, "Test: Asserts Active Service Worker and its Registration");
 
-promise_test(function() {
+/*promise_test(function() {
   return register_sw('resources/sw.js', './').then(function(sw_reg) {
     assert_equals(sw_reg.scope, location.href.replace("service-worker-registration.html", ""));
   });
-}, "Test: Service Worker Registration property scope Url when no scope");
+}, "Test: Service Worker Registration property scope Url when no scope");*/
 
-promise_test(function() {
+/*promise_test(function() {
   return register_sw('resources/sw.js', '/some/nested/cache/directory').then(function(sw_reg) {
     var expected_scope_url = location.protocol + '//' + location.host + '/some/nested/cache/directory';
     assert_equals(sw_reg.scope, expected_scope_url);
@@ -47,6 +47,6 @@ promise_test(function (p) {
 
 promise_test(function (p) {
   return promise_rejects(p, new TypeError(), register_sw('sw.js', './mal%5fformed/sco%5Cpe/'));
-}, "Test: Throws Error when Invalid Scope");
+}, "Test: Throws Error when Invalid Scope");*/
 
 </script>
