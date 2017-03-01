@@ -6,7 +6,9 @@ use hyper::client::Pool;
 use hyper::net::{HttpStream, HttpsConnector, SslClient};
 use openssl::ssl::{SSL_OP_NO_COMPRESSION, SSL_OP_NO_SSLV2, SSL_OP_NO_SSLV3, SSL_VERIFY_PEER};
 use openssl::ssl::{Ssl, SslContext, SslMethod, SslStream};
+use servo_config::opts;
 use servo_config::resource_files::resources_dir_path;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 pub type Connector = HttpsConnector<ServoSslClient>;
@@ -29,9 +31,13 @@ const DEFAULT_CIPHERS: &'static str = concat!(
 
 pub fn create_http_connector(certificate_file: &str) -> Arc<Pool<Connector>> {
     let mut context = SslContext::new(SslMethod::Sslv23).unwrap();
-    context.set_CA_file(&resources_dir_path()
-                        .expect("Need certificate file to make network requests")
-                        .join(certificate_file)).unwrap();
+    let cert_path = match opts::get().certificate_path {
+        Some(ref path) => PathBuf::from(path),
+        None => resources_dir_path()
+            .expect("Need certificate file to make network requests")
+            .join(certificate_file),
+    };
+    context.set_CA_file(&cert_path).unwrap();
     context.set_cipher_list(DEFAULT_CIPHERS).unwrap();
     context.set_options(SSL_OP_NO_SSLV2 | SSL_OP_NO_SSLV3 | SSL_OP_NO_COMPRESSION);
     let connector = HttpsConnector::new(ServoSslClient {

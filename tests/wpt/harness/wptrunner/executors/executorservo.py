@@ -97,7 +97,18 @@ class ServoTestharnessExecutor(ProcessTestExecutor):
         self.command = debug_args + self.command
 
         env = os.environ.copy()
-        env["HOST_FILE"] = self.hosts_path
+
+        try:
+            with open('/etc/hosts') as f:
+                if not 'web-platform.test' in f.read():
+                    env["HOST_FILE"] = self.hosts_path
+                    print('Running with fake HTTP host configuration. This will cause all tests '
+                          'that require HTTPS to fail. Follow the steps in '
+                          'https://github.com/servo/servo/blob/master/tests/wpt/'
+                          'README.md#running-the-tests-manually to make HTTPS tests work in your '
+                          'local test environment.')
+        except:
+            pass
         env["RUST_BACKTRACE"] = "1"
 
 
