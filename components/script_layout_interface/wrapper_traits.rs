@@ -31,6 +31,7 @@ pub enum PseudoElementType<T> {
     After(T),
     DetailsSummary(T),
     DetailsContent(T),
+    SelectOptions(T),
 }
 
 impl<T> PseudoElementType<T> {
@@ -55,6 +56,7 @@ impl<T> PseudoElementType<T> {
             PseudoElementType::After(_) => PseudoElementType::After(()),
             PseudoElementType::DetailsSummary(_) => PseudoElementType::DetailsSummary(()),
             PseudoElementType::DetailsContent(_) => PseudoElementType::DetailsContent(()),
+            PseudoElementType::SelectOptions(_) => PseudoElementType::SelectOptions(()),
         }
     }
 
@@ -65,6 +67,7 @@ impl<T> PseudoElementType<T> {
             PseudoElementType::After(_) => PseudoElement::After,
             PseudoElementType::DetailsSummary(_) => PseudoElement::DetailsSummary,
             PseudoElementType::DetailsContent(_) => PseudoElement::DetailsContent,
+            PseudoElementType::SelectOptions(_) => PseudoElement::ServoInputSelect,
         }
     }
 }
@@ -202,6 +205,10 @@ pub trait ThreadSafeLayoutNode: Clone + Copy + Debug + GetLayoutData + NodeInfo 
         self.as_element().and_then(|el| el.get_details_content_pseudo()).map(|el| el.as_node())
     }
 
+    fn get_select_options_pseudo(&self) -> Option<Self> {
+        self.as_element().and_then(|el| el.get_select_options_pseudo()).map(|el| el.as_node())
+    }
+
     fn debug_id(self) -> usize;
 
     /// Returns an iterator over this node's children.
@@ -266,6 +273,8 @@ pub trait ThreadSafeLayoutNode: Clone + Copy + Debug + GetLayoutData + NodeInfo 
 
     fn svg_data(&self) -> Option<SVGSVGData>;
 
+    fn is_active_select(&self) -> bool;
+
     /// If this node is an iframe element, returns its pipeline ID. If this node is
     /// not an iframe element, fails.
     fn iframe_pipeline_id(&self) -> PipelineId;
@@ -281,6 +290,7 @@ pub trait ThreadSafeLayoutNode: Clone + Copy + Debug + GetLayoutData + NodeInfo 
             PseudoElementType::After(_) => FragmentType::AfterPseudoContent,
             PseudoElementType::DetailsSummary(_) => FragmentType::FragmentBody,
             PseudoElementType::DetailsContent(_) => FragmentType::FragmentBody,
+            PseudoElementType::SelectOptions(_) => FragmentType::FragmentBody,
         }
     }
 
@@ -351,6 +361,16 @@ pub trait ThreadSafeLayoutElement: Clone + Copy + Sized + Debug +
                .styles().pseudos
                .contains_key(&PseudoElement::After) {
             Some(self.with_pseudo(PseudoElementType::After(None)))
+        } else {
+            None
+        }
+    }
+
+    fn get_select_options_pseudo(&self) -> Option<Self> {
+        if self.get_local_name() == &local_name!("select") &&
+           self.get_namespace() == &ns!(html) &&
+           self.as_node().is_active_select() {
+            Some(self.with_pseudo(PseudoElementType::SelectOptions(None)))
         } else {
             None
         }

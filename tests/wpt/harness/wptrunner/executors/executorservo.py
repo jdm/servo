@@ -100,7 +100,7 @@ class ServoTestharnessExecutor(ProcessTestExecutor):
 
         try:
             with open('/etc/hosts') as f:
-                if not 'web-platform.test' in f.read():
+                if True or not 'web-platform.test' in f.read():
                     env["HOST_FILE"] = self.hosts_path
                     print('Running with fake HTTP host configuration. This will cause all tests '
                           'that require HTTPS to fail. Follow the steps in '

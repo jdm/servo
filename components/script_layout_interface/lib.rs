@@ -109,6 +109,7 @@ pub enum LayoutElementType {
     HTMLImageElement,
     HTMLInputElement,
     HTMLObjectElement,
+    HTMLSelectElement,
     HTMLTableCellElement,
     HTMLTableColElement,
     HTMLTableElement,

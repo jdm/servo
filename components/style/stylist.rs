@@ -344,7 +344,8 @@ impl Stylist {
             PseudoElement::After |
             PseudoElement::Selection |
             PseudoElement::DetailsSummary |
-            PseudoElement::DetailsContent => {
+            PseudoElement::DetailsContent |
+            PseudoElement::ServoInputSelect => {
                 unreachable!("That pseudo doesn't represent an anonymous box!")
             }
         };

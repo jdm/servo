@@ -32,6 +32,7 @@ pub enum PseudoElement {
     DetailsSummary,
     DetailsContent,
     ServoInputText,
+    ServoInputSelect,
     ServoTableWrapper,
     ServoAnonymousTableWrapper,
     ServoAnonymousTable,
@@ -50,6 +51,7 @@ impl ToCss for PseudoElement {
             DetailsSummary => "::-servo-details-summary",
             DetailsContent => "::-servo-details-content",
             ServoInputText => "::-servo-input-text",
+            ServoInputSelect => "::-servo-input-select",
             ServoTableWrapper => "::-servo-table-wrapper",
             ServoAnonymousTableWrapper => "::-servo-anonymous-table-wrapper",
             ServoAnonymousTable => "::-servo-anonymous-table",
@@ -84,6 +86,7 @@ impl PseudoElement {
             PseudoElement::DetailsSummary => PseudoElementCascadeType::Lazy,
             PseudoElement::DetailsContent |
             PseudoElement::ServoInputText |
+            PseudoElement::ServoInputSelect |
             PseudoElement::ServoTableWrapper |
             PseudoElement::ServoAnonymousTableWrapper |
             PseudoElement::ServoAnonymousTable |
@@ -255,6 +258,12 @@ impl<'a> ::selectors::Parser for SelectorParser<'a> {
                 }
                 ServoInputText
             },
+            "-servo-input-select" => {
+                if !self.in_user_agent_stylesheet() {
+                    return Err(())
+                }
+                ServoInputSelect
+            },
             "-servo-table-wrapper" => {
                 if !self.in_user_agent_stylesheet() {
                     return Err(())
@@ -324,6 +333,7 @@ impl SelectorImpl {
         fun(PseudoElement::DetailsSummary);
         fun(PseudoElement::Selection);
         fun(PseudoElement::ServoInputText);
+        fun(PseudoElement::ServoInputSelect);
         fun(PseudoElement::ServoTableWrapper);
         fun(PseudoElement::ServoAnonymousTableWrapper);
         fun(PseudoElement::ServoAnonymousTable);

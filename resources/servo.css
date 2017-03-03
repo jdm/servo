@@ -172,6 +172,15 @@ svg > * {
     margin: 0;
 }
 
+/**|*::-servo-input-select option {
+    display: block !important;
+}*/
+select::-servo-input-select {
+    border: 1px solid red !important;
+    background-color: green !important;
+    font-size: 20pt;
+}
+
 *|*::-servo-table-wrapper {
     display: table;
     border: none;

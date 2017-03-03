@@ -44,6 +44,7 @@ use dom::htmlimageelement::{HTMLImageElement, LayoutHTMLImageElementHelpers};
 use dom::htmlinputelement::{HTMLInputElement, LayoutHTMLInputElementHelpers};
 use dom::htmllinkelement::HTMLLinkElement;
 use dom::htmlmetaelement::HTMLMetaElement;
+use dom::htmlselectelement::{HTMLSelectElement, LayoutHTMLSelectElementHelpers};
 use dom::htmlstyleelement::HTMLStyleElement;
 use dom::htmltextareaelement::{HTMLTextAreaElement, LayoutHTMLTextAreaElementHelpers};
 use dom::nodelist::NodeList;
@@ -947,6 +948,7 @@ pub trait LayoutNodeHelpers {
     fn image_url(&self) -> Option<ServoUrl>;
     fn canvas_data(&self) -> Option<HTMLCanvasData>;
     fn svg_data(&self) -> Option<SVGSVGData>;
+    fn is_active_select(&self) -> bool;
     fn iframe_pipeline_id(&self) -> PipelineId;
     fn opaque(&self) -> OpaqueNode;
 }
@@ -1095,6 +1097,11 @@ impl LayoutNodeHelpers for LayoutJS<Node> {
     fn svg_data(&self) -> Option<SVGSVGData> {
         self.downcast::<SVGSVGElement>()
             .map(|svg| svg.data())
+    }
+
+    fn is_active_select(&self) -> bool {
+        self.downcast::<HTMLSelectElement>()
+            .map_or(false, |select| select.is_active())
     }
 
     fn iframe_pipeline_id(&self) -> PipelineId {

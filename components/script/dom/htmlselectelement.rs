@@ -4,6 +4,7 @@
 
 use dom::attr::Attr;
 use dom::bindings::codegen::Bindings::ElementBinding::ElementMethods;
+use dom::bindings::codegen::Bindings::EventBinding::EventMethods;
 use dom::bindings::codegen::Bindings::HTMLCollectionBinding::HTMLCollectionMethods;
 use dom::bindings::codegen::Bindings::HTMLOptionElementBinding::HTMLOptionElementMethods;
 use dom::bindings::codegen::Bindings::HTMLOptionsCollectionBinding::HTMLOptionsCollectionMethods;
@@ -14,10 +15,11 @@ use dom::bindings::codegen::UnionTypes::HTMLElementOrLong;
 use dom::bindings::codegen::UnionTypes::HTMLOptionElementOrHTMLOptGroupElement;
 //use dom::bindings::error::ErrorResult;
 use dom::bindings::inheritance::Castable;
-use dom::bindings::js::{MutNullableJS, Root};
+use dom::bindings::js::{MutNullableJS, Root, LayoutJS};
 use dom::bindings::str::DOMString;
 use dom::document::Document;
 use dom::element::{AttributeMutation, Element};
+use dom::event::Event;
 use dom::htmlcollection::CollectionFilter;
 use dom::htmlelement::HTMLElement;
 use dom::htmlfieldsetelement::HTMLFieldSetElement;
@@ -25,12 +27,13 @@ use dom::htmlformelement::{FormDatumValue, FormControl, FormDatum, HTMLFormEleme
 use dom::htmloptgroupelement::HTMLOptGroupElement;
 use dom::htmloptionelement::HTMLOptionElement;
 use dom::htmloptionscollection::HTMLOptionsCollection;
-use dom::node::{Node, UnbindContext, window_from_node};
+use dom::node::{Node, UnbindContext, window_from_node, document_from_node, NodeDamage};
 use dom::nodelist::NodeList;
 use dom::validation::Validatable;
 use dom::validitystate::{ValidityState, ValidationFlags};
 use dom::virtualmethods::VirtualMethods;
 use html5ever_atoms::LocalName;
+use std::cell::Cell;
 use std::iter;
 use style::attr::AttrValue;
 use style::element_state::*;
@@ -60,9 +63,23 @@ impl CollectionFilter for OptionsFilter {
 pub struct HTMLSelectElement {
     htmlelement: HTMLElement,
     options: MutNullableJS<HTMLOptionsCollection>,
+    is_active: Cell<bool>,
 }
 
 static DEFAULT_SELECT_SIZE: u32 = 0;
+
+pub trait LayoutHTMLSelectElementHelpers {
+    fn is_active(&self) -> bool;
+}
+
+impl LayoutHTMLSelectElementHelpers for LayoutJS<HTMLSelectElement> {
+    #[allow(unsafe_code)]
+    fn is_active(&self) -> bool {
+        unsafe {
+            (*self.unsafe_get()).is_active.get()
+        }
+    }
+}
 
 impl HTMLSelectElement {
     fn new_inherited(local_name: LocalName,
@@ -72,7 +89,8 @@ impl HTMLSelectElement {
             htmlelement:
                 HTMLElement::new_inherited_with_state(IN_ENABLED_STATE,
                                                       local_name, prefix, document),
-                options: Default::default()
+            options: Default::default(),
+            is_active: Default::default(),
         }
     }
 
@@ -356,6 +374,25 @@ impl VirtualMethods for HTMLSelectElement {
                     el.check_ancestors_disabled_state_for_form_control();
                 }
             }
+        }
+    }
+
+    fn handle_event(&self, event: &Event) {
+        if let Some(s) = self.super_type() {
+            s.handle_event(event);
+        }
+
+        if !event.IsTrusted() || event.DefaultPrevented() {
+            return;
+        }
+
+        if event.type_() == atom!("click") {
+            document_from_node(self).request_focus(self.upcast());
+            self.is_active.set(true);
+            self.upcast::<Node>().dirty(NodeDamage::OtherNodeDamage);
+        } else if event.type_() == atom!("blur") {
+            self.is_active.set(false);
+            self.upcast::<Node>().dirty(NodeDamage::OtherNodeDamage);
         }
     }
 

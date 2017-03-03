@@ -857,6 +857,11 @@ impl<'ln> ThreadSafeLayoutNode for ServoThreadSafeLayoutNode<'ln> {
         this.svg_data()
     }
 
+    fn is_active_select(&self) -> bool {
+        let this = unsafe { self.get_jsmanaged() };
+        this.is_active_select()
+    }
+
     fn iframe_pipeline_id(&self) -> PipelineId {
         let this = unsafe { self.get_jsmanaged() };
         this.iframe_pipeline_id()
@@ -885,11 +890,16 @@ impl<ConcreteNode> ThreadSafeLayoutNodeChildrenIterator<ConcreteNode>
     pub fn new(parent: ConcreteNode) -> Self {
         let first_child: Option<ConcreteNode> = match parent.get_pseudo_element_type() {
             PseudoElementType::Normal => {
-                parent.get_before_pseudo().or_else(|| parent.get_details_summary_pseudo()).or_else(|| {
-                    unsafe { parent.dangerous_first_child() }
+                parent.get_before_pseudo()
+                    .or_else(|| parent.get_details_summary_pseudo())
+                    .or_else(|| parent.get_select_options_pseudo())
+                    .or_else(|| {
+                        unsafe { parent.dangerous_first_child() }
                 })
             },
-            PseudoElementType::DetailsContent(_) | PseudoElementType::DetailsSummary(_) => {
+            PseudoElementType::DetailsContent(_) |
+            PseudoElementType::DetailsSummary(_) |
+            PseudoElementType::SelectOptions(_) => {
                 unsafe { parent.dangerous_first_child() }
             },
             _ => None,
@@ -943,13 +953,27 @@ impl<ConcreteNode> Iterator for ThreadSafeLayoutNodeChildrenIterator<ConcreteNod
                 node
             }
 
+            PseudoElementType::SelectOptions(_) => {
+                let node = self.current_node.clone();
+                if let Some(ref node) = node {
+                    self.current_node = match unsafe { node.dangerous_next_sibling() } {
+                        Some(next) => Some(next),
+                        None => self.parent_node.get_after_pseudo(),
+                    };
+
+                }
+                node
+            }
+
             PseudoElementType::Normal => {
                 let node = self.current_node.clone();
                 if let Some(ref node) = node {
                     self.current_node = match node.get_pseudo_element_type() {
                         PseudoElementType::Before(_) => {
-                            let first = self.parent_node.get_details_summary_pseudo().or_else(|| unsafe {
-                                self.parent_node.dangerous_first_child()
+                            let first = self.parent_node.get_details_summary_pseudo()
+                                .or_else(|| self.parent_node.get_select_options_pseudo())
+                                .or_else(|| unsafe {
+                                    self.parent_node.dangerous_first_child()
                             });
                             match first {
                                 Some(first) => Some(first),
@@ -964,6 +988,7 @@ impl<ConcreteNode> Iterator for ThreadSafeLayoutNodeChildrenIterator<ConcreteNod
                         },
                         PseudoElementType::DetailsSummary(_) => self.parent_node.get_details_content_pseudo(),
                         PseudoElementType::DetailsContent(_) => self.parent_node.get_after_pseudo(),
+                        PseudoElementType::SelectOptions(_) => self.parent_node.get_select_options_pseudo(),
                         PseudoElementType::After(_) => {
                             None
                         },

@@ -2827,6 +2827,7 @@ impl Fragment {
             PseudoElementType::After(_) => FragmentType::AfterPseudoContent,
             PseudoElementType::DetailsSummary(_) => FragmentType::FragmentBody,
             PseudoElementType::DetailsContent(_) => FragmentType::FragmentBody,
+            PseudoElementType::SelectOptions(_) => FragmentType::FragmentBody,
         }
     }
 

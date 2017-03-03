@@ -651,7 +651,7 @@ impl<'a, ConcreteThreadSafeLayoutNode: ThreadSafeLayoutNode>
         let mut initial_fragments = IntermediateInlineFragments::new();
         let node_is_input_or_text_area =
            node.type_id() == Some(LayoutNodeType::Element(LayoutElementType::HTMLInputElement)) ||
-           node.type_id() == Some(LayoutNodeType::Element(LayoutElementType::HTMLTextAreaElement));
+            node.type_id() == Some(LayoutNodeType::Element(LayoutElementType::HTMLTextAreaElement));
         if node.get_pseudo_element_type().is_replaced_content() ||
                 node_is_input_or_text_area {
             // A TextArea's text contents are displayed through the input text
@@ -1491,7 +1491,8 @@ impl<'a, ConcreteThreadSafeLayoutNode> PostorderNodeMutTraversal<ConcreteThreadS
                     PseudoElementType::Before(maybe_display) |
                     PseudoElementType::After(maybe_display) |
                     PseudoElementType::DetailsContent(maybe_display) |
-                    PseudoElementType::DetailsSummary(maybe_display)
+                    PseudoElementType::DetailsSummary(maybe_display) |
+                    PseudoElementType::SelectOptions(maybe_display)
                         => maybe_display.unwrap_or(style.get_box().display),
                 };
                 (display, style.get_box().float, style.get_box().position)
@@ -1667,6 +1668,7 @@ impl<ConcreteThreadSafeLayoutNode> NodeUtils for ConcreteThreadSafeLayoutNode
             PseudoElementType::After(_) => &mut data.after_flow_construction_result,
             PseudoElementType::DetailsSummary(_) => &mut data.details_summary_flow_construction_result,
             PseudoElementType::DetailsContent(_) => &mut data.details_content_flow_construction_result,
+            PseudoElementType::SelectOptions(_) => &mut data.select_options_flow_construction_result,
             PseudoElementType::Normal    => &mut data.flow_construction_result,
         }
     }

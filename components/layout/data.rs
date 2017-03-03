@@ -24,6 +24,8 @@ pub struct PersistentLayoutData {
 
     pub details_content_flow_construction_result: ConstructionResult,
 
+    pub select_options_flow_construction_result: ConstructionResult,
+
     /// Various flags.
     pub flags: LayoutDataFlags,
 }
@@ -38,6 +40,7 @@ impl PersistentLayoutData {
             after_flow_construction_result: ConstructionResult::None,
             details_summary_flow_construction_result: ConstructionResult::None,
             details_content_flow_construction_result: ConstructionResult::None,
+            select_options_flow_construction_result: ConstructionResult::None,
             flags: LayoutDataFlags::empty(),
         }
     }
