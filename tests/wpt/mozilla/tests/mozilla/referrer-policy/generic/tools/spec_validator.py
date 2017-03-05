@@ -138,10 +138,10 @@ def validate(spec_json, details):
     assert_contains_only_fields(subresource_path,
                                 test_expansion_schema['subresource']);
 
-    for subresource in subresource_path:
-        local_rel_path = "." + subresource_path[subresource]
-        full_path = os.path.join(test_root_directory, local_rel_path)
-        assert os.path.isfile(full_path), "%s is not an existing file" % path
+    #for subresource in subresource_path:
+    #    local_rel_path = "." + subresource_path[subresource]
+    #    full_path = os.path.join(test_root_directory, local_rel_path)
+    #    assert os.path.isfile(full_path), "%s is not an existing file" % full_path
 
     del details['object']
 
