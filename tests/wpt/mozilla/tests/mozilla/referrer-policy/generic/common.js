@@ -209,9 +209,13 @@ function queryAnchor(url, callback, referrer_policy) {
     documentUrl.host = window.location.host;
 
     var meta_referrer = undefined;
+    var http_referrer = undefined;
     for (var meta of document.head.querySelectorAll("meta")) {
       if (meta.name === "referrer") {
         meta_referrer = meta.content;
+        break;
+      } else if (meta.name === "http-referrer-policy") {
+        http_referrer = meta.content;
         break;
       }
     }
@@ -220,6 +224,7 @@ function queryAnchor(url, callback, referrer_policy) {
       "&id=" + id +
       "&tagAttrs=" + JSON.stringify(referrer_policy) +
       "&metaReferrer=" + meta_referrer +
+      "&httpReferrer=" + http_referrer +
       "&protocol=" + documentProtocol +
       "&host=" + documentHost;
 
@@ -231,11 +236,16 @@ function queryAnchor(url, callback, referrer_policy) {
       }
 
       var xhr = new XMLHttpRequest();
+      xhr.open('GET', '/_mozilla/mozilla/referrer-policy/generic/subresource/stash.py?path=a-tag-document-url&id=' + id, false);
+      xhr.send();
+      var expected_url = JSON.parse(xhr.responseText);
+
+      var xhr = new XMLHttpRequest();
       xhr.open('GET', '/_mozilla/mozilla/referrer-policy/generic/subresource/stash.py?id=' + id, false);
       xhr.onload = function(e) {
         var server_data = JSON.parse(this.responseText);
 
-        callback(server_data, url_with_params);
+        callback(server_data, expected_url);
       };
       xhr.send();
 

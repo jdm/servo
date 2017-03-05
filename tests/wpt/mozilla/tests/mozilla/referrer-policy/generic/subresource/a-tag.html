@@ -4,14 +4,24 @@
   </head>
   <body>
     <script>
+      var xhr = new XMLHttpRequest();
       var url = new URL(window.location.toString());
+      xhr.open('GET', 'stash.py?path=a-tag-stash&id=' + url.searchParams.get("id"), false);
+      xhr.send();
+      params = JSON.parse(xhr.responseText);
+
+      var xhr = new XMLHttpRequest();
+      var url = new URL(window.location.toString());
+      xhr.open('POST', 'stash.py?path=a-tag-document-url&id=' + url.searchParams.get("id"), false);
+      xhr.send(JSON.stringify(window.location.toString()));
+
       var id = url.searchParams.get("id");
-      var redirection = url.searchParams.get("redirection");
-      var cache_destroyer = url.searchParams.get("cache_destroyer");
-      var tag_attrs = url.searchParams.get("tagAttrs");
-      var meta_referrer = url.searchParams.get("metaReferrer");
-      var protocol = url.searchParams.get("protocol");
-      var host = url.searchParams.get("host");
+      var redirection = params["redirection"];
+      var cache_destroyer = params["cache_destroyer"];
+      var tag_attrs = params["tagAttrs"];
+      var meta_referrer = params["metaReferrer"];
+      var protocol = params["protocol"];
+      var host = params["host"];
 
       var referrer_policy;
       try {

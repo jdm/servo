@@ -24,12 +24,12 @@ def create_redirect_url(request, cross_origin = False):
     if cross_origin:
         destination_netloc = get_swapped_origin_netloc(parsed.netloc)
 
-    query = filter(lambda x: x.startswith('id='), parsed.query.split('&'))
+    query = filter(lambda x: not x.startswith('redirection='), parsed.query.split('&'))
     destination_url = urlparse.urlunsplit(urlparse.SplitResult(
         scheme = parsed.scheme,
         netloc = destination_netloc,
         path = parsed.path,
-        query = query[0] if query else None,
+        query = '&'.join(query),
         fragment = None))
 
     return destination_url
@@ -73,7 +73,8 @@ def respond(request,
             content_type = "text/html",
             payload_generator = __noop,
             cache_control = "no-cache; must-revalidate",
-            access_control_allow_origin = "*"):
+            access_control_allow_origin = "*",
+            referrer_policy = None):
     if preprocess_redirection(request, response):
         return
 
@@ -85,6 +86,8 @@ def respond(request,
                                      access_control_allow_origin)
     response.writer.write_header("content-type", content_type)
     response.writer.write_header("cache-control", cache_control)
+    if referrer_policy:
+        response.writer.write_header("referrer-policy", referrer_policy)
     response.writer.end_headers()
 
     server_data = {"headers": json.dumps(request.headers, indent = 4)}
