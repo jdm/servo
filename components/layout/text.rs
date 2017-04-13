@@ -708,7 +708,6 @@ pub enum CompressionMode {
     CompressNone,
     CompressWhitespace,
     CompressWhitespaceNewline,
-    DiscardNewline
 }
 
 // ported from Gecko's nsTextFrameUtils::TransformText.
@@ -727,7 +726,7 @@ pub fn transform_text(text: &str,
                       output_text: &mut String)
                       -> bool {
     let out_whitespace = match mode {
-        CompressionMode::CompressNone | CompressionMode::DiscardNewline => {
+        CompressionMode::CompressNone => {
             for ch in text.chars() {
                 if is_discardable_char(ch, mode) {
                     // TODO: record skipped char
@@ -788,7 +787,7 @@ pub fn transform_text(text: &str,
             return true;
         }
         match mode {
-            CompressionMode::DiscardNewline | CompressionMode::CompressWhitespaceNewline => ch == '\n',
+            CompressionMode::CompressWhitespaceNewline => ch == '\n',
             _ => false
         }
     }
