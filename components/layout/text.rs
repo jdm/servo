@@ -14,7 +14,7 @@ use gfx::font::{KEEP_ALL_FLAG, RTL_FLAG, RunMetrics, ShapingFlags, ShapingOption
 use gfx::font_context::FontContext;
 use gfx::text::glyph::ByteIndex;
 use gfx::text::text_run::TextRun;
-use gfx::text::util::{self, CompressionMode};
+use gfx::text::util::is_bidi_control;
 use inline::{FIRST_FRAGMENT_OF_ELEMENT, InlineFragments, LAST_FRAGMENT_OF_ELEMENT};
 use linked_list::split_off_head;
 use ordered_float::NotNaN;
@@ -594,10 +594,10 @@ impl RunMapping {
              end_position: usize) {
         let was_empty = *start_position == end_position;
         let old_byte_length = run_info.text.len();
-        *last_whitespace = util::transform_text(&text[(*start_position)..end_position],
-                                                compression,
-                                                *last_whitespace,
-                                                &mut run_info.text);
+        *last_whitespace = transform_text(&text[(*start_position)..end_position],
+                                          compression,
+                                          *last_whitespace,
+                                          &mut run_info.text);
 
         // Account for `text-transform`. (Confusingly, this is not handled in "text
         // transformation" above, but we follow Gecko in the naming.)
@@ -701,4 +701,100 @@ fn is_compatible(a: Script, b: Script) -> bool {
 /// Returns true if the script is not invalid or inherited.
 fn is_specific(script: Script) -> bool {
     script != Script::Common && script != Script::Inherited
+}
+
+#[derive(PartialEq, Eq, Copy, Clone, Debug)]
+pub enum CompressionMode {
+    CompressNone,
+    CompressWhitespace,
+    CompressWhitespaceNewline,
+    DiscardNewline
+}
+
+// ported from Gecko's nsTextFrameUtils::TransformText.
+//
+// High level TODOs:
+//
+// * Issue #113: consider incoming text state (arabic, etc)
+//               and propagate outgoing text state (dual of above)
+//
+// * Issue #114: record skipped and kept chars for mapping original to new text
+//
+// * Untracked: various edge cases for bidi, CJK, etc.
+pub fn transform_text(text: &str,
+                      mode: CompressionMode,
+                      incoming_whitespace: bool,
+                      output_text: &mut String)
+                      -> bool {
+    let out_whitespace = match mode {
+        CompressionMode::CompressNone | CompressionMode::DiscardNewline => {
+            for ch in text.chars() {
+                if is_discardable_char(ch, mode) {
+                    // TODO: record skipped char
+                } else {
+                    // TODO: record kept char
+                    if ch == '\t' {
+                        // TODO: set "has tab" flag
+                    }
+                    output_text.push(ch);
+                }
+            }
+            false
+        },
+
+        CompressionMode::CompressWhitespace | CompressionMode::CompressWhitespaceNewline => {
+            let mut in_whitespace: bool = incoming_whitespace;
+            for ch in text.chars() {
+                // TODO: discard newlines between CJK chars
+                let mut next_in_whitespace: bool = is_in_whitespace(ch, mode);
+
+                if !next_in_whitespace {
+                    if is_always_discardable_char(ch) {
+                        // revert whitespace setting, since this char was discarded
+                        next_in_whitespace = in_whitespace;
+                        // TODO: record skipped char
+                    } else {
+                        // TODO: record kept char
+                        output_text.push(ch);
+                    }
+                } else { /* next_in_whitespace; possibly add a space char */
+                    if in_whitespace {
+                        // TODO: record skipped char
+                    } else {
+                        // TODO: record kept char
+                        output_text.push(' ');
+                    }
+                }
+                // save whitespace context for next char
+                in_whitespace = next_in_whitespace;
+            } /* /for str::each_char */
+            in_whitespace
+        }
+    };
+
+    return out_whitespace;
+
+    fn is_in_whitespace(ch: char, mode: CompressionMode) -> bool {
+        match (ch, mode) {
+            (' ', _)  => true,
+            ('\t', _) => true,
+            ('\n', CompressionMode::CompressWhitespaceNewline) => true,
+            (_, _)    => false
+        }
+    }
+
+    fn is_discardable_char(ch: char, mode: CompressionMode) -> bool {
+        if is_always_discardable_char(ch) {
+            return true;
+        }
+        match mode {
+            CompressionMode::DiscardNewline | CompressionMode::CompressWhitespaceNewline => ch == '\n',
+            _ => false
+        }
+    }
+
+    fn is_always_discardable_char(ch: char) -> bool {
+        // TODO: check for soft hyphens.
+        is_bidi_control(ch)
+    }
 }
