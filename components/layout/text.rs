@@ -720,11 +720,11 @@ pub enum CompressionMode {
 // * Issue #114: record skipped and kept chars for mapping original to new text
 //
 // * Untracked: various edge cases for bidi, CJK, etc.
-pub fn transform_text(text: &str,
-                      mode: CompressionMode,
-                      incoming_whitespace: bool,
-                      output_text: &mut String)
-                      -> bool {
+fn transform_text(text: &str,
+                  mode: CompressionMode,
+                  incoming_whitespace: bool,
+                  output_text: &mut String)
+                  -> bool {
     let out_whitespace = match mode {
         CompressionMode::CompressNone => {
             for ch in text.chars() {
