@@ -23,10 +23,10 @@ use ipc_channel::ipc::{self, IpcSender, IpcReceiver};
 use ipc_channel::router::ROUTER;
 use js::jsapi::{JS_SetInterruptCallback, JSAutoCompartment, JSContext};
 use js::jsval::UndefinedValue;
-use js::rust::Runtime;
 use net_traits::{load_whole_resource, IpcSend, CustomResponseMediator};
 use net_traits::request::{CredentialsMode, Destination, RequestInit, Type as RequestType};
 use script_runtime::{CommonScriptMsg, StackRootTLS, get_reports, new_rt_and_cx, ScriptChan};
+use script_runtime::ScriptRuntime;
 use script_traits::{TimerEvent, WorkerGlobalScopeInit, ScopeThings, ServiceWorkerMsg, WorkerScriptLoadOrigin};
 use servo_config::prefs::PREFS;
 use servo_rand::random;
@@ -87,7 +87,7 @@ impl ServiceWorkerGlobalScope {
     fn new_inherited(init: WorkerGlobalScopeInit,
                      worker_url: ServoUrl,
                      from_devtools_receiver: Receiver<DevtoolScriptControlMsg>,
-                     runtime: Runtime,
+                     runtime: ScriptRuntime,
                      own_sender: Sender<ServiceWorkerScriptMsg>,
                      receiver: Receiver<ServiceWorkerScriptMsg>,
                      timer_event_chan: IpcSender<TimerEvent>,
@@ -114,7 +114,7 @@ impl ServiceWorkerGlobalScope {
     pub fn new(init: WorkerGlobalScopeInit,
                worker_url: ServoUrl,
                from_devtools_receiver: Receiver<DevtoolScriptControlMsg>,
-               runtime: Runtime,
+               runtime: ScriptRuntime,
                own_sender: Sender<ServiceWorkerScriptMsg>,
                receiver: Receiver<ServiceWorkerScriptMsg>,
                timer_event_chan: IpcSender<TimerEvent>,

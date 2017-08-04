@@ -19,6 +19,7 @@ use js::jsapi::{JSGCInvocationKind, JSGCStatus, JS_AddExtraGCRootsTracer, JS_Set
 use js::jsapi::{JSGCMode, JSGCParamKey, JS_SetGCParameter, JS_SetGlobalJitCompilerOption};
 use js::jsapi::{JSJitCompilerOption, JS_SetOffthreadIonCompilationEnabled, JS_SetParallelParsingEnabled};
 use js::jsapi::{JSObject, RuntimeOptionsRef, SetPreserveWrapperCallback, SetEnqueuePromiseJobCallback};
+use js::jsapi::JS_RemoveExtraGCRootsTracer;
 use js::panic::wrap_panic;
 use js::rust::Runtime;
 use microtask::{EnqueuedPromiseCallback, Microtask};
@@ -32,6 +33,7 @@ use std::io::{Write, stdout};
 use std::marker::PhantomData;
 use std::os;
 use std::os::raw::c_void;
+use std::ops::Deref;
 use std::panic::AssertUnwindSafe;
 use std::ptr;
 use style::thread_state;
@@ -134,8 +136,30 @@ unsafe extern "C" fn enqueue_job(cx: *mut JSContext,
     }), false)
 }
 
+#[derive(JSTraceable, HeapSizeOf)]
+pub struct ScriptRuntime(#[ignore_heap_size_of = "js"] Runtime);
+
+impl Deref for ScriptRuntime {
+    type Target = Runtime;
+
+    fn deref(&self) -> &Runtime {
+        &self.0
+    }
+}
+
+impl Drop for ScriptRuntime {
+    #[allow(unsafe_code)]
+    fn drop(&mut self) {
+        // We're about to trigger a final GC. We will not be processing any further events that
+        // contain Trusted<T> objects, so we can ignore the custom hook.
+        unsafe {
+            JS_RemoveExtraGCRootsTracer(self.0.rt(), Some(trace_refcounted_objects), ptr::null_mut());
+        }
+    }
+}
+
 #[allow(unsafe_code)]
-pub unsafe fn new_rt_and_cx() -> Runtime {
+pub unsafe fn new_rt_and_cx() -> ScriptRuntime {
     LiveDOMReferences::initialize();
     let runtime = Runtime::new().unwrap();
 
@@ -307,7 +331,7 @@ pub unsafe fn new_rt_and_cx() -> Runtime {
         }
     }
 
-    runtime
+    ScriptRuntime(runtime)
 }
 
 #[allow(unsafe_code)]

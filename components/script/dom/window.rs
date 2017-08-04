@@ -59,7 +59,6 @@ use ipc_channel::router::ROUTER;
 use js::jsapi::{HandleObject, HandleValue, JSAutoCompartment, JSContext};
 use js::jsapi::{JS_GC, JS_GetRuntime};
 use js::jsval::UndefinedValue;
-use js::rust::Runtime;
 use layout_image::fetch_image_for_layout;
 use msg::constellation_msg::{FrameType, PipelineId};
 use net_traits::{ResourceThreads, ReferrerPolicy};
@@ -76,7 +75,7 @@ use script_layout_interface::reporter::CSSErrorReporter;
 use script_layout_interface::rpc::{ContentBoxResponse, ContentBoxesResponse, LayoutRPC};
 use script_layout_interface::rpc::{MarginStyleResponse, NodeScrollRootIdResponse};
 use script_layout_interface::rpc::{ResolvedStyleResponse, TextIndexResponse};
-use script_runtime::{CommonScriptMsg, ScriptChan, ScriptPort, ScriptThreadEventCategory};
+use script_runtime::{CommonScriptMsg, ScriptChan, ScriptPort, ScriptThreadEventCategory, ScriptRuntime};
 use script_thread::{ImageCacheMsg, MainThreadScriptChan, MainThreadScriptMsg, Runnable};
 use script_thread::{RunnableWrapper, ScriptThread, SendableMainThreadScriptChan};
 use script_traits::{ConstellationControlMsg, DocumentState, LoadData, MozBrowserEvent};
@@ -208,7 +207,7 @@ pub struct Window {
 
     /// The JavaScript runtime.
     #[ignore_heap_size_of = "Rc<T> is hard"]
-    js_runtime: DOMRefCell<Option<Rc<Runtime>>>,
+    js_runtime: DOMRefCell<Option<Rc<ScriptRuntime>>>,
 
     /// A handle for communicating messages to the layout thread.
     #[ignore_heap_size_of = "channels are hard"]
@@ -1783,7 +1782,7 @@ impl Window {
 
 impl Window {
     #[allow(unsafe_code)]
-    pub fn new(runtime: Rc<Runtime>,
+    pub fn new(runtime: Rc<ScriptRuntime>,
                script_chan: MainThreadScriptChan,
                dom_task_source: DOMManipulationTaskSource,
                user_task_source: UserInteractionTaskSource,

@@ -39,7 +39,6 @@ use js::jsapi::JSGCParamKey;
 use js::jsapi::JSTracer;
 use js::jsapi::JS_GC;
 use js::jsapi::JS_GetGCParameter;
-use js::rust::Runtime;
 use msg::constellation_msg::PipelineId;
 use net_traits::IpcSend;
 use net_traits::load_whole_resource;
@@ -48,6 +47,7 @@ use net_traits::request::RequestInit;
 use net_traits::request::RequestMode;
 use net_traits::request::Type as RequestType;
 use script_runtime::CommonScriptMsg;
+use script_runtime::ScriptRuntime;
 use script_runtime::ScriptThreadEventCategory;
 use script_runtime::StackRootTLS;
 use script_runtime::new_rt_and_cx;
@@ -405,7 +405,7 @@ struct WorkletThread {
     control_buffer: Option<WorkletControl>,
 
     /// The JS runtime
-    runtime: Runtime,
+    runtime: ScriptRuntime,
     should_gc: bool,
     gc_threshold: u32,
 }

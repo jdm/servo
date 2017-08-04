@@ -69,7 +69,6 @@ use js::glue::GetWindowProxyClass;
 use js::jsapi::{JSAutoCompartment, JSContext, JS_SetWrapObjectCallbacks};
 use js::jsapi::{JSTracer, SetWindowProxyClass};
 use js::jsval::UndefinedValue;
-use js::rust::Runtime;
 use mem::heap_size_of_self_and_children;
 use metrics::PaintTimeMetrics;
 use microtask::{MicrotaskQueue, Microtask};
@@ -83,7 +82,7 @@ use profile_traits::mem::{self, OpaqueSender, Report, ReportKind, ReportsChan};
 use profile_traits::time::{self, ProfilerCategory, profile};
 use script_layout_interface::message::{self, Msg, NewLayoutThreadInfo, ReflowQueryType};
 use script_runtime::{CommonScriptMsg, ScriptChan, ScriptThreadEventCategory};
-use script_runtime::{ScriptPort, StackRootTLS, get_reports, new_rt_and_cx};
+use script_runtime::{ScriptPort, StackRootTLS, get_reports, new_rt_and_cx, ScriptRuntime};
 use script_traits::{CompositorEvent, ConstellationControlMsg};
 use script_traits::{DocumentActivity, DiscardBrowsingContext, EventResult};
 use script_traits::{InitialScriptState, LayoutMsg, LoadData, MouseButton, MouseEventType, MozBrowserEvent};
@@ -486,7 +485,7 @@ pub struct ScriptThread {
     devtools_sender: IpcSender<DevtoolScriptControlMsg>,
 
     /// The JavaScript runtime.
-    js_runtime: Rc<Runtime>,
+    js_runtime: Rc<ScriptRuntime>,
 
     /// The topmost element over the mouse.
     topmost_mouse_over_target: MutNullableJS<Element>,

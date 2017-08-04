@@ -29,11 +29,10 @@ use ipc_channel::ipc::IpcSender;
 use js::jsapi::{HandleValue, JSAutoCompartment, JSContext, JSRuntime};
 use js::jsval::UndefinedValue;
 use js::panic::maybe_resume_unwind;
-use js::rust::Runtime;
 use microtask::{MicrotaskQueue, Microtask};
 use net_traits::{IpcSend, load_whole_resource};
 use net_traits::request::{CredentialsMode, Destination, RequestInit as NetRequestInit, Type as RequestType};
-use script_runtime::{CommonScriptMsg, ScriptChan, ScriptPort};
+use script_runtime::{CommonScriptMsg, ScriptChan, ScriptPort, ScriptRuntime};
 use script_thread::RunnableWrapper;
 use script_traits::{TimerEvent, TimerEventId};
 use script_traits::WorkerGlobalScopeInit;
@@ -74,8 +73,7 @@ pub struct WorkerGlobalScope {
     worker_url: ServoUrl,
     #[ignore_heap_size_of = "Arc"]
     closing: Option<Arc<AtomicBool>>,
-    #[ignore_heap_size_of = "Defined in js"]
-    runtime: Runtime,
+    runtime: ScriptRuntime,
     location: MutNullableJS<WorkerLocation>,
     navigator: MutNullableJS<WorkerNavigator>,
 
@@ -95,7 +93,7 @@ pub struct WorkerGlobalScope {
 impl WorkerGlobalScope {
     pub fn new_inherited(init: WorkerGlobalScopeInit,
                          worker_url: ServoUrl,
-                         runtime: Runtime,
+                         runtime: ScriptRuntime,
                          from_devtools_receiver: Receiver<DevtoolScriptControlMsg>,
                          timer_event_chan: IpcSender<TimerEvent>,
                          closing: Option<Arc<AtomicBool>>)
