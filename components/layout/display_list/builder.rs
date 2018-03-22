@@ -954,7 +954,7 @@ impl FragmentDisplayListBuilding for Fragment {
         webrender_image: WebRenderImageInfo,
         index: usize,
     ) {
-        debug!("(building display list) building background image");
+        println!("(building display list) building background image");
 
         let image = Size2D::new(
             Au::from_px(webrender_image.width as i32),
@@ -979,7 +979,7 @@ impl FragmentDisplayListBuilding for Fragment {
             display_list_section,
         );
 
-        debug!("(building display list) adding background image.");
+        println!("(building display list) adding background image.");
         state.add_display_item(DisplayItem::Image(Box::new(ImageDisplayItem {
             base: base,
             webrender_image: webrender_image,
@@ -1010,7 +1010,7 @@ impl FragmentDisplayListBuilding for Fragment {
 
         let draw_result = match state.layout_context.registered_painters.get(&name) {
             Some(painter) => {
-                debug!(
+                println!(
                     "Drawing a paint image {}({},{}).",
                     name, size_in_px.width, size_in_px.height
                 );
@@ -1023,7 +1023,7 @@ impl FragmentDisplayListBuilding for Fragment {
                 painter.draw_a_paint_image(size_in_px, device_pixel_ratio, properties, arguments)
             },
             None => {
-                debug!("Worklet {} called before registration.", name);
+                println!("Worklet {} called before registration.", name);
                 return None;
             },
         };
@@ -1037,7 +1037,7 @@ impl FragmentDisplayListBuilding for Fragment {
             };
 
             for url in draw_result.missing_image_urls.into_iter() {
-                debug!("Requesting missing image URL {}.", url);
+                println!("Requesting missing image URL {}.", url);
                 state.layout_context.get_webrender_image_for_url(
                     self.node,
                     url,
@@ -1535,7 +1535,7 @@ impl FragmentDisplayListBuilding for Fragment {
             return;
         }
 
-        debug!(
+        println!(
             "Fragment::build_display_list at rel={:?}, abs={:?}: {:?}",
             self.border_box, stacking_relative_border_box, self
         );
@@ -1638,7 +1638,7 @@ impl FragmentDisplayListBuilding for Fragment {
             return;
         }
 
-        debug!("Fragment::build_display_list: intersected. Adding display item...");
+        println!("Fragment::build_display_list: intersected. Adding display item...");
 
         // Create special per-fragment-type display items.
         self.build_fragment_type_specific_display_items(state, &stacking_relative_border_box, clip);
@@ -2819,7 +2819,7 @@ impl InlineFlowDisplayListBuilding for InlineFlow {
     }
 
     fn build_display_list_for_inline(&mut self, state: &mut DisplayListBuildState) {
-        debug!(
+        println!(
             "Flow: building display list for {} inline fragments",
             self.fragments.len()
         );

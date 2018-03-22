@@ -72,7 +72,7 @@ impl TextRunScanner {
                          font_context: &mut LayoutFontContext,
                          mut fragments: LinkedList<Fragment>)
                          -> InlineFragments {
-        debug!("TextRunScanner: scanning {} fragments for text runs...", fragments.len());
+        println!("TextRunScanner: scanning {} fragments for text runs...", fragments.len());
         debug_assert!(!fragments.is_empty());
 
         // Calculate bidi embedding levels, so we can split bidirectional fragments for reordering.
@@ -124,7 +124,7 @@ impl TextRunScanner {
                                                        &mut linebreaker);
         }
 
-        debug!("TextRunScanner: complete.");
+        println!("TextRunScanner: complete.");
         InlineFragments {
             fragments: new_fragments,
         }
@@ -144,7 +144,7 @@ impl TextRunScanner {
                            mut last_whitespace: bool,
                            linebreaker: &mut Option<LineBreakLeafIter>)
                            -> bool {
-        debug!("TextRunScanner: flushing {} fragments in range", self.clump.len());
+        println!("TextRunScanner: flushing {} fragments in range", self.clump.len());
 
         debug_assert!(!self.clump.is_empty());
         match self.clump.front().unwrap().specific {
@@ -193,7 +193,7 @@ impl TextRunScanner {
             let mut insertion_point = None;
 
             for (fragment_index, in_fragment) in self.clump.iter().enumerate() {
-                debug!("  flushing {:?}", in_fragment);
+                println!("  flushing {:?}", in_fragment);
                 let mut mapping = RunMapping::new(&run_info_list[..], fragment_index);
                 let text;
                 let selection;
@@ -343,7 +343,7 @@ impl TextRunScanner {
         };
 
         // Make new fragments with the runs and adjusted text indices.
-        debug!("TextRunScanner: pushing {} fragment(s)", self.clump.len());
+        println!("TextRunScanner: pushing {} fragment(s)", self.clump.len());
         let mut mappings = mappings.into_iter().peekable();
         let mut prev_fragments_to_meld = Vec::new();
 

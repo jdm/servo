@@ -203,7 +203,11 @@ fn main() {
 #[cfg(target_os = "android")]
 fn setup_logging() {
     // Piping logs from stdout/stderr to logcat happens in android_injected_glue.
-    ::std::env::set_var("RUST_LOG", "error");
+    if ::std::env::var("RUST_LOG").is_err() {
+        ::std::env::set_var("RUST_LOG", "error");
+    }
+
+    ::std::env::set_var("RUST_LOG", "layout,layout_thread");
 
     unsafe { android_injected_glue::ffi::app_dummy() };
 }

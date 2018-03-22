@@ -48,7 +48,7 @@ where
                 for anim in animations.iter_mut() {
                     if let Animation::Keyframes(_, ref anim_name, ref mut anim_state) = *anim {
                         if *name == *anim_name {
-                            debug!("update_animation_state: Found other animation {}", name);
+                            println!("update_animation_state: Found other animation {}", name);
                             anim_state.update_from_other(&state, timer);
                             should_push = false;
                             break;

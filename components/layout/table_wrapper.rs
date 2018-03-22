@@ -332,7 +332,7 @@ impl Flow for TableWrapperFlow {
     }
 
     fn assign_inline_sizes(&mut self, layout_context: &LayoutContext) {
-        debug!("assign_inline_sizes({}): assigning inline_size for flow",
+        println!("assign_inline_sizes({}): assigning inline_size for flow",
                if self.block_flow.base.flags.is_float() {
                    "floated table_wrapper"
                } else {
@@ -419,7 +419,7 @@ impl Flow for TableWrapperFlow {
     }
 
     fn assign_block_size(&mut self, layout_context: &LayoutContext) {
-        debug!("assign_block_size: assigning block_size for table_wrapper");
+        println!("assign_block_size: assigning block_size for table_wrapper");
         let remaining = self.block_flow.assign_block_size_block_base(
             layout_context,
             None,

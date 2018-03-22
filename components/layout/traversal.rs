@@ -194,7 +194,7 @@ pub trait PostorderNodeMutTraversal<ConcreteThreadSafeLayoutNode: ThreadSafeLayo
 fn construct_flows_at<N>(context: &LayoutContext, node: N)
     where N: LayoutNode,
 {
-    debug!("construct_flows_at: {:?}", node);
+    println!("construct_flows_at: {:?}", node);
 
     // Construct flows for this node.
     {
@@ -207,7 +207,7 @@ fn construct_flows_at<N>(context: &LayoutContext, node: N)
             let mut flow_constructor = FlowConstructor::new(context);
             if nonincremental_layout || !flow_constructor.repair_if_possible(&tnode) {
                 flow_constructor.process(&tnode);
-                debug!("Constructed flow for {:?}: {:x}",
+                println!("Constructed flow for {:?}: {:x}",
                        tnode,
                        tnode.flow_debug_id());
             }

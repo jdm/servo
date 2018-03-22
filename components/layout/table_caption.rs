@@ -58,12 +58,12 @@ impl Flow for TableCaptionFlow {
     }
 
     fn assign_inline_sizes(&mut self, layout_context: &LayoutContext) {
-        debug!("assign_inline_sizes({}): assigning inline_size for flow", "table_caption");
+        println!("assign_inline_sizes({}): assigning inline_size for flow", "table_caption");
         self.block_flow.assign_inline_sizes(layout_context);
     }
 
     fn assign_block_size(&mut self, layout_context: &LayoutContext) {
-        debug!("assign_block_size: assigning block_size for table_caption");
+        println!("assign_block_size: assigning block_size for table_caption");
         self.block_flow.assign_block_size(layout_context);
     }
 
@@ -80,7 +80,7 @@ impl Flow for TableCaptionFlow {
     }
 
     fn build_display_list(&mut self, state: &mut DisplayListBuildState) {
-        debug!("build_display_list_table_caption: same process as block flow");
+        println!("build_display_list_table_caption: same process as block flow");
         self.block_flow.build_display_list(state);
     }
 

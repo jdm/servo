@@ -120,7 +120,7 @@ pub trait Flow: HasBaseFlow + fmt::Debug + Sync + Send + 'static {
 
     /// If this is a block flow, returns the underlying object, borrowed mutably. Fails otherwise.
     fn as_mut_block(&mut self) -> &mut BlockFlow {
-        debug!("called as_mut_block() on a flow of type {:?}", self.class());
+        println!("called as_mut_block() on a flow of type {:?}", self.class());
         panic!("called as_mut_block() on a non-block flow")
     }
 
@@ -412,7 +412,7 @@ pub trait Flow: HasBaseFlow + fmt::Debug + Sync + Send + 'static {
 
     /// Marks this flow as the root flow. The default implementation is a no-op.
     fn mark_as_root(&mut self) {
-        debug!("called mark_as_root() on a flow of type {:?}", self.class());
+        println!("called mark_as_root() on a flow of type {:?}", self.class());
         panic!("called mark_as_root() on an unhandled flow");
     }
 

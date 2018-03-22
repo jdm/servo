@@ -167,7 +167,7 @@ impl Floats {
         let list = &self.list;
         let block_start = block_start - self.offset.block;
 
-        debug!("available_rect: trying to find space at {:?}", block_start);
+        println!("available_rect: trying to find space at {:?}", block_start);
 
         // Relevant dimensions for the inline-end-most inline-start float
         let mut max_inline_start = Au(0) - self.offset.inline;
@@ -180,11 +180,11 @@ impl Floats {
 
         // Find the float collisions for the given range in the block direction.
         for float in list.floats.iter() {
-            debug!("available_rect: Checking for collision against float");
+            println!("available_rect: Checking for collision against float");
             let float_pos = float.bounds.start;
             let float_size = float.bounds.size;
 
-            debug!("float_pos: {:?}, float_size: {:?}", float_pos, float_size);
+            println!("float_pos: {:?}, float_size: {:?}", float_pos, float_size);
             match float.kind {
                 FloatKind::Left if float_pos.i + float_size.inline > max_inline_start &&
                         float_pos.b + float_size.block > block_start &&
@@ -194,7 +194,7 @@ impl Floats {
                     l_block_start = Some(float_pos.b);
                     l_block_end = Some(float_pos.b + float_size.block);
 
-                    debug!("available_rect: collision with inline_start float: new \
+                    println!("available_rect: collision with inline_start float: new \
                             max_inline_start is {:?}",
                            max_inline_start);
                 }
@@ -205,7 +205,7 @@ impl Floats {
 
                     r_block_start = Some(float_pos.b);
                     r_block_end = Some(float_pos.b + float_size.block);
-                    debug!("available_rect: collision with inline_end float: new min_inline_end \
+                    println!("available_rect: collision with inline_end float: new min_inline_end \
                             is {:?}",
                             min_inline_end);
                 }
@@ -263,7 +263,7 @@ impl Floats {
             kind: info.kind
         };
 
-        debug!("add_float: added float with info {:?}", new_info);
+        println!("add_float: added float with info {:?}", new_info);
 
         let new_float = Float {
             bounds: LogicalRect::from_point_size(
@@ -307,7 +307,7 @@ impl Floats {
     /// Given placement information, finds the closest place a fragment can be positioned without
     /// colliding with any floats.
     pub fn place_between_floats(&self, info: &PlacementInfo) -> LogicalRect<Au> {
-        debug!("place_between_floats: Placing object with {:?}", info.size);
+        println!("place_between_floats: Placing object with {:?}", info.size);
 
         // If no floats, use this fast path.
         if !self.list.is_present() {
@@ -337,7 +337,7 @@ impl Floats {
             let maybe_location = self.available_rect(float_b,
                                                      info.size.block,
                                                      info.max_inline_size);
-            debug!("place_float: got available rect: {:?} for block-pos: {:?}",
+            println!("place_float: got available rect: {:?} for block-pos: {:?}",
                    maybe_location,
                    float_b);
             match maybe_location {

@@ -284,6 +284,7 @@ impl LayoutThreadFactory for LayoutThread {
               layout_threads: usize,
               paint_time_metrics: PaintTimeMetrics) {
         thread::Builder::new().name(format!("LayoutThread {:?}", id)).spawn(move || {
+println!("started layout thread");
             thread_state::initialize(ThreadState::LAYOUT);
 
             // In order to get accurate crash reports, we install the top-level bc id.
@@ -466,7 +467,8 @@ impl LayoutThread {
         } else {
             None
         };
-        debug!("Possible layout Threads: {}", layout_threads);
+println!("creating pool builder");
+        println!("Possible layout Threads: {}", layout_threads);
 
         // Create the channel on which new animations can be sent.
         let (new_animations_sender, new_animations_receiver) = channel();
@@ -592,6 +594,7 @@ impl LayoutThread {
 
     /// Receives and dispatches messages from the script and constellation threads
     fn handle_request<'a, 'b>(&mut self, possibly_locked_rw_data: &mut RwData<'a, 'b>) -> bool {
+println!("handling requestr");
         enum Request {
             FromPipeline(LayoutControlMsg),
             FromScript(Msg),
@@ -742,7 +745,7 @@ impl LayoutThread {
                 self.url = final_url;
             },
             Msg::RegisterPaint(name, mut properties, painter) => {
-                debug!("Registering the painter");
+                println!("Registering the painter");
                 let properties = properties.drain(..)
                     .filter_map(|name| PropertyId::parse(&*name)
                         .ok().map(|id| (name.clone(), id)))
@@ -760,7 +763,7 @@ impl LayoutThread {
                 return false
             },
             Msg::ExitNow => {
-                debug!("layout: ExitNow received");
+                println!("layout: ExitNow received");
                 self.exit_now();
                 return false
             },
@@ -838,7 +841,7 @@ impl LayoutThread {
                     }
                 }
                 Msg::ExitNow => {
-                    debug!("layout thread is exiting...");
+                    println!("layout thread is exiting...");
                     self.exit_now();
                     break
                 }
@@ -979,7 +982,7 @@ impl LayoutThread {
                     let mut build_state =
                         sequential::build_display_list_for_subtree(layout_root, layout_context);
 
-                    debug!("Done building display list.");
+                    println!("Done building display list.");
 
                     let root_size = {
                         let root_flow = layout_root.base();
@@ -1031,7 +1034,7 @@ impl LayoutThread {
                 println!("{}", serde_json::to_string_pretty(&display_list).unwrap());
             }
 
-            debug!("Layout done!");
+            println!("Layout done!");
 
             // TODO: Avoid the temporary conversion and build webrender sc/dl directly!
             let builder = rw_data.display_list.as_ref().unwrap().convert_to_webrender(self.id);
@@ -1072,16 +1075,16 @@ impl LayoutThread {
         // Parallelize if there's more than 750 objects based on rzambre's suggestion
         // https://github.com/servo/servo/issues/10110
         self.parallel_flag = self.layout_threads > 1 && data.dom_count > 750;
-        debug!("layout: received layout request for: {}", self.url);
-        debug!("Number of objects in DOM: {}", data.dom_count);
-        debug!("layout: parallel? {}", self.parallel_flag);
+        println!("layout: received layout request for: {}", self.url);
+        println!("Number of objects in DOM: {}", data.dom_count);
+        println!("layout: parallel? {}", self.parallel_flag);
 
         let mut rw_data = possibly_locked_rw_data.lock();
 
         let element = match document.root_element() {
             None => {
                 // Since we cannot compute anything, give spec-required placeholders.
-                debug!("layout: No root node: bailing");
+                println!("layout: No root node: bailing");
                 match data.reflow_goal {
                     ReflowGoal::ContentBoxQuery(_) => {
                         rw_data.content_box_response = None;
@@ -1123,7 +1126,7 @@ impl LayoutThread {
             Some(x) => x,
         };
 
-        debug!("layout: processing reflow request for: {:?} ({}) (query={:?})",
+        println!("layout: processing reflow request for: {:?} ({}) (query={:?})",
                element, self.url, data.reflow_goal);
         trace!("{:?}", ShowSubtree(element.as_node()));
 
@@ -1154,7 +1157,7 @@ impl LayoutThread {
         self.stylist.force_stylesheet_origins_dirty(sheet_origins_affected_by_device_change);
         self.viewport_size =
             self.stylist.viewport_constraints().map_or(current_screen_size, |constraints| {
-                debug!("Viewport constraints: {:?}", constraints);
+                println!("Viewport constraints: {:?}", constraints);
 
                 // other rules are evaluated against the actual viewport
                 Size2D::new(Au::from_f32_px(constraints.size.width),
@@ -1178,7 +1181,7 @@ impl LayoutThread {
 
         {
             if self.first_reflow.get() {
-                debug!("First reflow, rebuilding user and UA rules");
+                println!("First reflow, rebuilding user and UA rules");
                 for stylesheet in &ua_stylesheets.user_or_user_agent_stylesheets {
                     self.stylist.append_stylesheet(stylesheet.clone(), &ua_or_user_guard);
                     self.handle_add_stylesheet(&stylesheet.0, &ua_or_user_guard);
@@ -1197,7 +1200,7 @@ impl LayoutThread {
             }
 
             if data.stylesheets_changed {
-                debug!("Doc sheets changed, flushing author sheets too");
+                println!("Doc sheets changed, flushing author sheets too");
                 self.stylist.force_stylesheet_origins_dirty(Origin::Author.into());
             }
         }
@@ -1209,7 +1212,7 @@ impl LayoutThread {
         }
 
         let restyles = document.drain_pending_restyles();
-        debug!("Draining restyles: {}", restyles.len());
+        println!("Draining restyles: {}", restyles.len());
 
         let mut map = SnapshotMap::new();
         let elements_with_snapshot: Vec<_> =
@@ -1247,7 +1250,7 @@ impl LayoutThread {
             // Stash the data on the element for processing by the style system.
             style_data.hint.insert(restyle.hint.into());
             style_data.damage = restyle.damage;
-            debug!("Noting restyle for {:?}: {:?}", el, style_data);
+            println!("Noting restyle for {:?}: {:?}", el, style_data);
         }
 
         self.stylist.flush(&guards, Some(element), Some(&map));
@@ -1633,7 +1636,7 @@ impl LayoutThread {
     }
 
     fn reflow_all_nodes(flow: &mut Flow) {
-        debug!("reflowing all nodes!");
+        println!("reflowing all nodes!");
         flow.mut_base()
             .restyle_damage
             .insert(ServoRestyleDamage::REPAINT | ServoRestyleDamage::STORE_OVERFLOW |

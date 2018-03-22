@@ -501,7 +501,7 @@ impl FlexFlow {
                                       inline_end_content_edge: Au,
                                       content_inline_size: Au) {
         let _scope = layout_debug_scope!("flex::block_mode_assign_inline_sizes");
-        debug!("flex::block_mode_assign_inline_sizes");
+        println!("flex::block_mode_assign_inline_sizes");
 
         // FIXME (mbrubeck): Get correct mode for absolute containing block
         let containing_block_mode = self.block_flow.base.writing_mode;
@@ -543,12 +543,12 @@ impl FlexFlow {
                                        _inline_end_content_edge: Au,
                                        content_inline_size: Au) {
         let _scope = layout_debug_scope!("flex::inline_mode_assign_inline_sizes");
-        debug!("inline_mode_assign_inline_sizes");
+        println!("inline_mode_assign_inline_sizes");
 
-        debug!("content_inline_size = {:?}", content_inline_size);
+        println!("content_inline_size = {:?}", content_inline_size);
 
         let child_count = ImmutableFlowUtils::child_count(self as &Flow) as i32;
-        debug!("child_count = {:?}", child_count);
+        println!("child_count = {:?}", child_count);
         if child_count == 0 {
             return;
         }
@@ -873,7 +873,7 @@ impl Flow for FlexFlow {
 
     fn assign_inline_sizes(&mut self, layout_context: &LayoutContext) {
         let _scope = layout_debug_scope!("flex::assign_inline_sizes {:x}", self.block_flow.base.debug_id());
-        debug!("assign_inline_sizes");
+        println!("assign_inline_sizes");
 
         if !self.block_flow.base.restyle_damage.intersects(ServoRestyleDamage::REFLOW_OUT_OF_FLOW |
                                                            ServoRestyleDamage::REFLOW) {
@@ -915,7 +915,7 @@ impl Flow for FlexFlow {
         let inline_start_content_edge = self.block_flow.fragment.border_box.start.i +
             self.block_flow.fragment.border_padding.inline_start;
 
-        debug!("inline_start_content_edge = {:?}", inline_start_content_edge);
+        println!("inline_start_content_edge = {:?}", inline_start_content_edge);
 
         let padding_and_borders = self.block_flow.fragment.border_padding.inline_start_end();
 
@@ -924,8 +924,8 @@ impl Flow for FlexFlow {
             self.block_flow.fragment.margin.inline_end +
             self.block_flow.fragment.border_padding.inline_end;
 
-        debug!("padding_and_borders = {:?}", padding_and_borders);
-        debug!("self.block_flow.fragment.border_box.size.inline = {:?}",
+        println!("padding_and_borders = {:?}", padding_and_borders);
+        println!("self.block_flow.fragment.border_box.size.inline = {:?}",
                self.block_flow.fragment.border_box.size.inline);
         let content_inline_size = self.block_flow.fragment.border_box.size.inline - padding_and_borders;
 

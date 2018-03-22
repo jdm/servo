@@ -1546,7 +1546,7 @@ impl BlockFlow {
 
         // If float speculation failed, fixup our layout, and re-layout all the children.
         if self.fragment.margin_box_inline_size() != self.base.position.size.inline {
-            debug!("assign_inline_position_for_formatting_context: float speculation failed");
+            println!("assign_inline_position_for_formatting_context: float speculation failed");
             // Fix-up our own layout.
             // We can't just traverse_flow_tree_preorder ourself, because that would re-run
             // float speculation, instead of acting on the actual results.
@@ -1685,7 +1685,7 @@ impl BlockFlow {
             return
         }
 
-        debug!("assign_inline_sizes({}): assigning inline_size for flow",
+        println!("assign_inline_sizes({}): assigning inline_size for flow",
                if self.base.flags.is_float() {
                    "float"
                } else {
@@ -1708,7 +1708,7 @@ impl BlockFlow {
     /// Should be called during `assign_inline_sizes` for flows that may be the root.
     pub fn initialize_container_size_for_root(&mut self, shared_context: &SharedStyleContext) {
         if self.is_root() {
-            debug!("Setting root position");
+            println!("Setting root position");
             self.base.position.start = LogicalPoint::zero(self.base.writing_mode);
             self.base.block_container_inline_size = LogicalSize::from_physical(
                 self.base.writing_mode, shared_context.viewport_size()).inline;
@@ -1950,14 +1950,14 @@ impl Flow for BlockFlow {
                 self.formatting_context_type() != FormattingContextType::None ||
                 self.base.flags.contains(FlowFlags::MARGINS_CANNOT_COLLAPSE) {
             // Root element margins should never be collapsed according to CSS § 8.3.1.
-            debug!("assign_block_size: assigning block_size for root flow {:?}",
+            println!("assign_block_size: assigning block_size for root flow {:?}",
                    self.base().debug_id());
             self.assign_block_size_block_base(
                 layout_context,
                 fragmentation_context,
                 MarginsMayCollapseFlag::MarginsMayNotCollapse)
         } else {
-            debug!("assign_block_size: assigning block_size for block {:?}",
+            println!("assign_block_size: assigning block_size for block {:?}",
                    self.base().debug_id());
             self.assign_block_size_block_base(
                 layout_context,
@@ -2960,7 +2960,7 @@ impl ISizeAndMarginsComputer for FloatNonReplaced {
             margin_inline_end;
         let shrink_to_fit = block.get_shrink_to_fit_inline_size(available_inline_size_float);
         let inline_size = computed_inline_size.specified_or_default(shrink_to_fit);
-        debug!("assign_inline_sizes_float -- inline_size: {:?}", inline_size);
+        println!("assign_inline_sizes_float -- inline_size: {:?}", inline_size);
         ISizeConstraintSolution::new(inline_size, margin_inline_start, margin_inline_end)
     }
 }
@@ -2979,7 +2979,7 @@ impl ISizeAndMarginsComputer for FloatReplaced {
             MaybeAuto::Specified(w) => w,
             MaybeAuto::Auto => panic!("FloatReplaced: inline_size should have been computed by now")
         };
-        debug!("assign_inline_sizes_float -- inline_size: {:?}", inline_size);
+        println!("assign_inline_sizes_float -- inline_size: {:?}", inline_size);
         ISizeConstraintSolution::new(inline_size, margin_inline_start, margin_inline_end)
     }
 

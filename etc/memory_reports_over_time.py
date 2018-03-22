@@ -46,7 +46,10 @@ def parse_memory_report(lines):
             while parents and parents[-1][1] >= separator_index:
                 parents.pop()
 
-        amount, unit, _, name = line.split()
+        line_components = line.split()
+        amount = line_components[0]
+        unit = line_components[1]
+        name = ' '.join(line_components[3:])
 
         dest_report = reports
         for (parent, index) in parents:

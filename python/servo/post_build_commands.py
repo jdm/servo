@@ -90,6 +90,7 @@ class PostBuildCommands(CommandBase):
                     % param.replace("'", "\\'")
                 ]
             script += [
+                "export RUST_LOG=layout",
                 "am start com.mozilla.servo/com.mozilla.servo.MainActivity",
                 "exit"
             ]

@@ -211,7 +211,7 @@ impl Flow for TableCellFlow {
     fn assign_inline_sizes(&mut self, layout_context: &LayoutContext) {
         let _scope = layout_debug_scope!("table_cell::assign_inline_sizes {:x}",
                                             self.block_flow.base.debug_id());
-        debug!("assign_inline_sizes({}): assigning inline_size for flow", "table_cell");
+        println!("assign_inline_sizes({}): assigning inline_size for flow", "table_cell");
 
         let shared_context = layout_context.shared_context();
         // The position was set to the column inline-size by the parent flow, table row flow.
@@ -241,7 +241,7 @@ impl Flow for TableCellFlow {
     }
 
     fn assign_block_size(&mut self, layout_context: &LayoutContext) {
-        debug!("assign_block_size: assigning block_size for table_cell");
+        println!("assign_block_size: assigning block_size for table_cell");
         self.assign_block_size_table_cell_base(layout_context);
     }
 

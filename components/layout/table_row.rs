@@ -436,7 +436,7 @@ impl Flow for TableRowFlow {
     fn assign_inline_sizes(&mut self, layout_context: &LayoutContext) {
         let _scope = layout_debug_scope!("table_row::assign_inline_sizes {:x}",
                                          self.block_flow.base.debug_id());
-        debug!("assign_inline_sizes({}): assigning inline_size for flow", "table_row");
+        println!("assign_inline_sizes({}): assigning inline_size for flow", "table_row");
 
         let shared_context = layout_context.shared_context();
         // The position was set to the containing block by the flow's parent.

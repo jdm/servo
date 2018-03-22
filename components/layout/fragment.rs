@@ -23,7 +23,7 @@ use gfx_traits::StackingContextId;
 use inline::{InlineFragmentNodeFlags, InlineFragmentContext, InlineFragmentNodeInfo};
 use inline::{InlineMetrics, LineMetrics};
 use ipc_channel::ipc::IpcSender;
-#[cfg(debug_assertions)]
+//#[cfg(debug_assertions)]
 use layout_debug;
 use model::{self, IntrinsicISizes, IntrinsicISizesContribution, MaybeAuto, SizeConstraint};
 use model::style_length;
@@ -146,7 +146,7 @@ pub struct Fragment {
     /// A debug ID that is consistent for the life of this fragment (via transform etc).
     /// This ID should not be considered stable across multiple layouts or fragment
     /// manipulations.
-    debug_id: DebugId,
+    pub debug_id: DebugId,
 
     /// The ID of the StackingContext that contains this fragment. This is initialized
     /// to 0, but it assigned during the collect_stacking_contexts phase of display
@@ -1752,14 +1752,14 @@ impl Fragment {
         let mut inline_end_range = None;
         let mut overflowing = false;
 
-        debug!("calculate_split_position_using_breaking_strategy: splitting text fragment \
+        println!("calculate_split_position_using_breaking_strategy: splitting text fragment \
                 (strlen={}, range={:?}, max_inline_size={:?})",
                text_fragment_info.run.text.len(),
                text_fragment_info.range,
                max_inline_size);
 
         for slice in slice_iterator {
-            debug!("calculate_split_position_using_breaking_strategy: considering slice \
+            println!("calculate_split_position_using_breaking_strategy: considering slice \
                     (offset={:?}, slice range={:?}, remaining_inline_size={:?})",
                    slice.offset,
                    slice.range,
@@ -1773,7 +1773,7 @@ impl Fragment {
             // Have we found the split point?
             if advance <= remaining_inline_size || slice.glyphs.is_whitespace() {
                 // Keep going; we haven't found the split point yet.
-                debug!("calculate_split_position_using_breaking_strategy: enlarging span");
+                println!("calculate_split_position_using_breaking_strategy: enlarging span");
                 remaining_inline_size = remaining_inline_size - advance;
                 inline_start_range.extend_by(slice.range.length());
                 continue
@@ -1801,7 +1801,7 @@ impl Fragment {
                 let mut inline_end = remaining_range;
                 inline_end.extend_to(text_fragment_info.range.end());
                 inline_end_range = Some(inline_end);
-                debug!("calculate_split_position: splitting remainder with inline-end range={:?}",
+                println!("calculate_split_position: splitting remainder with inline-end range={:?}",
                        inline_end);
             }
 
@@ -3110,50 +3110,50 @@ pub struct SpeculatedInlineContentEdgeOffsets {
     pub end: Au,
 }
 
-#[cfg(not(debug_assertions))]
+/*#[cfg(not(debug_assertions))]
 #[derive(Clone)]
-struct DebugId;
+struct DebugId;*/
 
-#[cfg(debug_assertions)]
-#[derive(Clone)]
-struct DebugId(u16);
+//#[cfg(debug_assertions)]
+#[derive(Clone, PartialEq)]
+pub struct DebugId(u16);
 
-#[cfg(not(debug_assertions))]
+/*#[cfg(not(debug_assertions))]
 impl DebugId {
     pub fn new() -> DebugId {
         DebugId
     }
-}
+}*/
 
-#[cfg(debug_assertions)]
+//#[cfg(debug_assertions)]
 impl DebugId {
     pub fn new() -> DebugId {
         DebugId(layout_debug::generate_unique_debug_id())
     }
 }
 
-#[cfg(not(debug_assertions))]
+/*#[cfg(not(debug_assertions))]
 impl fmt::Display for DebugId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:p}", &self)
     }
-}
+}*/
 
-#[cfg(debug_assertions)]
+//#[cfg(debug_assertions)]
 impl fmt::Display for DebugId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.0)
     }
 }
 
-#[cfg(not(debug_assertions))]
+/*#[cfg(not(debug_assertions))]
 impl Serialize for DebugId {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(&format!("{:p}", &self))
     }
-}
+}*/
 
-#[cfg(debug_assertions)]
+//#[cfg(debug_assertions)]
 impl Serialize for DebugId {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_u16(self.0)

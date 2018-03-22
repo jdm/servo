@@ -85,7 +85,7 @@ impl Flow for MulticolFlow {
     }
 
     fn assign_inline_sizes(&mut self, layout_context: &LayoutContext) {
-        debug!("assign_inline_sizes({}): assigning inline_size for flow", "multicol");
+        println!("assign_inline_sizes({}): assigning inline_size for flow", "multicol");
         let shared_context = layout_context.shared_context();
         self.block_flow.compute_inline_sizes(shared_context);
 
@@ -138,7 +138,7 @@ impl Flow for MulticolFlow {
     }
 
     fn assign_block_size(&mut self, ctx: &LayoutContext) {
-        debug!("assign_block_size: assigning block_size for multicol");
+        println!("assign_block_size: assigning block_size for multicol");
 
         let fragmentation_context = Some(FragmentationContext {
             this_fragment_is_empty: true,
@@ -195,7 +195,7 @@ impl Flow for MulticolFlow {
     }
 
     fn build_display_list(&mut self, state: &mut DisplayListBuildState) {
-        debug!("build_display_list_multicol");
+        println!("build_display_list_multicol");
         self.block_flow.build_display_list(state);
     }
 
@@ -257,12 +257,12 @@ impl Flow for MulticolColumnFlow {
     }
 
     fn assign_inline_sizes(&mut self, layout_context: &LayoutContext) {
-        debug!("assign_inline_sizes({}): assigning inline_size for flow", "multicol column");
+        println!("assign_inline_sizes({}): assigning inline_size for flow", "multicol column");
         self.block_flow.assign_inline_sizes(layout_context);
     }
 
     fn assign_block_size(&mut self, ctx: &LayoutContext) {
-        debug!("assign_block_size: assigning block_size for multicol column");
+        println!("assign_block_size: assigning block_size for multicol column");
         self.block_flow.assign_block_size(ctx);
     }
 
@@ -285,7 +285,7 @@ impl Flow for MulticolColumnFlow {
     }
 
     fn build_display_list(&mut self, state: &mut DisplayListBuildState) {
-        debug!("build_display_list_multicol column");
+        println!("build_display_list_multicol column");
         self.block_flow.build_display_list(state);
     }
 

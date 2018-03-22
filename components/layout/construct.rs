@@ -565,7 +565,7 @@ impl<'a, ConcreteThreadSafeLayoutNode: ThreadSafeLayoutNode>
                     inline_fragment_accumulator.push_all(predecessors);
 
                     // Flush any inline fragments that we were gathering up.
-                    debug!("flushing {} inline box(es) to flow A",
+                    println!("flushing {} inline box(es) to flow A",
                            inline_fragment_accumulator.fragments.fragments.len());
                     let old_inline_fragment_accumulator =
                         mem::replace(inline_fragment_accumulator,
@@ -1369,7 +1369,7 @@ impl<'a, ConcreteThreadSafeLayoutNode: ThreadSafeLayoutNode>
             }
         }
         if col_fragments.is_empty() {
-            debug!("add SpecificFragmentInfo::TableColumn for empty colgroup");
+            println!("add SpecificFragmentInfo::TableColumn for empty colgroup");
             let specific = SpecificFragmentInfo::TableColumn(TableColumnFragmentInfo::new(node));
             col_fragments.push(Fragment::new(node, specific, self.layout_context));
         }
@@ -1561,7 +1561,7 @@ impl<'a, ConcreteThreadSafeLayoutNode> PostorderNodeMutTraversal<ConcreteThreadS
                 (Display::Inline, Float::None, Position::Static),
         };
 
-        debug!("building flow for node: {:?} {:?} {:?} {:?}", display, float, positioning, node.type_id());
+        println!("building flow for node: {:?} {:?} {:?} {:?}", display, float, positioning, node.type_id());
 
         // Switch on display and floatedness.
         match (display, float, positioning) {
