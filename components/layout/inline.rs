@@ -272,10 +272,14 @@ impl LineBreaker {
     }
 
     /// Reinitializes the pending line to blank data.
-    fn reset_line(&mut self) -> Line {
+    fn reset_line(&mut self) {
+        println!("resetting line");
         self.last_known_line_breaking_opportunity = None;
+        println!("pending was {:?}", self.pending_line);
         mem::replace(&mut self.pending_line,
-                     Line::new(self.floats.writing_mode, &self.minimum_metrics))
+                     Line::new(self.floats.writing_mode, &self.minimum_metrics));
+        //self.pending_line = Line::new(self.floats.writing_mode, &self.minimum_metrics);
+        println!("pending is now {:?}", self.pending_line);
     }
 
     /// Reflows fragments for the given inline flow.
@@ -578,12 +582,16 @@ impl LineBreaker {
         // Also, determine whether we can legally break the line before, or
         // inside, this fragment.
         let fragment_is_line_break_opportunity = if self.pending_line_is_empty() {
+            println!("pending line was empty");
             fragment.strip_leading_whitespace_if_necessary();
             let (line_bounds, _) = self.initial_line_placement(flow, &fragment, self.cur_b);
+            println!("did initial placement, pending is {:?}", self.pending_line);
             self.pending_line.bounds.start = line_bounds.start;
             self.pending_line.green_zone = line_bounds.size;
+            println!("pending is now {:?}", self.pending_line);
             false
         } else {
+            println!("pending line was not empty: {:?}", self.pending_line);
             // In case of Foo<span style="...">bar</span>, the line breaker will
             // set the "suppress line break before" flag for the second fragment.
             //
@@ -789,7 +797,7 @@ impl LineBreaker {
         }
 
         if line_flush_mode == LineFlushMode::Flush {
-            println!("flishing current line");
+            println!("flushing current line");
             self.flush_current_line()
         }
     }
@@ -823,6 +831,7 @@ impl LineBreaker {
                                               layout_context: &LayoutContext,
                                               cur_fragment: Fragment,
                                               line_flush_mode: LineFlushMode) {
+        println!("splitting at last known good position");
         let last_known_line_breaking_opportunity =
             match self.last_known_line_breaking_opportunity {
                 None => {
