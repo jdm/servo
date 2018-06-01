@@ -484,8 +484,13 @@ class CommandBase(object):
             env["OPENSSL_INCLUDE_DIR"] = path.join(package_dir("openssl"), "include")
             env["OPENSSL_LIB_DIR"] = path.join(package_dir("openssl"), "lib" + msvc_x64)
             env["OPENSSL_LIBS"] = "libsslMD:libcryptoMD"
-            # Link moztools
-            env["MOZTOOLS_PATH"] = path.join(package_dir("moztools"), "bin")
+            # Link moztools, used for building SpiderMonkey
+            env["MOZTOOLS_PATH"] = os.pathsep.join([
+                path.join(package_dir("moztools"), "bin"),
+                path.join(package_dir("moztools"), "msys", "bin"),
+            ])
+            # Link autoconf 2.13, used for building SpiderMonkey
+            env["AUTOCONF"] = path.join(package_dir("moztools"), "msys", "local", "bin", "autoconf-2.13")
             # Link LLVM
             env["LIBCLANG_PATH"] = path.join(package_dir("llvm"), "lib")
 

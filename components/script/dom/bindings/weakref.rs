@@ -61,7 +61,8 @@ pub trait WeakReferenceable: DomObject + Sized {
                     count: Cell::new(1),
                     value: Cell::new(Some(ptr::NonNull::from(self))),
                 }));
-                JS_SetReservedSlot(object, DOM_WEAK_SLOT, PrivateValue(ptr as *const c_void));
+                let val = PrivateValue(ptr as *const c_void);
+                JS_SetReservedSlot(object, DOM_WEAK_SLOT, &val);
             }
             let box_ = &*ptr;
             assert!(box_.value.get().is_some());

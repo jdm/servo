@@ -24,12 +24,12 @@ use js::jsapi::{Heap, JSAutoCompartment, JSContext};
 use js::jsapi::{JSJitInfo, JSObject, JSTracer, JSWrapObjectCallbacks};
 use js::jsapi::{JS_EnumerateStandardClasses, JS_GetLatin1StringCharsAndLength};
 use js::jsapi::{JS_GetReservedSlot, JS_IsExceptionPending, JS_IsGlobalObject};
-use js::jsapi::{JS_ResolveStandardClass, ToWindowProxyIfWindow};
-use js::jsapi::{JS_StringHasLatin1Chars, ObjectOpResult};
+use js::jsapi::{JS_ResolveStandardClass, JS_StringHasLatin1Chars, ObjectOpResult};
 use js::jsapi::HandleId as RawHandleId;
 use js::jsapi::HandleObject as RawHandleObject;
+use js::jsapi::MutableHandleObject as RawMutableHandleObject;
 use js::jsval::{JSVal, UndefinedValue};
-use js::rust::{GCMethods, ToString, get_object_class, is_dom_class};
+use js::rust::{GCMethods, ToString, ToWindowProxyIfWindow, get_object_class, is_dom_class};
 use js::rust::{Handle, HandleId, HandleObject, HandleValue, MutableHandleValue};
 use js::rust::wrappers::JS_DeletePropertyById;
 use js::rust::wrappers::JS_ForwardGetPropertyTo;
@@ -387,14 +387,14 @@ unsafe extern "C" fn wrap(cx: *mut JSContext,
 }
 
 unsafe extern "C" fn pre_wrap(cx: *mut JSContext,
-                              _existing: RawHandleObject,
+                              _scope: RawHandleObject,
                               obj: RawHandleObject,
-                              _object_passed_to_wrap: RawHandleObject)
-                              -> *mut JSObject {
+                              _object_passed_to_wrap: RawHandleObject,
+                              ret_object: RawMutableHandleObject) {
     let _ac = JSAutoCompartment::new(cx, obj.get());
     let obj = ToWindowProxyIfWindow(obj.get());
     assert!(!obj.is_null());
-    obj
+    ret_object.set(obj)
 }
 
 /// Callback table for use with JS_SetWrapObjectCallbacks

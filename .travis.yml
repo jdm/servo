@@ -13,11 +13,6 @@ matrix:
     - sudo: 9000
       dist: trusty
       before_install:
-        - sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
-        - sudo add-apt-repository 'deb http://apt.llvm.org/precise/ llvm-toolchain-precise-3.9 main' -y
-        - sudo apt-get update -q
-        - sudo apt-get install clang-3.9 llvm-3.9 llvm-3.9-runtime -y
-        - export LLVM_CONFIG=/usr/lib/llvm-3.9/bin/llvm-config
         - curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain none -y
         - source ~/.profile
       script:
@@ -37,13 +32,24 @@ matrix:
         - ./mach clean-nightlies --keep 2 --force
         - ./mach clean-cargo-cache --keep 2 --force
       env:
+        CC=gcc-6
+        CXX=g++-6
         CCACHE=/usr/bin/ccache
         RUSTFLAGS=-Dwarnings
         CARGO_INCREMENTAL=0
+        LLVM_CONFIG=/usr/bin/llvm-config-6.0
       addons:
         apt:
+          sources:
+            - ubuntu-toolchain-r-test
+            - llvm-toolchain-trusty-6.0
           packages:
+            - autoconf2.13
+            - clang-6.0
+            - llvm-6.0
+            - llvm-6.0-runtime
             - cmake
+            - g++-6
             - gperf
             - libosmesa6-dev
             - libgles2-mesa-dev

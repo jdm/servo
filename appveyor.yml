@@ -1,4 +1,5 @@
 version: 1.0.{build}
+image: Visual Studio 2017
 
 environment:
   CCACHE_DIR: "%APPVEYOR_BUILD_FOLDER%\\.ccache"
@@ -43,6 +44,7 @@ cache:
   - .ccache
 
 install:
+  - call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\VC\Auxiliary\Build\vcvars64.bat"
   - appveyor-retry appveyor DownloadFile https://win.rustup.rs/ -FileName rustup-init.exe
   - rustup-init.exe -y --default-host x86_64-pc-windows-msvc --default-toolchain none
   - set PATH=%PATH%;C:\Users\appveyor\.cargo\bin
