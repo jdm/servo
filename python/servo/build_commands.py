@@ -295,7 +295,7 @@ class MachCommands(CommandBase):
                     sys.exit(1)
 
             env["RUST_TARGET"] = target
-            env["ANDROID_TOOLCHAIN_NAME"] = self.config["android"]["toolchain_prefix"]
+            env["ANDROID_TOOLCHAIN_NAME"] = android_toolchain
             with cd(openssl_dir):
                 status = call(
                     make_cmd + ["-f", "openssl.makefile"],

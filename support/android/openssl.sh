@@ -34,14 +34,14 @@ case $RUST_TARGET in
       _ANDROID_ARCH=arch-arm
       _OPENSSL_MACHINE="armv7"
       _OPENSSL_ARCH="arm"
-      _OPENSSL_CONFIG="android-armv7"
+      _OPENSSL_CONFIG="linux-generic32"
       ;;
     arm*)
       _ANDROID_TARGET=$RUST_TARGET
       _ANDROID_ARCH=arch-arm
       _OPENSSL_MACHINE="arm"
       _OPENSSL_ARCH="arm"
-      _OPENSSL_CONFIG="android-armv7"
+      _OPENSSL_CONFIG="linux-generic32"
       ;;
     aarch64*)
       _ANDROID_TARGET=$RUST_TARGET
@@ -62,7 +62,7 @@ case $RUST_TARGET in
       ;;
 esac
 
-_ANDROID_EABI="$ANDROID_TOOLCHAIN_NAME-4.9"
+_ANDROID_EABI="$ANDROID_TOOLCHAIN_NAME"
 
 
 # Set _ANDROID_API to the API you want to use. You should set it
@@ -129,7 +129,8 @@ if [ -z "$ANDROID_TOOLCHAIN" ] || [ ! -d "$ANDROID_TOOLCHAIN" ]; then
   # exit 1
 fi
 
-ANDROID_TOOLS="$_ANDROID_TARGET-gcc $_ANDROID_TARGET-ranlib $_ANDROID_TARGET-ld"
+#ANDROID_TOOLS="$_ANDROID_TARGET-gcc $_ANDROID_TARGET-ranlib $_ANDROID_TARGET-ld"
+ANDROID_TOOLS="clang"
 
 for tool in $ANDROID_TOOLS
 do
@@ -171,13 +172,13 @@ export MACHINE=$_OPENSSL_MACHINE
 export RELEASE=2.6.37
 export SYSTEM=android
 export ARCH=$_OPENSSL_ARCH
-export CROSS_COMPILE="$_ANDROID_TARGET-"
+#export CROSS_COMPILE="$_ANDROID_TARGET-"
 
 # For the Android toolchain
 # https://android.googlesource.com/platform/ndk/+/ics-mr0/docs/STANDALONE-TOOLCHAIN.html
 export ANDROID_SYSROOT="$ANDROID_NDK_ROOT/platforms/$_ANDROID_API/$_ANDROID_ARCH"
 export SYSROOT="$ANDROID_SYSROOT"
-export CROSS_SYSROOT="$ANDROID_SYSROOT"
+#export CROSS_SYSROOT="$ANDROID_SYSROOT"
 export NDK_SYSROOT="$ANDROID_SYSROOT"
 export ANDROID_NDK_SYSROOT="$ANDROID_SYSROOT"
 export ANDROID_API="$_ANDROID_API"
@@ -186,9 +187,15 @@ export ANDROID_API="$_ANDROID_API"
 # export CROSS_COMPILE="arm-linux-androideabi-"
 export ANDROID_DEV="$ANDROID_NDK_ROOT/platforms/$_ANDROID_API/$_ANDROID_ARCH/usr"
 export HOSTCC=gcc
+export CC=clang
+export RANLIB="$ANDROID_NDK_ROOT/toolchains/$_ANDROID_TARGET-4.9/prebuilt/$host/$_ANDROID_TARGET/bin/ranlib"
+export AR="$ANDROID_NDK_ROOT/toolchains/$_ANDROID_TARGET-4.9/prebuilt/$host/$_ANDROID_TARGET/bin/ar"
+export LD="$ANDROID_NDK_ROOT/toolchains/$_ANDROID_TARGET-4.9/prebuilt/$host/$_ANDROID_TARGET/bin"
 
 # See https://github.com/cocochpie/android-openssl/blob/master/build-all-arch.sh
-xCFLAGS="-DSHARED_EXTENSION=.so -fPIC -DOPENSSL_PIC -DDSO_DLFCN -DHAVE_DLFCN_H -mandroid -I$ANDROID_DEV/include -B$ANDROID_DEV/lib -O3 -fomit-frame-pointer -Wall"
+#+xCFLAGS="-DSHARED_EXTENSION=.so -fPIC -DOPENSSL_PIC -DDSO_DLFCN -DHAVE_DLFCN_H -B$ANDROID_DEV/lib -O3 -fomit-frame-pointer -Wall -D__ANDROID_API__=18 --target=armv7a-none-linux-androideabi --gcc-toolchain=$ANDROID_NDK_ROOT/toolchains/$_ANDROID_TARGET-4.9/prebuilt/$host --sysroot=$ANDROID_SYSROOT -I$ANDROID_DEV/include -I$ANDROID_DEV/include/$_ANDROID_TARGET -L$ANDROID_NDK_ROOT/platforms/$_ANDROID_API/$_ANDROID_ARCH/usr/lib -B$ANDROID_NDK_ROOT/platforms/$_ANDROID_API/$_ANDROID_ARCH/usr/lib"
+
+xCFLAGS="-DSHARED_EXTENSION=.so -fPIC -DOPENSSL_PIC -DDSO_DLFCN -DHAVE_DLFCN_H -I$ANDROID_DEV/include -B$ANDROID_DEV/lib -O3 -fomit-frame-pointer -Wall --gcc-toolchain=$ANDROID_NDK_ROOT/toolchains/$_ANDROID_TARGET-4.9/prebuilt/$host -Wno-error=macro-redefined -B$LD -L$ANDROID_NDK_ROOT/platforms/$_ANDROID_API/$_ANDROID_ARCH/usr/lib -L$ANDROID_NDK_ROOT/toolchains/$_ANDROID_TARGET-4.9/prebuilt/$host/lib/gcc/$_ANDROID_TARGET/4.9.x/ -B$ANDROID_NDK_ROOT/platforms/$_ANDROID_API/$_ANDROID_ARCH/usr/lib --sysroot=$ANDROID_SYSROOT --target=armv7a-none-linux-androideabi -v"
 
 VERBOSE=1
 if [ ! -z "$VERBOSE" ] && [ "$VERBOSE" != "0" ]; then
