@@ -333,11 +333,23 @@ class MachCommands(CommandBase):
             sysroot_include = path.join(
                 env['ANDROID_SYSROOT'], "usr", "include")
             env['HOST_CFLAGS'] = ''
+            env['CC'] = 'clang'
+            env['CXX'] = 'clang++'
+            gcc_toolchain = path.join(
+                env['ANDROID_NDK'], "toolchains", self.config["android"]["toolchain_prefix"] + "-4.9",
+                "prebuilt", host
+            )
+            gcc_toolchain_bin = path.join(gcc_toolchain, self.config["android"]["toolchain_prefix"], "bin")
+            env['AR'] = path.join(gcc_toolchain_bin, "ar")
+            env['RANLIB'] = path.join(gcc_toolchain_bin, "ranlib")
+            env['OBJCOPY'] = path.join(gcc_toolchain_bin, "objcopy")
             env['CFLAGS'] = ' '.join([
                 "--sysroot=" + env['ANDROID_SYSROOT'],
+                "--gcc-toolchain=" + gcc_toolchain,
                 "-I" + support_include])
             env['CXXFLAGS'] = ' '.join([
                 "--sysroot=" + env['ANDROID_SYSROOT'],
+                "--gcc-toolchain=" + gcc_toolchain,
                 "-I" + support_include,
                 "-I" + cxx_include,
                 "-I" + cxxabi_include,
