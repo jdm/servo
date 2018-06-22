@@ -24,6 +24,7 @@ from mach.decorators import (
     Command,
 )
 
+from mach_bootstrap import _get_exec_path
 from servo.command_base import CommandBase, cd, call, check_call, BIN_SUFFIX
 from servo.util import host_triple
 
@@ -321,6 +322,9 @@ class MachCommands(CommandBase):
                 host_suffix = "x86_64"
             host = os_type + "-" + host_suffix
 
+            host_clang = _get_exec_path(["clang"])
+            host_clangpp = _get_exec_path(["clang++"])
+
             env['PATH'] = path.join(
                 env['ANDROID_NDK'], "toolchains", android_toolchain, "prebuilt", host, "bin"
             ) + ':' + env['PATH']
@@ -333,7 +337,13 @@ class MachCommands(CommandBase):
             sysroot_include = path.join(
                 env['ANDROID_SYSROOT'], "usr", "include")
             env['HOST_CFLAGS'] = ''
+            env['HOST_CC'] = host_clang
+            env['HOST_CXX'] = host_clangpp
+            env['HOST_CFLAGS'] = ''
+            env['HOST_CXXFLAGS'] = ''
+            env['ANDROID_TOOLCHAIN'] = 'llvm'
             env['CC'] = 'clang'
+            env['CPP'] = 'clang -E'
             env['CXX'] = 'clang++'
             gcc_toolchain = path.join(
                 env['ANDROID_NDK'], "toolchains", self.config["android"]["toolchain_prefix"] + "-4.9",
@@ -343,6 +353,7 @@ class MachCommands(CommandBase):
             env['AR'] = path.join(gcc_toolchain_bin, "ar")
             env['RANLIB'] = path.join(gcc_toolchain_bin, "ranlib")
             env['OBJCOPY'] = path.join(gcc_toolchain_bin, "objcopy")
+            env['YASM'] = path.join(env['ANDROID_NDK'], 'prebuilt', host, 'bin', 'yasm')
             env['CFLAGS'] = ' '.join([
                 "--sysroot=" + env['ANDROID_SYSROOT'],
                 "--gcc-toolchain=" + gcc_toolchain,
@@ -353,7 +364,8 @@ class MachCommands(CommandBase):
                 "-I" + support_include,
                 "-I" + cxx_include,
                 "-I" + cxxabi_include,
-                "-I" + sysroot_include])
+                "-I" + sysroot_include,
+                "-D__NDK_FPABI__="])
             env["NDK_ANDROID_VERSION"] = android_platform.replace("android-", "")
             env['CPPFLAGS'] = ' '.join(["--sysroot", env['ANDROID_SYSROOT']])
             env["CMAKE_ANDROID_ARCH_ABI"] = self.config["android"]["lib"]

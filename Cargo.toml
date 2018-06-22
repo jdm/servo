@@ -26,3 +26,7 @@ opt-level = 3
 #     [patch."https://github.com/servo/<repository>"]
 #     <crate> = { path = "/path/to/local/checkout" }
 cc = { path = "../cc-rs" }
+harfbuzz-sys = { path = "../rust-harfbuzz/harfbuzz-sys" }
+servo-fontconfig-sys = { path = "../libfontconfig" }
+servo-skia = { path = "../skia" }
+mozjs_sys = { path = "../mozjs" }
