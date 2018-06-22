@@ -348,6 +348,7 @@ class MachCommands(CommandBase):
                 "prebuilt", host
             )
             env['ANDROID_TOOLCHAIN'] = gcc_toolchain
+            env['GCC_TOOLCHAIN'] = gcc_toolchain
             gcc_toolchain_bin = path.join(gcc_toolchain, self.config["android"]["toolchain_prefix"], "bin")
             env['AR'] = path.join(gcc_toolchain_bin, "ar")
             env['RANLIB'] = path.join(gcc_toolchain_bin, "ranlib")
