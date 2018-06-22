@@ -336,12 +336,10 @@ class MachCommands(CommandBase):
                 env['ANDROID_NDK'], "sources", "cxx-stl", "llvm-libc++abi", "libcxxabi", "include")
             sysroot_include = path.join(
                 env['ANDROID_SYSROOT'], "usr", "include")
-            env['HOST_CFLAGS'] = ''
             env['HOST_CC'] = host_clang
             env['HOST_CXX'] = host_clangpp
             env['HOST_CFLAGS'] = ''
             env['HOST_CXXFLAGS'] = ''
-            env['ANDROID_TOOLCHAIN'] = 'llvm'
             env['CC'] = 'clang'
             env['CPP'] = 'clang -E'
             env['CXX'] = 'clang++'
@@ -349,6 +347,7 @@ class MachCommands(CommandBase):
                 env['ANDROID_NDK'], "toolchains", self.config["android"]["toolchain_prefix"] + "-4.9",
                 "prebuilt", host
             )
+            env['ANDROID_TOOLCHAIN'] = gcc_toolchain
             gcc_toolchain_bin = path.join(gcc_toolchain, self.config["android"]["toolchain_prefix"], "bin")
             env['AR'] = path.join(gcc_toolchain_bin, "ar")
             env['RANLIB'] = path.join(gcc_toolchain_bin, "ranlib")
