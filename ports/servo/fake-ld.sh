@@ -31,9 +31,9 @@ call_gcc()
   echo "toolchain: ${ANDROID_TOOLCHAIN}"
   echo "libs dir: ${ANDROID_CXX_LIBS}"
   echo "sysroot: ${ANDROID_SYSROOT}"
-  echo "targetdir: ${ANDROID_CXX_LIBS}"
+  echo "targetdir: ${TARGET_DIR}"
 
   "${ANDROID_TOOLCHAIN}/clang" \
     --sysroot="${ANDROID_SYSROOT}" --gcc-toolchain="${GCC_TOOLCHAIN}" -L "${ANDROID_CXX_LIBS}" ${_GCC_PARAMS} -lc++ \
-    -v -o "${TARGET_DIR}/libservo.so" --target="${_ANDROID_TARGET}" -shared && touch "${TARGET_DIR}/servo"
+    -v -o "${TARGET_DIR}/libservo.so" --target="${_ANDROID_TARGET}" -shared -Wl,-undefined -Wl,dynamic_lookup && touch "${TARGET_DIR}/servo"
 }
