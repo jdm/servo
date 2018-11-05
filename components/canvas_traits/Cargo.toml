@@ -22,6 +22,8 @@ lazy_static = "1"
 malloc_size_of = { path = "../malloc_size_of" }
 malloc_size_of_derive = "0.1"
 pixels = {path = "../pixels"}
+profile_derive = {path = "../profile_derive"}
+profile_traits = {path = "../profile_traits"}
 serde = "1.0"
 serde_bytes = "0.10"
 servo_config = {path = "../config"}

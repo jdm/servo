@@ -11,6 +11,7 @@ use gleam::gl;
 use half::f16;
 use offscreen_gl_context::{DrawBuffer, GLContext, NativeGLContextMethods};
 use pixels::{self, PixelFormat};
+use profile_traits::time::{profile, ProfilerChan};
 use std::borrow::Cow;
 use std::thread;
 
@@ -64,6 +65,8 @@ pub struct WebGLThread<VR: WebVRRenderHandler + 'static> {
     webvr_compositor: Option<VR>,
     /// Texture ids and sizes used in DOM to texture outputs.
     dom_outputs: FnvHashMap<webrender_api::PipelineId, DOMToTextureData>,
+    /// Profiler Channel
+    time_profiler_chan: ProfilerChan,
 }
 
 impl<VR: WebVRRenderHandler + 'static> WebGLThread<VR> {
@@ -71,6 +74,7 @@ impl<VR: WebVRRenderHandler + 'static> WebGLThread<VR> {
         gl_factory: GLContextFactory,
         webrender_api_sender: webrender_api::RenderApiSender,
         webvr_compositor: Option<VR>,
+        time_profiler_chan: ProfilerChan,
     ) -> Self {
         WebGLThread {
             gl_factory,
@@ -81,6 +85,7 @@ impl<VR: WebVRRenderHandler + 'static> WebGLThread<VR> {
             next_webgl_id: 0,
             webvr_compositor,
             dom_outputs: Default::default(),
+            time_profiler_chan: time_profiler_chan,
         }
     }
 
@@ -90,14 +95,19 @@ impl<VR: WebVRRenderHandler + 'static> WebGLThread<VR> {
         gl_factory: GLContextFactory,
         webrender_api_sender: webrender_api::RenderApiSender,
         webvr_compositor: Option<VR>,
+        time_profiler_chan: ProfilerChan,
     ) -> WebGLSender<WebGLMsg> {
         let (sender, receiver) = webgl_channel::<WebGLMsg>().unwrap();
         let result = sender.clone();
         thread::Builder::new()
             .name("WebGLThread".to_owned())
             .spawn(move || {
-                let mut renderer =
-                    WebGLThread::new(gl_factory, webrender_api_sender, webvr_compositor);
+                let mut renderer = WebGLThread::new(
+                    gl_factory,
+                    webrender_api_sender,
+                    webvr_compositor,
+                    time_profiler_chan,
+                );
                 let webgl_chan = WebGLChan(sender);
                 loop {
                     let msg = receiver.recv().unwrap();
@@ -163,9 +173,14 @@ impl<VR: WebVRRenderHandler + 'static> WebGLThread<VR> {
             WebGLMsg::RemoveContext(ctx_id) => {
                 self.remove_webgl_context(ctx_id);
             },
-            WebGLMsg::WebGLCommand(ctx_id, command, backtrace) => {
-                self.handle_webgl_command(ctx_id, command, backtrace);
-            },
+            WebGLMsg::WebGLCommand(ctx_id, command, backtrace) => profile(
+                (&command).into(),
+                None,
+                self.time_profiler_chan.clone(),
+                || {
+                    self.handle_webgl_command(ctx_id, command, backtrace);
+                },
+            ),
             WebGLMsg::WebVRCommand(ctx_id, command) => {
                 self.handle_webvr_command(ctx_id, command);
             },
