@@ -2,12 +2,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-use super::gl_context::{GLContextFactory, GLContextWrapper};
+use super::gl_context::{GLContextFactory, GLContextWrapper, map_attrs_to_script_attrs};
 use canvas_traits::webgl::*;
 use euclid::Size2D;
 use fnv::FnvHashMap;
 use gleam::gl;
-use offscreen_gl_context::{GLContext, GLContextAttributes, GLLimits, NativeGLContextMethods};
+use offscreen_gl_context::{GLContext, NativeGLContextMethods};
 use std::thread;
 
 /// WebGL Threading API entry point that lives in the constellation.
@@ -751,7 +751,7 @@ impl WebGLImpl {
     ) {
         match command {
             WebGLCommand::GetContextAttributes(ref sender) => {
-                sender.send(*ctx.borrow_attributes()).unwrap()
+                sender.send(map_attrs_to_script_attrs(*ctx.borrow_attributes())).unwrap()
             },
             WebGLCommand::ActiveTexture(target) => ctx.gl().active_texture(target),
             WebGLCommand::AttachShader(program_id, shader_id) => {

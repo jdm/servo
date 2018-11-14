@@ -38,7 +38,7 @@ use canvas_traits::webgl::{ActiveAttribInfo, ActiveUniformInfo, WebGLBufferId, W
 use canvas_traits::webgl::{WebGLContextShareMode, WebGLError, WebGLFramebufferId, WebGLMsgSender};
 use canvas_traits::webgl::{WebGLPipeline, WebGLProgramId, WebGLReceiver, WebGLRenderbufferId};
 use canvas_traits::webgl::{WebGLSLVersion, WebGLSender, WebGLShaderId, WebGLTextureId};
-use canvas_traits::webgl::{WebGLVersion, WebGLVertexArrayId};
+use canvas_traits::webgl::{WebGLVersion, WebGLVertexArrayId, GLLimits};
 use crate::dom::bindings::cell::DomRefCell;
 use crate::dom::bindings::error::Error;
 use crate::dom::bindings::refcounted::{Trusted, TrustedPromise};
@@ -80,7 +80,6 @@ use net_traits::response::HttpsState;
 use net_traits::response::{Response, ResponseBody};
 use net_traits::storage_thread::StorageType;
 use net_traits::{Metadata, NetworkError, ReferrerPolicy, ResourceThreads};
-use offscreen_gl_context::GLLimits;
 use profile_traits::mem::ProfilerChan as MemProfilerChan;
 use profile_traits::time::ProfilerChan as TimeProfilerChan;
 use script_layout_interface::reporter::CSSErrorReporter;

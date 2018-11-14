@@ -5,7 +5,6 @@
 use euclid::{Rect, Size2D};
 use gleam::gl;
 use ipc_channel::ipc::{IpcBytesReceiver, IpcBytesSender};
-use offscreen_gl_context::{GLContextAttributes, GLLimits};
 use serde_bytes::ByteBuf;
 use std::borrow::Cow;
 use std::num::NonZeroU32;
@@ -649,4 +648,28 @@ pub fn is_gles() -> bool {
     // TODO: align this with the actual kind of graphics context in use, rather than
     // making assumptions based on platform
     cfg!(any(target_os = "android", target_os = "ios"))
+}
+
+#[derive(Copy, Clone, Debug, Deserialize, Serialize)]
+pub struct GLContextAttributes {
+    pub alpha: bool,
+    pub depth: bool,
+    pub stencil: bool,
+    pub antialias: bool,
+    pub premultiplied_alpha: bool,
+    pub preserve_drawing_buffer: bool,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct GLLimits {
+    pub max_vertex_attribs: u32,
+    pub max_tex_size: u32,
+    pub max_cube_map_tex_size: u32,
+    pub max_combined_texture_image_units: u32,
+    pub max_fragment_uniform_vectors: u32,
+    pub max_renderbuffer_size: u32,
+    pub max_texture_image_units: u32,
+    pub max_varying_vectors: u32,
+    pub max_vertex_texture_image_units: u32,
+    pub max_vertex_uniform_vectors: u32
 }

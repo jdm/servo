@@ -6,7 +6,7 @@
 use backtrace::Backtrace;
 use byteorder::{ByteOrder, NativeEndian, WriteBytesExt};
 use canvas_traits::webgl::WebGLError::*;
-use canvas_traits::webgl::{webgl_channel, WebGLVersion, WebVRCommand};
+use canvas_traits::webgl::{webgl_channel, WebGLVersion, WebVRCommand, GLLimits, GLContextAttributes};
 use canvas_traits::webgl::{DOMToTextureCommand, Parameter, WebGLCommandBacktrace};
 use canvas_traits::webgl::{TexParameter, WebGLCommand, WebGLContextShareMode, WebGLError};
 use canvas_traits::webgl::{WebGLFramebufferBindingRequest, WebGLMsg, WebGLMsgSender};
@@ -69,7 +69,6 @@ use js::typedarray::{
 use js::typedarray::{TypedArray, TypedArrayElementCreator};
 use net_traits::image::base::PixelFormat;
 use net_traits::image_cache::ImageResponse;
-use offscreen_gl_context::{GLContextAttributes, GLLimits};
 use script_layout_interface::HTMLCanvasDataSource;
 use serde::{Deserialize, Serialize};
 use servo_config::prefs::PREFS;
