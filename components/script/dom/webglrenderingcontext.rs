@@ -167,6 +167,8 @@ pub struct WebGLRenderingContext {
     current_vao: MutNullableDom<WebGLVertexArrayObjectOES>,
     textures: Textures,
     api_type: GlType,
+    #[ignore_malloc_size_of = "channels are hard"]
+    ready_to_present: Option<ipc::IpcReceiver<()>>,
 }
 
 impl WebGLRenderingContext {
@@ -223,6 +225,7 @@ impl WebGLRenderingContext {
                 current_vao: Default::default(),
                 textures: Textures::new(max_combined_texture_image_units),
                 api_type: ctx_data.api_type,
+                ready_to_present: ctx_data.ready_to_present,
             }
         })
     }
@@ -448,8 +451,8 @@ impl WebGLRenderingContext {
     }
 
     fn mark_as_dirty(&self) {
-        // If we don't have a bound framebuffer, then don't mark the canvas
-        // as dirty.
+        // If we don't have a bound framebuffer, we want to ensure that the current
+        // frame contents are presented to the compositor.
         if self.bound_framebuffer.get().is_none() {
             self.canvas
                 .upcast::<Node>()
@@ -796,26 +799,19 @@ impl WebGLRenderingContext {
     }
 
     pub fn layout_handle(&self) -> webrender_api::ImageKey {
-        match self.share_mode {
-            WebGLContextShareMode::SharedTexture => {
-                // WR using ExternalTexture requires a single update message.
-                self.webrender_image.get().unwrap_or_else(|| {
-                    let (sender, receiver) = webgl_channel().unwrap();
-                    self.webgl_sender.send_update_wr_image(sender).unwrap();
-                    let image_key = receiver.recv().unwrap();
-                    self.webrender_image.set(Some(image_key));
-
-                    image_key
-                })
-            },
-            WebGLContextShareMode::Readback => {
-                // WR using Readback requires to update WR image every frame
-                // in order to send the new raw pixels.
-                let (sender, receiver) = webgl_channel().unwrap();
-                self.webgl_sender.send_update_wr_image(sender).unwrap();
-                receiver.recv().unwrap()
-            },
+        let _ = self.webgl_sender.send_present_frame();
+        if let Some(ref rx) = self.ready_to_present {
+            // Wait for a notification that the frame has been presented.
+            let _ = rx.recv();
         }
+
+        self.webrender_image.get().unwrap_or_else(|| {
+            let (sender, receiver) = webgl_channel().unwrap();
+            self.webgl_sender.send_update_wr_image(sender).unwrap();
+            let image_key = receiver.recv().unwrap();
+            self.webrender_image.set(Some(image_key));
+            image_key
+        })
     }
 
     // https://www.khronos.org/registry/webgl/extensions/ANGLE_instanced_arrays/

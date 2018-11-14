@@ -10,7 +10,7 @@ use euclid::Size2D;
 use fnv::FnvHashMap;
 use gleam::gl;
 use half::f16;
-use ipc_channel::ipc::IpcSender;
+use ipc_channel::ipc;
 use offscreen_gl_context::{DrawBuffer, GLContext, NativeGLContextMethods};
 use pixels::{self, PixelFormat};
 use std::borrow::Cow;
@@ -223,7 +223,7 @@ impl WebGLThread {
             WebGLMsg::CreateContext(version, size, attributes, result_sender) => {
                 let result = self.create_webgl_context(version, size, attributes, textures);
                 result_sender
-                    .send(result.map(|(id, limits, share_mode)| {
+                    .send(result.map(|(id, limits, share_mode, receiver)| {
                         let data = Self::make_current_if_needed(
                             id,
                             &self.contexts,
@@ -261,6 +261,7 @@ impl WebGLThread {
                             share_mode,
                             glsl_version,
                             api_type,
+                            ready_to_present: receiver,
                         }
                     }))
                     .unwrap();
@@ -274,6 +275,9 @@ impl WebGLThread {
             WebGLMsg::WebGLCommand(ctx_id, command, backtrace) => {
                 self.handle_webgl_command(ctx_id, command, backtrace);
             },
+            WebGLMsg::PresentWebGLFrame(ctx_id) => {
+                self.handle_present_webgl_frame(ctx_id);
+            }
             WebGLMsg::WebVRCommand(ctx_id, command) => {
                 self.handle_webvr_command(ctx_id, command);
             },
@@ -298,6 +302,62 @@ impl WebGLThread {
         }
 
         false
+    }
+
+    fn handle_present_webgl_frame(
+        &mut self,
+        context_id: WebGLContextId,
+    ) {
+        let info = self.cached_context_info.get_mut(&context_id).unwrap();
+        let new_texture = match Self::make_current_if_needed_mut(
+            context_id,
+            &mut self.contexts,
+            &mut self.bound_context_id,
+        ) {
+            Some(data) => {
+                match info.share_mode {
+                    WebGLContextShareMode::Readback => {
+                        // Obtain the pixels for the current frame and notify webrender.
+                        let pixels = Self::raw_pixels(&data.ctx, info.size);
+                        if let Some(image_key) = info.image_key {
+                            Self::update_wr_readback_image(
+                                &self.webrender_api,
+                                info.size,
+                                info.alpha,
+                                image_key,
+                                pixels,
+                            );
+                        } else {
+                            info.image_key = Some(Self::create_wr_readback_image(
+                                &self.webrender_api,
+                                info.size,
+                                info.alpha,
+                                pixels,
+                            ));
+                        }
+                    }
+                    WebGLContextShareMode::SharedTexture if info.image_key.is_none() => {
+                        info.image_key = Some(Self::create_wr_external_image(
+                            &self.webrender_api,
+                            info.size,
+                            info.alpha,
+                            context_id
+                        ));
+                    }
+                    WebGLContextShareMode::SharedTexture => {}
+                }
+
+                // Swap the backing textures now that this frame is complete.
+                data.ctx.swap_draw_buffer(data.state.clear_color)
+            }
+            None => return,
+        };
+
+        // Store the texture that represents the complete frame.
+        info.texture_id = new_texture;
+        if let Some(ref sender) = info.present_notifier {
+            let _ = sender.send(());
+        }
     }
 
     /// Handles a WebGLCommand for a specific WebGLContext
@@ -346,7 +406,7 @@ impl WebGLThread {
     fn handle_lock_ipc(
         &mut self,
         context_id: WebGLContextId,
-        sender: IpcSender<(u32, Size2D<i32>, usize)>,
+        sender: ipc::IpcSender<(u32, Size2D<i32>, usize)>,
     ) {
         sender.send(self.handle_lock_inner(context_id)).unwrap();
     }
@@ -391,7 +451,7 @@ impl WebGLThread {
         size: Size2D<u32>,
         attributes: GLContextAttributes,
         textures: Option<&TexturesMap>,
-    ) -> Result<(WebGLContextId, GLLimits, WebGLContextShareMode), String> {
+    ) -> Result<(WebGLContextId, GLLimits, WebGLContextShareMode, Option<ipc::IpcReceiver<()>>), String> {
         // Creating a new GLContext may make the current bound context_id dirty.
         // Clear it to ensure that  make_current() is called in subsequent commands.
         self.bound_context_id = None;
@@ -432,6 +492,13 @@ impl WebGLThread {
             textures.borrow_mut().insert(id, (texture_id, size));
         }
 
+        let (notifier_sender, notifier_receiver) = match share_mode {
+            WebGLContextShareMode::SharedTexture => (None, None),
+            WebGLContextShareMode::Readback => {
+                let (sender, receiver) = ipc::channel().unwrap();
+                (Some(sender), Some(receiver))
+            }
+        };
         self.cached_context_info.insert(
             id,
             WebGLContextInfo {
@@ -442,10 +509,11 @@ impl WebGLThread {
                 share_mode,
                 gl_sync: None,
                 render_state: ContextRenderState::Unlocked,
+                present_notifier: notifier_sender,
             },
         );
 
-        Ok((id, limits, share_mode))
+        Ok((id, limits, share_mode, notifier_receiver))
     }
 
     /// Resizes a WebGLContext
@@ -538,62 +606,16 @@ impl WebGLThread {
         self.bound_context_id = None;
     }
 
-    /// Handles the creation/update of webrender_api::ImageKeys for a specific WebGLContext.
-    /// This method is invoked from a UpdateWebRenderImage message sent by the layout thread.
-    /// If SharedTexture is used the UpdateWebRenderImage message is sent only after a WebGLContext creation.
-    /// If Readback is used UpdateWebRenderImage message is sent always on each layout iteration in order to
-    /// submit the updated raw pixels.
+    /// Handles the retrieval of webrender_api::ImageKeys for a specific WebGLContext.
+    /// This method is invoked from a UpdateWebRenderImage message sent by the layout thread,
+    /// only once after a WebGL frame is presented to the compositor for the first time.
     fn handle_update_wr_image(
         &mut self,
         context_id: WebGLContextId,
         sender: WebGLSender<webrender_api::ImageKey>,
     ) {
-        let info = self.cached_context_info.get_mut(&context_id).unwrap();
-        let webrender_api = &self.webrender_api;
-
-        let image_key = match info.share_mode {
-            WebGLContextShareMode::SharedTexture => {
-                let size = info.size;
-                let alpha = info.alpha;
-                // Reuse existing ImageKey or generate a new one.
-                // When using a shared texture ImageKeys are only generated after a WebGLContext creation.
-                *info.image_key.get_or_insert_with(|| {
-                    Self::create_wr_external_image(webrender_api, size, alpha, context_id)
-                })
-            },
-            WebGLContextShareMode::Readback => {
-                let pixels = Self::raw_pixels(&self.contexts[&context_id].ctx, info.size);
-                match info.image_key.clone() {
-                    Some(image_key) => {
-                        // ImageKey was already created, but WR Images must
-                        // be updated every frame in readback mode to send the new raw pixels.
-                        Self::update_wr_readback_image(
-                            webrender_api,
-                            info.size,
-                            info.alpha,
-                            image_key,
-                            pixels,
-                        );
-
-                        image_key
-                    },
-                    None => {
-                        // Generate a new ImageKey for Readback mode.
-                        let image_key = Self::create_wr_readback_image(
-                            webrender_api,
-                            info.size,
-                            info.alpha,
-                            pixels,
-                        );
-                        info.image_key = Some(image_key);
-                        image_key
-                    },
-                }
-            },
-        };
-
-        // Send the ImageKey to the Layout thread.
-        sender.send(image_key).unwrap();
+        let info = self.cached_context_info.get(&context_id).unwrap();
+        let _ = sender.send(info.image_key.expect("no image key for webgl context?"));
     }
 
     fn handle_dom_to_texture(&mut self, command: DOMToTextureCommand) {
@@ -875,6 +897,8 @@ struct WebGLContextInfo {
     gl_sync: Option<gl::GLsync>,
     /// The status of this context with respect to external consumers.
     render_state: ContextRenderState,
+    /// Signal that the webgl thread is ready to present a new frame to the compositor.
+    present_notifier: Option<ipc::IpcSender<()>>,
 }
 
 /// Data about the linked DOM<->WebGLTexture elements.
