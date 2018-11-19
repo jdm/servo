@@ -544,6 +544,7 @@ dependencies = [
  "log 0.4.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "msg 0.0.1",
  "net_traits 0.0.1",
+ "pixels 0.0.1",
  "profile_traits 0.0.1",
  "script_traits 0.0.1",
  "servo_config 0.0.1",

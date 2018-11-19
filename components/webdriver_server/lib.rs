@@ -15,7 +15,7 @@ use base64;
 use crossbeam_channel::Sender;
 use euclid::TypedSize2D;
 use hyper::Method;
-use image::{DynamicImage, ImageFormat, RgbImage};
+use image::{DynamicImage, ImageFormat, ImageBuffer};
 use ipc_channel::ipc::{self, IpcReceiver, IpcSender};
 use keyboard_types::webdriver::{send_keys, Event as KeyEvent};
 use msg::constellation_msg::{BrowsingContextId, TopLevelBrowsingContextId, TraversalDirection};
@@ -1088,16 +1088,16 @@ impl Handler {
             },
         };
 
-        // The compositor always sends RGB pixels.
+        // The compositor always sends BGRA8 pixels.
         assert_eq!(
             img.format,
-            PixelFormat::RGB8,
+            PixelFormat::BGRA8,
             "Unexpected screenshot pixel format"
         );
-        let rgb = RgbImage::from_raw(img.width, img.height, img.bytes.to_vec()).unwrap();
+        let rgb = ImageBuffer::from_raw(img.width, img.height, img.bytes.to_vec()).unwrap();
 
         let mut png_data = Vec::new();
-        DynamicImage::ImageRgb8(rgb)
+        DynamicImage::ImageBgra8(rgb)
             .write_to(&mut png_data, ImageFormat::PNG)
             .unwrap();
 

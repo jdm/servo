@@ -111,14 +111,18 @@ pub fn draw_img(
     gl.delete_framebuffers(&render_target_info.framebuffer_ids);
 
     // flip image vertically (texture is upside down)
-    let orig_pixels = pixels.clone();
-    let stride = width * 3;
+    flip_pixels_y(&mut pixels, width, height, 3);
+
+    RgbImage::from_raw(width as u32, height as u32, pixels).expect("Flipping image failed!")
+}
+
+pub fn flip_pixels_y(pixels: &mut [u8], width: usize, height: usize, bytes_per_pixel: usize) {
+    let orig_pixels = pixels.to_owned();
+    let stride = width * bytes_per_pixel;
     for y in 0..height {
         let dst_start = y * stride;
         let src_start = (height - y - 1) * stride;
         let src_slice = &orig_pixels[src_start..src_start + stride];
         (&mut pixels[dst_start..dst_start + stride]).clone_from_slice(&src_slice[..stride]);
     }
-
-    RgbImage::from_raw(width as u32, height as u32, pixels).expect("Flipping image failed!")
 }

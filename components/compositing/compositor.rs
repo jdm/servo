@@ -13,10 +13,10 @@ use crate::windowing::{
 use crate::CompositionPipeline;
 use crate::SendableFrameTree;
 use crossbeam_channel::Sender;
-use euclid::{TypedPoint2D, TypedScale, TypedVector2D};
+use euclid::{TypedPoint2D, TypedScale, TypedVector2D, TypedSize2D};
 use gfx_traits::Epoch;
 #[cfg(feature = "gleam")]
-use image::{DynamicImage, ImageFormat};
+use image::{DynamicImage, ImageFormat, ImageBuffer, Bgra};
 use ipc_channel::ipc;
 use libc::c_void;
 use msg::constellation_msg::{PipelineId, PipelineIndex, PipelineNamespaceId};
@@ -41,7 +41,7 @@ use style_traits::viewport::ViewportConstraints;
 use style_traits::{CSSPixel, DevicePixel, PinchZoomFactor};
 use time::{now, precise_time_ns, precise_time_s};
 use webrender_api::{self, DeviceIntPoint, DevicePoint, HitTestFlags, HitTestResult};
-use webrender_api::{LayoutVector2D, ScrollLocation};
+use webrender_api::{LayoutVector2D, ScrollLocation, DeviceUintRect};
 
 #[derive(Debug, PartialEq)]
 enum UnableToComposite {
@@ -1277,12 +1277,16 @@ impl<Window: WindowMethods> IOCompositor<Window> {
             CompositeTarget::Window => None,
             #[cfg(feature = "gleam")]
             CompositeTarget::WindowAndPng => {
-                let img = gl::draw_img(&*self.window.gl(), rt_info, width, height);
+                //let img = gl::draw_img(&*self.window.gl(), rt_info, width, height);
+                let rect = DeviceUintRect::from_size(TypedSize2D::from_lengths(width, height));
+                let mut pixels = self.webrender.read_pixels_rgba8(rect);
+                gl::flip_pixels_y(&mut pixels, width.get() as usize, height.get() as usize, 4);
+                pixels::rgba8_byte_swap_colors_inplace(&mut pixels);
                 Some(Image {
-                    width: img.width(),
-                    height: img.height(),
-                    format: PixelFormat::RGB8,
-                    bytes: ipc::IpcSharedMemory::from_bytes(&*img),
+                    width: width.get(),
+                    height: height.get(),
+                    format: PixelFormat::BGRA8,
+                    bytes: ipc::IpcSharedMemory::from_bytes(&pixels),
                     id: None,
                 })
             },
@@ -1296,8 +1300,12 @@ impl<Window: WindowMethods> IOCompositor<Window> {
                     || match opts::get().output_file.as_ref() {
                         Some(path) => match File::create(path) {
                             Ok(mut file) => {
-                                let img = gl::draw_img(gl, rt_info, width, height);
-                                let dynamic_image = DynamicImage::ImageRgb8(img);
+                                //let img = gl::draw_img(gl, rt_info, width, height);
+                                let rect = DeviceUintRect::from_size(TypedSize2D::from_lengths(width, height));
+                                let mut pixels = self.webrender.read_pixels_rgba8(rect);
+                                gl::flip_pixels_y(&mut pixels, width.get() as usize, height.get() as usize, 4);
+                                let img = ImageBuffer::from_raw(width.get(), height.get(), pixels).unwrap();
+                                let dynamic_image = DynamicImage::ImageRgba8(img);
                                 if let Err(e) = dynamic_image.write_to(&mut file, ImageFormat::PNG)
                                 {
                                     error!("Failed to save {} ({}).", path, e);
