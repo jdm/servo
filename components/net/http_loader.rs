@@ -56,10 +56,13 @@ use std::sync::RwLock;
 use std::time::{Duration, SystemTime};
 use time::{self, Tm};
 use tokio::prelude::{future, Future, Stream};
-use tokio::runtime::Runtime;
+use tokio::runtime::{Builder, Runtime};
 
 lazy_static! {
-    pub static ref HANDLE: Mutex<Runtime> = { Mutex::new(Runtime::new().unwrap()) };
+    pub static ref HANDLE: Mutex<Runtime> = {
+        let runtime = Builder::new().core_threads(1).build().unwrap(); 
+        Mutex::new(runtime)
+    };
 }
 
 pub struct HttpState {

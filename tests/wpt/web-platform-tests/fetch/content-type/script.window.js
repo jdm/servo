@@ -7,9 +7,9 @@ self.stringFromExecutedScript = undefined;
 function runTests(allTestData) {
   allTestData.forEach(testData => {
     runScriptTest(testData, false);
-    if (testData.contentType.length > 1) {
+    /*if (testData.contentType.length > 1) {
       runScriptTest(testData, true);
-    }
+    }*/
   });
 }
 

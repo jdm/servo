@@ -11,5 +11,6 @@ def main(request, response):
     output += "Content-Length: " + str(len(content)) + "\r\n"
     output += "\r\n"
     output += content
+    print("responding to " + request.url)
     response.writer.write(output)
     response.close_connection = True
