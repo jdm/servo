@@ -58,6 +58,7 @@ net = {path = "../net"}
 net_traits = {path = "../net_traits"}
 profile = {path = "../profile"}
 profile_traits = {path = "../profile_traits"}
+servo-media-auto = {path = "../../../media/backends/auto"}
 script = {path = "../script"}
 script_layout_interface = {path = "../script_layout_interface"}
 script_traits = {path = "../script_traits"}

@@ -102,6 +102,7 @@ use profile_traits::time;
 use script_traits::{ConstellationMsg, SWManagerSenders, ScriptToConstellationChan};
 use servo_config::opts;
 use servo_config::prefs::PREFS;
+use servo_media_auto::Backend as MediaBackend;
 use std::borrow::Cow;
 use std::cmp::max;
 use std::path::PathBuf;
@@ -214,7 +215,7 @@ where
 
         // Important that this call is done in a single-threaded fashion, we
         // can't defer it after `create_constellation` has started.
-        script::init();
+        script::init::<MediaBackend>();
 
         let webvr_services = if PREFS.is_webvr_enabled() {
             let mut services = VRServiceManager::new();
@@ -684,7 +685,7 @@ pub fn run_content_process(token: String) {
 
     // send the required channels to the service worker manager
     let sw_senders = unprivileged_content.swmanager_senders();
-    script::init();
+    script::init::<MediaBackend>();
     script::init_service_workers(sw_senders);
 
     unprivileged_content.start_all::<script_layout_interface::message::Msg,

@@ -253,7 +253,7 @@ impl HTMLMediaElement {
             delaying_the_load_event_flag: Default::default(),
             pending_play_promises: Default::default(),
             in_flight_play_promises_queue: Default::default(),
-            player: ServoMedia::get().unwrap().create_player(),
+            player: ServoMedia::get().unwrap().make_player(),
             frame_renderer: Arc::new(Mutex::new(MediaFrameRenderer::new(
                 document.window().get_webrender_api_sender(),
             ))),
