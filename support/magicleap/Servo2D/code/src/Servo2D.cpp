@@ -34,7 +34,7 @@ const float LASER_LENGTH = 10.0;
 const float KEYBOARD_W = 0.666;
 
 // The home page
-const char* HOME_PAGE = "https://servo.org/ml-home";
+const char* HOME_PAGE = "https://threejs.org/examples";
 
 // The locale (currently ML only supports en)
 const lumin::ui::Locale::Code DEFAULT_LOCALE = lumin::ui::Locale::Code::kEn;
