@@ -34,7 +34,7 @@ const float LASER_LENGTH = 10.0;
 const float KEYBOARD_W = 0.666;
 
 // The home page
-const char* HOME_PAGE = "https://threejs.org/examples";
+const char* HOME_PAGE = "https://servo.org/ml-home";
 
 // The locale (currently ML only supports en)
 const lumin::ui::Locale::Code DEFAULT_LOCALE = lumin::ui::Locale::Code::kEn;
@@ -78,7 +78,9 @@ extern "C" void navigate_servo(ServoInstance*, const char* text);
 extern "C" void discard_servo(ServoInstance*);
 
 // Create a Servo2D instance
-Servo2D::Servo2D() {
+Servo2D::Servo2D(const char* uri)
+: uri_(uri ? uri : HOME_PAGE)
+{
   ML_LOG(Debug, "Servo2D Constructor.");
 }
 
@@ -171,7 +173,7 @@ int Servo2D::init() {
   EGLDisplay dpy = eglGetDisplay(EGL_DEFAULT_DISPLAY);
 
   // Hook into servo
-  servo_ = init_servo(ctx, surf, dpy, this, logger, history, url, keyboard, HOME_PAGE, VIEWPORT_W, VIEWPORT_H, HIDPI);
+  servo_ = init_servo(ctx, surf, dpy, this, logger, history, url, keyboard, uri_, VIEWPORT_W, VIEWPORT_H, HIDPI);
   if (!servo_) {
     ML_LOG(Error, "Servo2D Failed to init servo instance");
     abort();
