@@ -40,7 +40,7 @@ thread_local! {
 pub use servo::embedder_traits::EventLoopWaker;
 
 pub struct InitOptions {
-    pub args: Option<String>,
+    pub args: Option<Vec<String>>,
     pub url: Option<String>,
     pub coordinates: Coordinates,
     pub density: f32,
@@ -141,9 +141,7 @@ pub fn init(
 ) -> Result<(), &'static str> {
     resources::set(Box::new(ResourceReaderInstance::new()));
 
-    if let Some(args) = init_opts.args {
-        let mut args: Vec<String> = serde_json::from_str(&args)
-            .map_err(|_| "Invalid arguments. Servo arguments must be formatted as a JSON array")?;
+    if let Some(mut args) = init_opts.args {
         // opts::from_cmdline_args expects the first argument to be the binary name.
         args.insert(0, "servo".to_string());
 
