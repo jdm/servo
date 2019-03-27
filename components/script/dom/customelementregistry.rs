@@ -691,7 +691,7 @@ pub enum CustomElementReaction {
     Upgrade(#[ignore_malloc_size_of = "Rc"] Rc<CustomElementDefinition>),
     Callback(
         #[ignore_malloc_size_of = "Rc"] Rc<Function>,
-        Box<[Heap<JSVal>]>,
+        #[ignore_malloc_size_of = "mozjs"] Box<[Heap<JSVal>]>,
     ),
 }
 

@@ -16,6 +16,7 @@ use js::jsval::{JSVal, UndefinedValue};
 #[dom_struct]
 pub struct XRViewerPose {
     reflector_: Reflector,
+    #[ignore_malloc_size_of = "mozjs"]
     views: Heap<JSVal>,
 }
 
