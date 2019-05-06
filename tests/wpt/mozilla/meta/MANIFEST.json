@@ -11131,6 +11131,11 @@
      {}
     ]
    ],
+   "mozilla/worker_member_test.js": [
+    [
+     {}
+    ]
+   ],
    "mozilla/worklets/syntax_error.js": [
     [
      {}
@@ -20302,7 +20307,7 @@
    "testharness"
   ],
   "mozilla/interface_member_exposed.html": [
-   "dd637cf92a894e4569e8fb0baf11eea6968033af",
+   "01da8c3a8b68fd6a46271027a8df5342e127c203",
    "testharness"
   ],
   "mozilla/interfaces.html": [
@@ -21000,6 +21005,10 @@
   "mozilla/windowproxy.html": [
    "d5c75899eb546d7243d65b6f55e876c5008c6292",
    "testharness"
+  ],
+  "mozilla/worker_member_test.js": [
+   "0e7f29cff941926c78946874f44c0cbbfbc7f697",
+   "support"
   ],
   "mozilla/worklets/syntax_error.js": [
    "4adade8939ce62eb5e83d73d4faf2261b264d809",
