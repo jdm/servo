@@ -12,6 +12,7 @@ use crate::WindowSizeType;
 use crate::WorkerGlobalScopeInit;
 use crate::WorkerScriptLoadOrigin;
 use canvas_traits::canvas::{CanvasId, CanvasMsg};
+use canvas_traits::webgl::WebGLContextId;
 use devtools_traits::{ScriptToDevtoolsControlMsg, WorkerId};
 use embedder_traits::EmbedderMsg;
 use euclid::default::Size2D as UntypedSize2D;
@@ -60,6 +61,8 @@ pub enum LayoutMsg {
     PendingPaintMetric(PipelineId, Epoch),
     /// Notifies the constellation that the viewport has been constrained in some manner
     ViewportConstrained(PipelineId, ViewportConstraints),
+    /// Notifies the constellation that WebGL buffer swaps need to happen.
+    SwapWebGLBuffers(Vec<WebGLContextId>),
 }
 
 impl fmt::Debug for LayoutMsg {
@@ -70,6 +73,7 @@ impl fmt::Debug for LayoutMsg {
             IFrameSizes(..) => "IFrameSizes",
             PendingPaintMetric(..) => "PendingPaintMetric",
             ViewportConstrained(..) => "ViewportConstrained",
+            SwapWebGLBuffers(..) => "SwapWebGLBuffers",
         };
         write!(formatter, "LayoutMsg::{}", variant)
     }

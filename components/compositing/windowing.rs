@@ -10,6 +10,7 @@ use euclid::Scale;
 use gleam::gl;
 use keyboard_types::KeyboardEvent;
 use msg::constellation_msg::{PipelineId, TopLevelBrowsingContextId, TraversalDirection};
+use surfman::Device;
 use script_traits::{MouseButton, TouchEventType, TouchId, WheelDelta};
 use servo_geometry::DeviceIndependentPixel;
 use servo_media::player::context::{GlApi, GlContext, NativeDisplay};
@@ -144,9 +145,8 @@ pub enum AnimationState {
 pub trait WindowMethods {
     /// Presents the window to the screen (perhaps by page flipping).
     fn present(&self);
-    /// Requests that the window system prepare a composite. Typically this will involve making
-    /// some type of platform-specific graphics context current.
-    fn prepare_for_composite(&self);
+    /// Make the OpenGL context current.
+    fn make_gl_context_current(&self);
     /// Return the GL function pointer trait.
     #[cfg(feature = "gl")]
     fn gl(&self) -> Rc<dyn gl::Gl>;
@@ -163,6 +163,8 @@ pub trait WindowMethods {
     fn get_native_display(&self) -> NativeDisplay;
     /// Get the GL api
     fn get_gl_api(&self) -> GlApi;
+    /// Get the `surfman` device.
+    fn surfman_device(&self) -> Rc<Device>;
 }
 
 pub trait EmbedderMethods {

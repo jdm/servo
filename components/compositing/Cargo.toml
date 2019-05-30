@@ -43,5 +43,8 @@ webvr_traits = {path = "../webvr_traits"}
 webvr = {path = "../webvr"}
 webxr-api = {git = "https://github.com/servo/webxr"}
 
+[dependencies.surfman]
+path = "/Users/jdm/src/rust-offscreen-rendering-context/surfman"
+
 [build-dependencies]
 toml = "0.5"

@@ -31,6 +31,7 @@ use crate::model::MaybeAuto;
 use crate::table_cell::CollapsedBordersForCell;
 use app_units::{Au, AU_PER_PX};
 use canvas_traits::canvas::{CanvasMsg, FromLayoutMsg};
+use canvas_traits::webgl::WebGLContextId;
 use embedder_traits::Cursor;
 use euclid::{
     default::{Point2D, Rect, SideOffsets2D as UntypedSideOffsets2D, Size2D},
@@ -325,6 +326,9 @@ pub struct DisplayListBuildState<'a> {
 
     /// Stores text runs to answer text queries used to place a cursor inside text.
     pub indexable_text: IndexableText,
+
+    /// Vector containing canvas IDs that need to have their buffers swapped.
+    pub dirty_canvases: Vec<WebGLContextId>,
 }
 
 impl<'a> DisplayListBuildState<'a> {
@@ -345,6 +349,7 @@ impl<'a> DisplayListBuildState<'a> {
             ),
             iframe_sizes: Vec::new(),
             indexable_text: IndexableText::default(),
+            dirty_canvases: Vec::new(),
         }
     }
 
@@ -1868,7 +1873,10 @@ impl Fragment {
             },
             SpecificFragmentInfo::Canvas(ref canvas_fragment_info) => {
                 let image_key = match canvas_fragment_info.source {
-                    CanvasFragmentSource::WebGL(image_key) => image_key,
+                    CanvasFragmentSource::WebGL { image_key, context_id } => {
+                        state.dirty_canvases.push(context_id);
+                        image_key
+                    }
                     CanvasFragmentSource::Image(ref ipc_renderer) => match *ipc_renderer {
                         Some(ref ipc_renderer) => {
                             let ipc_renderer = ipc_renderer.lock().unwrap();

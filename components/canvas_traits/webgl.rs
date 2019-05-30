@@ -5,6 +5,7 @@
 use euclid::default::{Rect, Size2D};
 use ipc_channel::ipc::{IpcBytesReceiver, IpcBytesSender, IpcSharedMemory};
 use pixels::PixelFormat;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use sparkle::gl;
 use sparkle::gl::Gl;
 use std::borrow::Cow;
@@ -35,6 +36,43 @@ pub struct WebGLCommandBacktrace {
     pub js_backtrace: Option<String>,
 }
 
+#[derive(Debug)]
+pub struct WebGLSync(pub gl::GLsync);
+
+#[allow(unsafe_code)]
+unsafe impl Send for WebGLSync {}
+
+impl Serialize for WebGLSync {
+    fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        (self.0 as usize).serialize(s)
+    }
+}
+
+impl<'de> Deserialize<'de> for WebGLSync {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<WebGLSync, D::Error> {
+        let ptr: usize = Deserialize::deserialize(d)?;
+        Ok(WebGLSync(ptr as gl::GLsync))
+    }
+}
+
+/// WebGL Threading API entry point that lives in the constellation.
+pub struct WebGLThreads(pub WebGLSender<WebGLMsg>);
+
+impl WebGLThreads {
+    /// Gets the WebGLThread handle for each script pipeline.
+    pub fn pipeline(&self) -> WebGLPipeline {
+        // This mode creates a single thread, so the existing WebGLChan is just cloned.
+        WebGLPipeline(WebGLChan(self.0.clone()))
+    }
+
+    /// Sends a exit message to close the WebGLThreads and release all WebGLContexts.
+    pub fn exit(&self) -> Result<(), &'static str> {
+        self.0
+            .send(WebGLMsg::Exit)
+            .map_err(|_| "Failed to send Exit message")
+    }
+}
+
 /// WebGL Message API
 #[derive(Debug, Deserialize, Serialize)]
 pub enum WebGLMsg {
@@ -53,21 +91,12 @@ pub enum WebGLMsg {
     WebGLCommand(WebGLContextId, WebGLCommand, WebGLCommandBacktrace),
     /// Runs a WebVRCommand in a specific WebGLContext.
     WebVRCommand(WebGLContextId, WebVRCommand),
-    /// Locks a specific WebGLContext. Lock messages are used for a correct synchronization
-    /// with WebRender external image API.
-    /// WR locks a external texture when it wants to use the shared texture contents.
-    /// The WR client should not change the shared texture content until the Unlock call.
-    /// Currently OpenGL Sync Objects are used to implement the synchronization mechanism.
-    Lock(WebGLContextId, WebGLSender<(u32, Size2D<i32>, usize)>),
-    /// Unlocks a specific WebGLContext. Unlock messages are used for a correct synchronization
-    /// with WebRender external image API.
-    /// The WR unlocks a context when it finished reading the shared texture contents.
-    /// Unlock messages are always sent after a Lock message.
-    Unlock(WebGLContextId),
     /// Creates or updates the image keys required for WebRender.
     UpdateWebRenderImage(WebGLContextId, WebGLSender<ImageKey>),
     /// Commands used for the DOMToTexture feature.
     DOMToTextureCommand(DOMToTextureCommand),
+    /// Performs a buffer swap.
+    SwapBuffers(WebGLContextId),
     /// Frees all resources and closes the thread.
     Exit,
 }
@@ -85,22 +114,12 @@ pub struct WebGLCreateContextResult {
     pub sender: WebGLMsgSender,
     /// Information about the internal GL Context.
     pub limits: GLLimits,
-    /// How the WebGLContext is shared with WebRender.
-    pub share_mode: WebGLContextShareMode,
     /// The GLSL version supported by the context.
     pub glsl_version: WebGLSLVersion,
     /// The GL API used by the context.
     pub api_type: GlType,
     /// The format for creating new offscreen framebuffers for this context.
     pub framebuffer_format: GLFormats,
-}
-
-#[derive(Clone, Copy, Debug, Deserialize, MallocSizeOf, Serialize)]
-pub enum WebGLContextShareMode {
-    /// Fast: a shared texture_id is used in WebRender.
-    SharedTexture,
-    /// Slow: glReadPixels is used to send pixels to WebRender each frame.
-    Readback,
 }
 
 /// Defines the WebGL version
@@ -147,8 +166,7 @@ impl WebGLMsgSender {
     /// Send a WebGLCommand message
     #[inline]
     pub fn send(&self, command: WebGLCommand, backtrace: WebGLCommandBacktrace) -> WebGLSendResult {
-        self.sender
-            .send(WebGLMsg::WebGLCommand(self.ctx_id, command, backtrace))
+        self.sender.send(WebGLMsg::WebGLCommand(self.ctx_id, command, backtrace))
     }
 
     /// Send a WebVRCommand message
@@ -178,6 +196,11 @@ impl WebGLMsgSender {
     pub fn send_update_wr_image(&self, sender: WebGLSender<ImageKey>) -> WebGLSendResult {
         self.sender
             .send(WebGLMsg::UpdateWebRenderImage(self.ctx_id, sender))
+    }
+
+    #[inline]
+    pub fn send_swap_buffers(&self) -> WebGLSendResult {
+        self.sender.send(WebGLMsg::SwapBuffers(self.ctx_id))
     }
 
     pub fn send_dom_to_texture(&self, command: DOMToTextureCommand) -> WebGLSendResult {

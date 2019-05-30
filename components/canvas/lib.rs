@@ -13,8 +13,10 @@ mod azure_backend;
 #[cfg(feature = "canvas2d-raqote")]
 mod raqote_backend;
 
+pub use webgl_mode::WebGLComm;
+
 pub mod canvas_data;
 pub mod canvas_paint_thread;
-pub mod gl_context;
 mod webgl_mode;
+mod webgl_limits;
 pub mod webgl_thread;

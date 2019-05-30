@@ -55,7 +55,7 @@ use canvas_traits::webgl::WebGLError::*;
 use canvas_traits::webgl::{
     webgl_channel, AlphaTreatment, DOMToTextureCommand, GLContextAttributes, GLFormats, GLLimits,
     GlType, Parameter, TexDataType, TexFormat, TexParameter, WebGLChan, WebGLCommand,
-    WebGLCommandBacktrace, WebGLContextId, WebGLContextShareMode, WebGLError,
+    WebGLCommandBacktrace, WebGLContextId, WebGLError,
     WebGLFramebufferBindingRequest, WebGLMsg, WebGLMsgSender, WebGLProgramId, WebGLResult,
     WebGLSLVersion, WebGLSendResult, WebGLSender, WebGLVersion, WebVRCommand, YAxisTreatment,
 };
@@ -140,10 +140,9 @@ pub struct WebGLRenderingContext {
     webgl_sender: WebGLMessageSender,
     #[ignore_malloc_size_of = "Defined in webrender"]
     webrender_image: Cell<Option<webrender_api::ImageKey>>,
-    share_mode: WebGLContextShareMode,
     webgl_version: WebGLVersion,
     glsl_version: WebGLSLVersion,
-    #[ignore_malloc_size_of = "Defined in offscreen_gl_context"]
+    #[ignore_malloc_size_of = "Defined in surfman"]
     limits: GLLimits,
     canvas: Dom<HTMLCanvasElement>,
     #[ignore_malloc_size_of = "Defined in canvas_traits"]
@@ -205,7 +204,6 @@ impl WebGLRenderingContext {
                     window.get_event_loop_waker(),
                 ),
                 webrender_image: Cell::new(None),
-                share_mode: ctx_data.share_mode,
                 webgl_version,
                 glsl_version: ctx_data.glsl_version,
                 limits: ctx_data.limits,
@@ -302,7 +300,7 @@ impl WebGLRenderingContext {
         self.send_command(WebGLCommand::Scissor(rect.0, rect.1, rect.2, rect.3));
 
         // Bound texture must not change when the canvas is resized.
-        // Right now offscreen_gl_context generates a new FBO and the bound texture is changed
+        // Right now surfman generates a new FBO and the bound texture is changed
         // in order to create a new render to texture attachment.
         // Send a command to re-bind the TEXTURE_2D, if any.
         if let Some(texture) = self
@@ -318,7 +316,7 @@ impl WebGLRenderingContext {
         }
 
         // Bound framebuffer must not change when the canvas is resized.
-        // Right now offscreen_gl_context generates a new FBO on resize.
+        // Right now surfman generates a new FBO on resize.
         // Send a command to re-bind the framebuffer, if any.
         if let Some(fbo) = self.bound_framebuffer.get() {
             let id = WebGLFramebufferBindingRequest::Explicit(fbo.id());
@@ -809,27 +807,23 @@ impl WebGLRenderingContext {
         receiver.recv().unwrap()
     }
 
-    pub fn layout_handle(&self) -> webrender_api::ImageKey {
-        match self.share_mode {
-            WebGLContextShareMode::SharedTexture => {
-                // WR using ExternalTexture requires a single update message.
-                self.webrender_image.get().unwrap_or_else(|| {
-                    let (sender, receiver) = webgl_channel().unwrap();
-                    self.webgl_sender.send_update_wr_image(sender).unwrap();
-                    let image_key = receiver.recv().unwrap();
-                    self.webrender_image.set(Some(image_key));
-
-                    image_key
-                })
-            },
-            WebGLContextShareMode::Readback => {
-                // WR using Readback requires to update WR image every frame
-                // in order to send the new raw pixels.
+    pub(crate) fn layout_handle(&self) -> HTMLCanvasDataSource {
+        // WR using ExternalTexture requires a single update message.
+        let image_key = match self.webrender_image.get() {
+            None => {
                 let (sender, receiver) = webgl_channel().unwrap();
                 self.webgl_sender.send_update_wr_image(sender).unwrap();
-                receiver.recv().unwrap()
-            },
-        }
+                let image_key = receiver.recv().unwrap();
+                self.webrender_image.set(Some(image_key));
+                image_key
+            }
+            Some(image_key) => {
+                //self.webgl_sender.send_swap_buffers().unwrap();
+                image_key
+            }
+        };
+        let context_id = self.context_id();
+        HTMLCanvasDataSource::WebGL { image_key, context_id }
     }
 
     // https://www.khronos.org/registry/webgl/extensions/ANGLE_instanced_arrays/
@@ -4171,7 +4165,7 @@ pub trait LayoutCanvasWebGLRenderingContextHelpers {
 impl LayoutCanvasWebGLRenderingContextHelpers for LayoutDom<WebGLRenderingContext> {
     #[allow(unsafe_code)]
     unsafe fn canvas_data_source(&self) -> HTMLCanvasDataSource {
-        HTMLCanvasDataSource::WebGL((*self.unsafe_get()).layout_handle())
+        (*self.unsafe_get()).layout_handle()
     }
 }
 
@@ -4365,7 +4359,7 @@ impl TexPixels {
 }
 
 #[derive(JSTraceable)]
-pub(crate) struct WebGLCommandSender {
+pub struct WebGLCommandSender {
     sender: WebGLChan,
     waker: Option<Box<dyn EventLoopWaker>>,
 }

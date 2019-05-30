@@ -879,7 +879,6 @@ install them, let us know by filing a bug!")
             features.append("native-bluetooth")
         if uwp:
             features.append("canvas2d-raqote")
-            features.append("no_wgl")
             features.append("uwp")
         else:
             # Non-UWP builds provide their own libEGL via mozangle.
@@ -895,8 +894,6 @@ install them, let us know by filing a bug!")
         if with_frame_pointer:
             env['RUSTFLAGS'] = env.get('RUSTFLAGS', "") + " -C force-frame-pointers=yes"
             features.append("profilemozjs")
-        if without_wgl:
-            features.append("no_wgl")
         if self.config["build"]["webgl-backtrace"]:
             features.append("webgl-backtrace")
         if self.config["build"]["dom-backtrace"]:

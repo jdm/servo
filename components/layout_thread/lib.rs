@@ -97,6 +97,7 @@ use servo_url::ServoUrl;
 use std::borrow::ToOwned;
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
+use std::mem;
 use std::ops::{Deref, DerefMut};
 use std::process;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -1196,6 +1197,16 @@ impl LayoutThread {
                                 if let Err(e) = self.constellation_chan.send(msg) {
                                     warn!("Layout resize to constellation failed ({}).", e);
                                 }
+                            }
+                        }
+
+                        if !build_state.dirty_canvases.is_empty() {
+                            let dirty_canvases = mem::replace(&mut build_state.dirty_canvases,
+                                                              vec![]);
+                            let msg = ConstellationMsg::SwapWebGLBuffers(dirty_canvases);
+                            if let Err(error) = self.constellation_chan.send(msg) {
+                                warn!("Dirty canvases couldn't be sent to constellation: {:?}",
+                                      error);
                             }
                         }
 

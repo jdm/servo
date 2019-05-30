@@ -34,6 +34,7 @@ use servo_media::player::context::{GlApi, GlContext as PlayerGLContext, NativeDi
 use std::cell::{Cell, RefCell};
 use std::mem;
 use std::rc::Rc;
+use surfman::{self, Device};
 #[cfg(target_os = "windows")]
 use winapi;
 
@@ -68,6 +69,7 @@ pub struct Window {
     animation_state: Cell<AnimationState>,
     fullscreen: Cell<bool>,
     gl: Rc<dyn gl::Gl>,
+    device: Rc<Device>,
 }
 
 #[cfg(not(target_os = "windows"))]
@@ -177,6 +179,11 @@ impl Window {
 
         let mut context = GlContext::Current(context);
 
+        let (device, mut surfman_context) = unsafe {
+            Device::from_current_context().expect("Failed to create a `surfman` device!")
+        };
+        device.destroy_context(&mut surfman_context).unwrap();
+
         context.make_not_current();
 
         debug!("Created window {:?}", context.window().id());
@@ -194,6 +201,7 @@ impl Window {
             inner_size: Cell::new(inner_size),
             primary_monitor,
             screen_size,
+            device: Rc::new(device),
         };
 
         window.present();
@@ -571,7 +579,7 @@ impl WindowMethods for Window {
         self.animation_state.set(state);
     }
 
-    fn prepare_for_composite(&self) {
+    fn make_gl_context_current(&self) {
         self.gl_context.borrow_mut().make_current();
     }
 
@@ -669,6 +677,11 @@ impl WindowMethods for Window {
             glutin::Api::OpenGlEs => GlApi::Gles1,
             _ => GlApi::None,
         }
+    }
+
+    #[inline]
+    fn surfman_device(&self) -> Rc<Device> {
+        self.device.clone()
     }
 }
 

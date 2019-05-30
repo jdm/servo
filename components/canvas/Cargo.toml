@@ -14,7 +14,6 @@ path = "lib.rs"
 canvas2d-azure = ["azure"]
 canvas2d-raqote = ["raqote"]
 webgl_backtrace = ["canvas_traits/webgl_backtrace"]
-no_wgl = ["offscreen_gl_context/no_wgl"]
 
 [dependencies]
 azure = {git = "https://github.com/servo/rust-azure", optional = true}
@@ -29,7 +28,6 @@ half = "1"
 ipc-channel = "0.12"
 log = "0.4"
 num-traits = "0.2"
-offscreen_gl_context = {version = "0.25", features = ["serde", "osmesa"]}
 raqote = {git = "https://github.com/jrmuizel/raqote", optional = true}
 pixels = {path = "../pixels"}
 serde_bytes = "0.10"
@@ -39,3 +37,6 @@ webrender = {git = "https://github.com/servo/webrender"}
 webrender_api = {git = "https://github.com/servo/webrender", features = ["ipc"]}
 webrender_traits = {path = "../webrender_traits"}
 webxr-api = {git = "https://github.com/servo/webxr", features = ["ipc"]}
+
+[dependencies.surfman]
+path = "/Users/jdm/src/rust-offscreen-rendering-context/surfman"

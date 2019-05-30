@@ -104,9 +104,8 @@ use background_hang_monitor::HangMonitorRegister;
 use backtrace::Backtrace;
 use bluetooth_traits::BluetoothRequest;
 use canvas::canvas_paint_thread::CanvasPaintThread;
-use canvas::webgl_thread::WebGLThreads;
-use canvas_traits::canvas::CanvasId;
-use canvas_traits::canvas::CanvasMsg;
+use canvas_traits::canvas::{CanvasId, CanvasMsg};
+use canvas_traits::webgl::{WebGLContextId, WebGLMsg, WebGLThreads};
 use compositing::compositor_thread::CompositorProxy;
 use compositing::compositor_thread::Msg as ToCompositorMsg;
 use compositing::SendableFrameTree;
@@ -1682,6 +1681,9 @@ where
             FromLayoutMsg::ViewportConstrained(pipeline_id, constraints) => {
                 self.handle_viewport_constrained_msg(pipeline_id, constraints);
             },
+            FromLayoutMsg::SwapWebGLBuffers(context_ids) => {
+                self.handle_swap_webgl_buffers_msg(context_ids);
+            }
         }
     }
 
@@ -2151,6 +2153,16 @@ where
             };
 
             self.resize_browsing_context(window_size, type_, data.id);
+        }
+    }
+
+    fn handle_swap_webgl_buffers_msg(&mut self, context_ids: Vec<WebGLContextId>) {
+        if let Some(ref webgl_threads) = self.webgl_threads {
+            for context_id in context_ids {
+                if webgl_threads.0.send(WebGLMsg::SwapBuffers(context_id)).is_err() {
+                    warn!("Failed to send WebGL buffer swap message!")
+                }
+            }
         }
     }
 

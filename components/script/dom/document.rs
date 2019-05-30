@@ -98,6 +98,7 @@ use crate::dom::treewalker::TreeWalker;
 use crate::dom::uievent::UIEvent;
 use crate::dom::virtualmethods::vtable_for;
 use crate::dom::webglcontextevent::WebGLContextEvent;
+use crate::dom::webglrenderingcontext::WebGLCommandSender;
 use crate::dom::wheelevent::WheelEvent;
 use crate::dom::window::{ReflowReason, Window};
 use crate::dom::windowproxy::WindowProxy;
@@ -4660,6 +4661,8 @@ pub enum AnimationFrameCallback {
     FrameRequestCallback {
         #[ignore_malloc_size_of = "Rc is hard"]
         callback: Rc<FrameRequestCallback>,
+        #[ignore_malloc_size_of = "channels are hard"]
+        webgl_chan: Option<WebGLCommandSender>,
     },
 }
 
@@ -4675,7 +4678,10 @@ impl AnimationFrameCallback {
                     .unwrap();
                 devtools_sender.send(msg).unwrap();
             },
-            AnimationFrameCallback::FrameRequestCallback { ref callback } => {
+            AnimationFrameCallback::FrameRequestCallback {
+                ref callback,
+                webgl_chan: _,
+            } => {
                 // TODO(jdm): The spec says that any exceptions should be suppressed:
                 // https://github.com/servo/servo/issues/6928
                 let _ = callback.Call__(Finite::wrap(now), ExceptionHandling::Report);

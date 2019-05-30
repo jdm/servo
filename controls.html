@@ -1,0 +1,42 @@
+
+<html lang="en">
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Video test</title>
+    <style>
+      .hidden {
+        display: none;
+      }
+
+      #controls {
+        background-color: rgba(50, 50, 50, 0.8);
+        height: 40px;
+        width: 640px;
+        box-sizing: border-box;
+        padding: 6px;
+        position: relative;
+        margin-top: -40px;
+        color: white;
+      }
+
+      
+    </style>
+  </head>
+  <body>
+    <video src="https://addpipe.com/sample_vid/short.mp4" poster="https://addpipe.com/sample_vid/poster.png">Hello</video>
+    <div id=controls>
+      <div id=play></div>
+      <div id=track class=slider></div>
+      <div id=time>0:00 / 2:26</div>
+      <div id=volume-icon></div>
+      <div id=volume class=slider></div>
+      <div id=fullscreen></div>
+    </div>
+    <script>
+      setTimeout(() => {
+        document.querySelector("video").setAttribute("controls", "");
+      });
+    </script>
+  </body>
+</html>
+

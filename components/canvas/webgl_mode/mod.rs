@@ -3,4 +3,4 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 mod inprocess;
-pub use self::inprocess::{ThreadMode, WebGLThreads};
+pub use self::inprocess::{FrontBuffer, WebGLComm};
