@@ -76,7 +76,7 @@ fn init_logger() {
     use vslogger::VSLogger;
 
     static LOGGER: VSLogger = VSLogger;
-    log::set_logger(&LOGGER).map(|_| log::set_max_level(LevelFilter::Info)).unwrap();
+    log::set_logger(&LOGGER).map(|_| log::set_max_level(LevelFilter::Debug)).unwrap();
 }
 
 #[cfg(not(target_os = "windows"))]

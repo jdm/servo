@@ -10,14 +10,14 @@ pub struct VSLogger;
 
 impl log::Log for VSLogger {
     fn enabled(&self, metadata: &Metadata) -> bool {
-        metadata.level() <= Level::Info
+        metadata.level() <= Level::Debug
     }
 
     fn log(&self, record: &Record) {
         if self.enabled(record.metadata()) {
             let log = format!("RUST: {} - {}\r\n", record.level(), record.args());
             let log: Vec<u16> = OsStr::new(&log).encode_wide().collect();
-            unsafe { OutputDebugStringW(log.as_ptr()); };
+            // unsafe { OutputDebugStringW(log.as_ptr()); };
         }
     }
 
