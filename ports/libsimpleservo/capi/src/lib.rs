@@ -73,10 +73,14 @@ pub extern "C" fn servo_version() -> *const c_char {
 #[cfg(target_os = "windows")]
 fn init_logger() {
     use log::LevelFilter;
+    use std::sync::Once;
     use vslogger::VSLogger;
 
     static LOGGER: VSLogger = VSLogger;
-    log::set_logger(&LOGGER).map(|_| log::set_max_level(LevelFilter::Debug)).unwrap();
+    static LOGGER_INIT: Once = Once::new();
+    LOGGER_INIT.call_once(|| {
+        log::set_logger(&LOGGER).map(|_| log::set_max_level(LevelFilter::Debug)).unwrap();
+    });
 }
 
 #[cfg(not(target_os = "windows"))]
