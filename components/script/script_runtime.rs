@@ -29,7 +29,7 @@ use crate::dom::globalscope::GlobalScope;
 use crate::dom::promise::Promise;
 use crate::dom::promiserejectionevent::PromiseRejectionEvent;
 use crate::dom::response::Response;
-use crate::microtask::{EnqueuedPromiseCallback, Microtask,MicrotaskQueue};
+use crate::microtask::{EnqueuedPromiseCallback, Microtask, MicrotaskQueue};
 use crate::script_module::EnsureModuleHooksInitialized;
 use crate::script_thread::trace_thread;
 use crate::task::TaskBox;
