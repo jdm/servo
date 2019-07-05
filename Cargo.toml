@@ -33,3 +33,7 @@ cmake = { git = "https://github.com/alexcrichton/cmake-rs" }
 [patch."https://github.com/servo/webrender"]
 webrender = { git = "https://github.com/jdm/webrender", branch = "servo-hl" }
 webrender_api = { git = "https://github.com/jdm/webrender", branch = "servo-hl" }
+
+[patch."https://github.com/servo/media"]
+servo-media-gstreamer = { path = "../media/backends/gstreamer" }
+servo-media = { path = "../media/servo-media" }
