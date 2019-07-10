@@ -273,10 +273,10 @@ impl<VR: WebVRRenderHandler + 'static> WebGLThread<VR> {
 
         // First try to create a shared context for the best performance.
         // Fallback to readback mode if the shared context creation fails.
-        let (ctx, share_mode) = self
+        let (ctx, share_mode) = /*self
             .gl_factory
             .new_shared_context(version, size, attributes)
-            .map(|r| (r, WebGLContextShareMode::SharedTexture))
+            .map(|r| (r, WebGLContextShareMode::SharedTexture))*/Err("")
             .or_else(|err| {
                 warn!(
                     "Couldn't create shared GL context ({}), using slow readback context instead.",
@@ -1774,9 +1774,17 @@ impl WebGLImpl {
     }
 
     #[inline]
+    #[allow(unsafe_code)]
     fn compile_shader(gl: &dyn gl::Gl, shader_id: WebGLShaderId, source: &str) {
         gl.shader_source(shader_id.get(), &[source.as_bytes()]);
         gl.compile_shader(shader_id.get());
+        let mut param = [0];
+        unsafe {
+            gl.get_shader_iv(shader_id.get(), gl::COMPILE_STATUS, &mut param);
+        }
+        if param[0] as u8 == gl::FALSE {
+            warn!("Shader compile error: {}", gl.get_shader_info_log(shader_id.get()));
+        }
     }
 }
 

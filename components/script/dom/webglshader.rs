@@ -122,7 +122,7 @@ impl WebGLShader {
         };
         let validator = match webgl_version {
             WebGLVersion::WebGL1 => {
-                let output_format = if cfg!(any(target_os = "android", target_os = "ios")) {
+                let output_format = if true || cfg!(any(target_os = "android", target_os = "ios")) {
                     Output::Essl
                 } else {
                     Output::Glsl

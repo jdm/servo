@@ -146,6 +146,7 @@ mod media_platform {
             "gstproxy.dll",
             "gsttypefindfunctions.dll",
             "gstvideoconvert.dll",
+            "gstvideofilter.dll",
             "gstvideoparsersbad.dll",
             "gstvideoscale.dll",
             "gstvolume.dll",
@@ -164,7 +165,7 @@ mod media_platform {
             "gstwebrtc.dll",
         ];
 
-        let plugins: Vec<_> = if cfg!(feature = "uwp") {
+        let plugins: Vec<_> = if true || cfg!(feature = "uwp") {
             uwp_plugins.to_vec()
         } else {
             uwp_plugins
@@ -178,8 +179,8 @@ mod media_platform {
         let backend = match GStreamerBackend::init_with_plugins(plugin_dir, &plugins) {
             Ok(b) => b,
             Err(e) => {
-                error!("Error initializing GStreamer: {:?}", e);
-                panic!()
+                //error!("Error initializing GStreamer: {:?}", e);
+                panic!("Error initializing GStreamer: {:?}", e);
             }
         };
             //.expect("Error initializing GStreamer");

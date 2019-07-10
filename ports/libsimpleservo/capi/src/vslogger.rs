@@ -12,7 +12,7 @@ pub struct VSLogger;
 
 impl log::Log for VSLogger {
     fn enabled(&self, metadata: &Metadata) -> bool {
-        metadata.level() <= Level::Warn
+        metadata.level() <= Level::Info
     }
 
     fn log(&self, record: &Record) {

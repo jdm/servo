@@ -514,7 +514,7 @@ impl WindowMethods for Window {
 
     fn present(&self) {
         self.gl_context.borrow().swap_buffers();
-        self.gl_context.borrow_mut().make_not_current();
+        //self.gl_context.borrow_mut().make_not_current();
     }
 
     fn set_animation_state(&self, state: AnimationState) {

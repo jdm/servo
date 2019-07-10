@@ -33,7 +33,7 @@ impl GLContextFactory {
         // not true on Linux, we probably need a third `Egl` variant or abstract
         // it a bit more...
         NativeGLContext::current_handle().map(|handle| {
-            if cfg!(target_os = "windows") {
+            if cfg!(target_os = "windows") /*&& !cfg!(feature = "no_wgl")*/ {
                 // Used to dispatch functions from the GLContext thread to the main thread's event loop.
                 // Required to allow WGL GLContext sharing in Windows.
                 GLContextFactory::Native(handle, Some(MainThreadDispatcher::new(proxy.clone())))
@@ -64,7 +64,7 @@ impl GLContextFactory {
                     size.to_i32(),
                     attributes,
                     ColorAttachmentType::Texture,
-                    gl::GlType::default(),
+                    gl::GlType::Gles,
                     Self::gl_version(webgl_version),
                     Some(handle),
                     dispatcher,
@@ -100,7 +100,7 @@ impl GLContextFactory {
                     size.to_i32(),
                     attributes,
                     ColorAttachmentType::Texture,
-                    gl::GlType::default(),
+                    gl::GlType::Gles,
                     Self::gl_version(webgl_version),
                     None,
                     None,
