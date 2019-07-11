@@ -5,6 +5,7 @@
 use super::gl_context::{map_attrs_to_script_attrs, GLContextFactory, GLContextWrapper};
 use byteorder::{ByteOrder, NativeEndian, WriteBytesExt};
 use canvas_traits::webgl::*;
+use embedder_traits::EventLoopWaker;
 use euclid::Size2D;
 use fnv::FnvHashMap;
 use gleam::gl;
@@ -12,6 +13,9 @@ use half::f16;
 use offscreen_gl_context::{DrawBuffer, GLContext, NativeGLContextMethods};
 use pixels::{self, PixelFormat};
 use std::borrow::Cow;
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::rc::Rc;
 use std::thread;
 
 /// WebGL Threading API entry point that lives in the constellation.
@@ -47,7 +51,7 @@ impl Default for GLState {
 
 /// A WebGLThread manages the life cycle and message multiplexing of
 /// a set of WebGLContexts living in the same thread.
-pub struct WebGLThread<VR: WebVRRenderHandler + 'static> {
+pub struct WebGLThread {
     /// Factory used to create a new GLContext shared with the WR/Main thread.
     gl_factory: GLContextFactory,
     /// Channel used to generate/update or delete `webrender_api::ImageKey`s.
@@ -61,16 +65,29 @@ pub struct WebGLThread<VR: WebVRRenderHandler + 'static> {
     /// Id generator for new WebGLContexts.
     next_webgl_id: usize,
     /// Handler user to send WebVR commands.
-    webvr_compositor: Option<VR>,
+    webvr_compositor: Option<Box<dyn WebVRRenderHandler>>,
     /// Texture ids and sizes used in DOM to texture outputs.
     dom_outputs: FnvHashMap<webrender_api::PipelineId, DOMToTextureData>,
+    ///
+    receiver: WebGLReceiver<WebGLMsg>,
+    ///
+    sender: WebGLSender<WebGLMsg>,
+    ///
+    shut_down: bool,
+    ///
+    textures: TexturesMap,
 }
 
-impl<VR: WebVRRenderHandler + 'static> WebGLThread<VR> {
+pub(crate) type TexturesMap = Rc<RefCell<HashMap<WebGLContextId, (u32, Size2D<i32>)>>>;
+
+impl WebGLThread {
     pub fn new(
         gl_factory: GLContextFactory,
         webrender_api_sender: webrender_api::RenderApiSender,
-        webvr_compositor: Option<VR>,
+        webvr_compositor: Option<Box<WebVRRenderHandler>>,
+        sender: WebGLSender<WebGLMsg>,
+        receiver: WebGLReceiver<WebGLMsg>,
+        textures: TexturesMap,
     ) -> Self {
         WebGLThread {
             gl_factory,
@@ -81,6 +98,10 @@ impl<VR: WebVRRenderHandler + 'static> WebGLThread<VR> {
             next_webgl_id: 0,
             webvr_compositor,
             dom_outputs: Default::default(),
+            sender,
+            receiver,
+            shut_down: false,
+            textures,
         }
     }
 
@@ -89,27 +110,56 @@ impl<VR: WebVRRenderHandler + 'static> WebGLThread<VR> {
     pub fn start(
         gl_factory: GLContextFactory,
         webrender_api_sender: webrender_api::RenderApiSender,
-        webvr_compositor: Option<VR>,
-    ) -> WebGLSender<WebGLMsg> {
+        webvr_compositor: Option<Box<WebVRRenderHandler>>,
+        textures: TexturesMap,
+        event_loop_waker: Box<dyn EventLoopWaker>,
+    ) -> (WebGLSender<WebGLMsg>, WebGLThread) {
         let (sender, receiver) = webgl_channel::<WebGLMsg>().unwrap();
-        let result = sender.clone();
+        let (sender2, receiver2) = webgl_channel::<WebGLMsg>().unwrap();
         thread::Builder::new()
-            .name("WebGLThread".to_owned())
+            .name("WebGL pump".to_owned())
             .spawn(move || {
-                let mut renderer =
-                    WebGLThread::new(gl_factory, webrender_api_sender, webvr_compositor);
-                let webgl_chan = WebGLChan(sender);
+                while let Ok(msg) = receiver.recv() {
+                    let _ = sender2.send(msg);
+                    event_loop_waker.wake();
+                }
+            })
+            .expect("Thread spawning failed");
+        //let result = sender.clone();
+        /*thread::Builder::new()
+            .name("WebGLThread".to_owned())
+            .spawn(move || {*/
+                let /*mut*/ renderer =
+                    WebGLThread::new(gl_factory, webrender_api_sender, webvr_compositor, sender.clone(), receiver2, textures);
+                /*let webgl_chan = WebGLChan(sender);
                 loop {
                     let msg = receiver.recv().unwrap();
                     let exit = renderer.handle_msg(msg, &webgl_chan);
                     if exit {
                         return;
                     }
-                }
-            })
-            .expect("Thread spawning failed");
+                }*/
+            /*})
+            .expect("Thread spawning failed");*/
 
-        result
+        //result
+        (sender, renderer)
+    }
+    
+    pub fn process(&mut self) {
+        if self.shut_down {
+            return;
+        }
+        // Any context could be current when we start.
+        self.bound_context_id = None;
+        let webgl_chan = WebGLChan(self.sender.clone());
+        while let Ok(msg) = self.receiver.try_recv() {
+            let exit = self.handle_msg(msg, &webgl_chan);
+            if exit {
+                self.shut_down = true;
+                break;
+            }
+        }        
     }
 
     /// Handles a generic WebGLMsg message
@@ -229,6 +279,7 @@ impl<VR: WebVRRenderHandler + 'static> WebGLThread<VR> {
         context_id: WebGLContextId,
         sender: WebGLSender<(u32, Size2D<i32>, usize)>,
     ) {
+        panic!("oh no lock");
         let data =
             Self::make_current_if_needed(context_id, &self.contexts, &mut self.bound_context_id)
                 .expect("WebGLContext not found in a WebGLMsg::Lock message");
@@ -236,11 +287,12 @@ impl<VR: WebVRRenderHandler + 'static> WebGLThread<VR> {
         info.render_state = ContextRenderState::Locked(None);
         // Insert a OpenGL Fence sync object that sends a signal when all the WebGL commands are finished.
         // The related gl().wait_sync call is performed in the WR thread. See WebGLExternalImageApi for mor details.
-        let gl_sync = data.ctx.gl().fence_sync(gl::SYNC_GPU_COMMANDS_COMPLETE, 0);
-        info.gl_sync = Some(gl_sync);
+        /*let gl_sync = data.ctx.gl().fence_sync(gl::SYNC_GPU_COMMANDS_COMPLETE, 0);
+        info.gl_sync = Some(gl_sync);*/
         // It is important that the fence sync is properly flushed into the GPU's command queue.
         // Without proper flushing, the sync object may never be signaled.
         data.ctx.gl().flush();
+        let gl_sync = 0;
 
         sender
             .send((info.texture_id, info.size, gl_sync as usize))
@@ -249,6 +301,7 @@ impl<VR: WebVRRenderHandler + 'static> WebGLThread<VR> {
 
     /// Handles an unlock external callback received from webrender::ExternalImageHandler
     fn handle_unlock(&mut self, context_id: WebGLContextId) {
+        panic!("oh no unlock");
         let data =
             Self::make_current_if_needed(context_id, &self.contexts, &mut self.bound_context_id)
                 .expect("WebGLContext not found in a WebGLMsg::Unlock message");
@@ -273,10 +326,10 @@ impl<VR: WebVRRenderHandler + 'static> WebGLThread<VR> {
 
         // First try to create a shared context for the best performance.
         // Fallback to readback mode if the shared context creation fails.
-        let (ctx, share_mode) = /*self
+        let (ctx, share_mode) = self
             .gl_factory
             .new_shared_context(version, size, attributes)
-            .map(|r| (r, WebGLContextShareMode::SharedTexture))*/Err("")
+            .map(|r| (r, WebGLContextShareMode::SharedTexture))/*Err("")*/
             .or_else(|err| {
                 warn!(
                     "Couldn't create shared GL context ({}), using slow readback context instead.",
@@ -297,6 +350,7 @@ impl<VR: WebVRRenderHandler + 'static> WebGLThread<VR> {
                 state: Default::default(),
             },
         );
+        self.textures.borrow_mut().insert(id, (texture_id, size));
         self.cached_context_info.insert(
             id,
             WebGLContextInfo {
@@ -343,6 +397,7 @@ impl<VR: WebVRRenderHandler + 'static> WebGLThread<VR> {
                 // Update webgl texture size. Texture id may change too.
                 info.texture_id = texture_id;
                 info.size = real_size;
+                self.textures.borrow_mut().insert(context_id, (texture_id, real_size));
                 // Update WR image if needed. Resize image updates are only required for SharedTexture mode.
                 // Readback mode already updates the image every frame to send the raw pixels.
                 // See `handle_update_wr_image`.
@@ -694,7 +749,7 @@ impl<VR: WebVRRenderHandler + 'static> WebGLThread<VR> {
     }
 }
 
-impl<VR: WebVRRenderHandler + 'static> Drop for WebGLThread<VR> {
+impl Drop for WebGLThread {
     fn drop(&mut self) {
         // Call remove_context functions in order to correctly delete WebRender image keys.
         let context_ids: Vec<WebGLContextId> = self.contexts.keys().map(|id| *id).collect();

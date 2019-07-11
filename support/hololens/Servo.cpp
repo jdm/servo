@@ -48,8 +48,8 @@ Servo::Servo(GLsizei width, GLsizei height)
   o.args = NULL;
   //o.url = "http://example.com";
   //o.url = "http://web.cse.ohio-state.edu/~shen.94/5542/Site/WebGL_files/code00.html";
-  //o.url = "http://mdn.github.io/webgl-examples/tutorial/sample4/";
-  o.url = "http://example.com";
+  o.url = "http://mdn.github.io/webgl-examples/tutorial/sample4/";
+  //o.url = "http://example.com";
   o.width = mWindowWidth;
   o.height = mWindowHeight;
   o.density = 1.0;

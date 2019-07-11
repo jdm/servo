@@ -61,6 +61,7 @@ log = "0.4"
 msg = {path = "../msg"}
 net = {path = "../net"}
 net_traits = {path = "../net_traits"}
+offscreen_gl_context = "0.22"
 profile = {path = "../profile"}
 profile_traits = {path = "../profile_traits"}
 script = {path = "../script"}

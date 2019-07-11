@@ -13,7 +13,6 @@ path = "lib.rs"
 [features]
 canvas2d-azure = ["azure"]
 canvas2d-raqote = ["raqote"]
-default = ["canvas2d-azure"]
 webgl_backtrace = ["canvas_traits/webgl_backtrace"]
 no_wgl = ["offscreen_gl_context/no_wgl"]
 
@@ -21,8 +20,9 @@ no_wgl = ["offscreen_gl_context/no_wgl"]
 azure = {git = "https://github.com/servo/rust-azure", optional = true}
 byteorder = "1"
 canvas_traits = {path = "../canvas_traits"}
-compositing = {path = "../compositing"}
+#compositing = {path = "../compositing"}
 cssparser = "0.25"
+embedder_traits = {path = "../embedder_traits"}
 euclid = "0.19"
 fnv = "1.0"
 gleam = "0.6.7"

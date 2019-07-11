@@ -6,7 +6,7 @@ use super::webgl_thread::{GLState, WebGLImpl};
 use canvas_traits::webgl::{
     GLContextAttributes, GLLimits, WebGLCommand, WebGLCommandBacktrace, WebGLVersion,
 };
-use compositing::compositor_thread::{self, CompositorProxy};
+//use compositing::compositor_thread::{self, CompositorProxy};
 use euclid::Size2D;
 use gleam::gl;
 use offscreen_gl_context::{
@@ -22,17 +22,17 @@ use std::sync::{Arc, Mutex};
 /// Currently, shared textures are used to render WebGL textures into the WR compositor.
 /// In order to create a shared context, the GLContextFactory stores the handle of the main GL context.
 pub enum GLContextFactory {
-    Native(NativeGLContextHandle, Option<MainThreadDispatcher>),
+    Native(NativeGLContextHandle, Option<Box<GLContextDispatcher>>),
     OSMesa(OSMesaContextHandle),
 }
 
 impl GLContextFactory {
     /// Creates a new GLContextFactory that uses the currently bound GL context to create shared contexts.
-    pub fn current_native_handle(proxy: &CompositorProxy) -> Option<GLContextFactory> {
+    pub fn current_native_handle(dispatcher: Option<Box<GLContextDispatcher>>) -> Option<GLContextFactory> {
         // FIXME(emilio): This assumes a single GL backend per platform which is
         // not true on Linux, we probably need a third `Egl` variant or abstract
         // it a bit more...
-        NativeGLContext::current_handle().map(|handle| {
+        NativeGLContext::current_handle().map(|handle| GLContextFactory::Native(handle, dispatcher)/*{
             if cfg!(target_os = "windows") /*&& !cfg!(feature = "no_wgl")*/ {
                 // Used to dispatch functions from the GLContext thread to the main thread's event loop.
                 // Required to allow WGL GLContext sharing in Windows.
@@ -40,7 +40,7 @@ impl GLContextFactory {
             } else {
                 GLContextFactory::Native(handle, None)
             }
-        })
+        }*/)
     }
 
     /// Creates a new GLContextFactory that uses the currently bound OSMesa context to create shared contexts.
@@ -58,7 +58,8 @@ impl GLContextFactory {
         let attributes = map_attrs(attributes);
         Ok(match *self {
             GLContextFactory::Native(ref handle, ref dispatcher) => {
-                let dispatcher = dispatcher.as_ref().map(|d| Box::new(d.clone()) as Box<_>);
+                //let dispatcher = dispatcher.as_ref().map(|d| Box::new(d.clone()) as Box<_>);
+                let dispatcher = dispatcher.as_ref().map(|d| GLContextDispatcher::clone(&**d));
                 GLContextWrapper::Native(GLContext::new_shared_with_dispatcher(
                     // FIXME(nox): Why are those i32 values?
                     size.to_i32(),
@@ -212,29 +213,6 @@ impl GLContextWrapper {
                 ctx.resize(size.to_i32())
             },
         }
-    }
-}
-
-/// Implements GLContextDispatcher to dispatch functions from GLContext threads to the main thread's event loop.
-/// It's used in Windows to allow WGL GLContext sharing.
-#[derive(Clone)]
-pub struct MainThreadDispatcher {
-    compositor_proxy: Arc<Mutex<CompositorProxy>>,
-}
-
-impl MainThreadDispatcher {
-    fn new(proxy: CompositorProxy) -> Self {
-        Self {
-            compositor_proxy: Arc::new(Mutex::new(proxy)),
-        }
-    }
-}
-impl GLContextDispatcher for MainThreadDispatcher {
-    fn dispatch(&self, f: Box<dyn Fn() + Send>) {
-        self.compositor_proxy
-            .lock()
-            .unwrap()
-            .send(compositor_thread::Msg::Dispatch(f));
     }
 }
 

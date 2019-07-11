@@ -206,7 +206,7 @@ pub struct IOCompositor<Window: WindowMethods + ?Sized> {
     convert_mouse_to_touch: bool,
 
     /// Ratio of device pixels per px at the default scale.
-    device_pixels_per_px: Option<f32>,
+    device_pixels_per_px: Option<f32>,    
 }
 
 #[derive(Clone, Copy)]

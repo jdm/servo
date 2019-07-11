@@ -63,9 +63,9 @@ fn webdriver(_port: u16, _constellation: Sender<ConstellationMsg>) {}
 use bluetooth::BluetoothThreadFactory;
 use bluetooth_traits::BluetoothRequest;
 use canvas::gl_context::GLContextFactory;
-use canvas::webgl_thread::WebGLThreads;
+use canvas::webgl_thread::{WebGLThreads, WebGLThread};
 use compositing::compositor_thread::{
-    CompositorProxy, CompositorReceiver, InitialCompositorState, Msg,
+    self, CompositorProxy, CompositorReceiver, InitialCompositorState, Msg,
 };
 use compositing::windowing::{EmbedderMethods, WindowEvent, WindowMethods};
 use compositing::{CompositingReason, IOCompositor, ShutdownState};
@@ -96,6 +96,7 @@ use log::{Log, Metadata, Record};
 use msg::constellation_msg::{PipelineNamespace, PipelineNamespaceId};
 use net::resource_thread::new_resource_threads;
 use net_traits::IpcSend;
+use offscreen_gl_context::GLContextDispatcher;
 use profile::mem as profile_mem;
 use profile::time as profile_time;
 use profile_traits::mem;
@@ -108,6 +109,8 @@ use std::borrow::Cow;
 use std::cmp::max;
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::sync::Arc;
+use std::sync::Mutex;
 use webrender::{RendererKind, ShaderPrecacheFlags};
 use webvr::{VRServiceManager, WebVRCompositorHandler, WebVRThread};
 
@@ -221,6 +224,7 @@ pub struct Servo<Window: WindowMethods + 'static + ?Sized> {
     embedder_receiver: EmbedderReceiver,
     embedder_events: Vec<(Option<BrowserId>, EmbedderMsg)>,
     profiler_enabled: bool,
+    webgl_thread_data: Option<WebGLThread>,
 }
 
 #[derive(Clone)]
@@ -271,7 +275,7 @@ where
         let opts = opts::get();
 
         if !opts.multiprocess {
-            media_platform::init();
+            //media_platform::init();
         }
 
         // Make sure the gl context is made current.
@@ -373,7 +377,7 @@ where
         // Create the constellation, which maintains the engine
         // pipelines, including the script and layout threads, as well
         // as the navigation context.
-        let (constellation_chan, sw_senders) = create_constellation(
+        let (constellation_chan, sw_senders, webgl_thread_data) = create_constellation(
             opts.user_agent.clone(),
             opts.config_dir.clone(),
             embedder_proxy.clone(),
@@ -388,6 +392,7 @@ where
             window.gl(),
             webvr_services,
             webxr_registry,
+            embedder.create_event_loop_waker(),
         );
 
         // Send the constellation's swmanager sender to service worker manager thread
@@ -419,14 +424,16 @@ where
             opts.exit_after_load,
             opts.convert_mouse_to_touch,
             opts.device_pixels_per_px,
+            //webgl_thread_data,
         );
-
+        
         Servo {
             compositor: compositor,
             constellation_chan: constellation_chan,
             embedder_receiver: embedder_receiver,
             embedder_events: Vec::new(),
             profiler_enabled: false,
+            webgl_thread_data,
         }
     }
 
@@ -618,17 +625,28 @@ where
     }
 
     pub fn handle_events(&mut self, events: Vec<WindowEvent>) {
+    info!("handling servo events");
+        if let Some(ref mut webgl_thread) = self.webgl_thread_data {
+            info!("processing webgl messages");
+            webgl_thread.process();
+            info!("done processing webgl messages");
+        }
+
+info!("checking compositor messages");
         if self.compositor.receive_messages() {
             self.receive_messages();
         }
+        info!("handling window events");
         for event in events {
             self.handle_window_event(event);
         }
         if self.compositor.shutdown_state != ShutdownState::FinishedShuttingDown {
+        info!("performing compositor updates");
             self.compositor.perform_updates();
         } else {
             self.embedder_events.push((None, EmbedderMsg::Shutdown));
         }
+        info!("done handling events");
     }
 
     pub fn repaint_synchronously(&mut self) {
@@ -683,6 +701,34 @@ fn create_compositor_channel(
     )
 }
 
+/// Implements GLContextDispatcher to dispatch functions from GLContext threads to the main thread's event loop.
+/// It's used in Windows to allow WGL GLContext sharing.
+#[derive(Clone)]
+pub struct MainThreadDispatcher {
+    compositor_proxy: Arc<Mutex<CompositorProxy>>,
+}
+
+impl MainThreadDispatcher {
+    fn new(proxy: CompositorProxy) -> Self {
+        Self {
+            compositor_proxy: Arc::new(Mutex::new(proxy)),
+        }
+    }
+}
+impl GLContextDispatcher for MainThreadDispatcher {
+    fn dispatch(&self, f: Box<dyn Fn() + Send>) {
+        self.compositor_proxy
+            .lock()
+            .unwrap()
+            .send(compositor_thread::Msg::Dispatch(f));
+    }
+    fn clone(&self) -> Box<GLContextDispatcher> {
+        Box::new(MainThreadDispatcher {
+            compositor_proxy: self.compositor_proxy.clone(),
+        })
+    }
+}
+
 fn create_constellation(
     user_agent: Cow<'static, str>,
     config_dir: Option<PathBuf>,
@@ -698,7 +744,8 @@ fn create_constellation(
     window_gl: Rc<dyn gl::Gl>,
     webvr_services: Option<VRServiceManager>,
     webxr_registry: webxr_api::Registry,
-) -> (Sender<ConstellationMsg>, SWManagerSenders) {
+    event_loop_waker: Box<dyn EventLoopWaker>,
+) -> (Sender<ConstellationMsg>, SWManagerSenders, Option<WebGLThread>) {
     // Global configuration options, parsed from the command line.
     let opts = opts::get();
 
@@ -740,16 +787,22 @@ fn create_constellation(
     let gl_factory = if opts.should_use_osmesa() {
         GLContextFactory::current_osmesa_handle()
     } else {
-        GLContextFactory::current_native_handle(&compositor_proxy)
+        let dispatcher = if cfg!(target_os = "windows") {
+            Some(Box::new(MainThreadDispatcher::new(compositor_proxy.clone())) as Box<_>)
+        } else {
+            None
+        };
+        GLContextFactory::current_native_handle(dispatcher)
     };
 
     // Initialize WebGL Thread entry point.
-    let webgl_threads = gl_factory.map(|factory| {
-        let (webgl_threads, image_handler, output_handler) = WebGLThreads::new(
+    let webgl_result = gl_factory.map(|factory| {
+        let (webgl_threads, thread_data, image_handler, output_handler) = WebGLThreads::new(
             factory,
             window_gl,
             webrender_api_sender.clone(),
             webvr_compositor.map(|c| c as Box<_>),
+            event_loop_waker,
         );
 
         // Set webrender external image handler for WebGL textures
@@ -760,8 +813,12 @@ fn create_constellation(
             webrender.set_output_image_handler(output_handler);
         }
 
-        webgl_threads
+        (webgl_threads, thread_data)
     });
+    let (webgl_threads, thread_data) = match webgl_result {
+        Some((a, b)) => (Some(a), Some(b)),
+        None => (None, None),
+    };
 
     let initial_state = InitialConstellationState {
         compositor_proxy,
@@ -808,7 +865,7 @@ fn create_constellation(
         resource_sender: resource_sender,
     };
 
-    (constellation_chan, sw_senders)
+    (constellation_chan, sw_senders, thread_data)
 }
 
 // A logger that logs to two downstream loggers.
@@ -877,7 +934,7 @@ pub fn run_content_process(token: String) {
     script::init();
     script::init_service_workers(sw_senders);
 
-    media_platform::init();
+    //media_platform::init();
 
     unprivileged_content.start_all::<script_layout_interface::message::Msg,
                                      layout_thread::LayoutThread,
