@@ -3,7 +3,9 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 use crate::gl_context::GLContextFactory;
-use crate::webgl_thread::{TexturesMap, WebGLMainThread, WebGLThread, WebGLThreadInit};
+use crate::webgl_thread::{
+    ContextRenderState, TexturesMap, WebGLMainThread, WebGLThread, WebGLThreadInit
+};
 use canvas_traits::webgl::webgl_channel;
 use canvas_traits::webgl::DOMToTextureCommand;
 use canvas_traits::webgl::{WebGLChan, WebGLContextId, WebGLMsg, WebGLPipeline, WebGLReceiver};
@@ -13,8 +15,6 @@ use euclid::Size2D;
 use fnv::FnvHashMap;
 use gleam::gl;
 use servo_config::pref;
-use std::cell::RefCell;
-use std::collections::HashMap;
 use std::default::Default;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
@@ -66,9 +66,8 @@ impl WebGLThreads {
 
         let (external, webgl_thread) = match mode {
             ThreadMode::MainThread(event_loop_waker) => {
-                let textures = Rc::new(RefCell::new(HashMap::new()));
-                let thread_data =
-                    WebGLThread::run_on_current_thread(init, event_loop_waker, textures.clone());
+                let (thread_data, textures) =
+                    WebGLThread::run_on_current_thread(init, event_loop_waker);
                 (
                     WebGLExternalImages::new_main_thread(textures),
                     Some(thread_data),
@@ -165,9 +164,10 @@ impl WebrenderExternalImageApi for WebGLExternalImages {
                 let entry = textures
                     .get_mut(&WebGLContextId(id as usize))
                     .expect("no texture entry???");
-                assert!(!entry.2);
-                entry.2 = true;
-                (entry.0, entry.1)
+                let texture_info = entry.texture_info_mut();
+                assert!(texture_info.render_state.is_unlocked());
+                texture_info.render_state = ContextRenderState::Locked(None);
+                (texture_info.texture_id, texture_info.size)
             },
         }
     }
@@ -187,8 +187,9 @@ impl WebrenderExternalImageApi for WebGLExternalImages {
                 let entry = textures
                     .get_mut(&WebGLContextId(id as usize))
                     .expect("no texture entry????");
-                assert!(entry.2);
-                entry.2 = false;
+                let texture_info = entry.texture_info_mut();
+                assert!(texture_info.render_state.is_locked());
+                texture_info.render_state = ContextRenderState::Unlocked;
             }
         }
     }

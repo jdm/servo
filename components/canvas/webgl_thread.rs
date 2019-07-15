@@ -15,7 +15,6 @@ use offscreen_gl_context::{DrawBuffer, GLContext, NativeGLContextMethods};
 use pixels::{self, PixelFormat};
 use std::borrow::Cow;
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::mem;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
@@ -63,7 +62,7 @@ pub(crate) struct WebGLThread {
     /// Map of live WebGLContexts.
     contexts: FnvHashMap<WebGLContextId, GLContextData>,
     /// Cached information for WebGLContexts.
-    cached_context_info: FnvHashMap<WebGLContextId, WebGLContextInfo>,
+    cached_context_info: TexturesMap,
     /// Current bound context.
     bound_context_id: Option<WebGLContextId>,
     /// Handler user to send WebVR commands.
@@ -83,7 +82,7 @@ pub(crate) struct WebGLThread {
 /// Only used for accessing this information when the WebGL processing is run
 /// on the main thread and the compositor needs access to this information
 /// synchronously.
-pub(crate) type TexturesMap = Rc<RefCell<HashMap<WebGLContextId, (u32, Size2D<i32>, bool)>>>;
+pub(crate) type TexturesMap = Rc<RefCell<FnvHashMap<WebGLContextId, WebGLContextInfo>>>;
 
 #[derive(PartialEq)]
 enum EventLoop {
@@ -106,7 +105,6 @@ pub(crate) struct WebGLThreadInit {
 pub struct WebGLMainThread {
     thread_data: WebGLThread,
     shut_down: bool,
-    textures: TexturesMap,
 }
 
 impl WebGLMainThread {
@@ -120,7 +118,7 @@ impl WebGLMainThread {
         self.thread_data.bound_context_id = None;
         self.shut_down = !self
             .thread_data
-            .process(EventLoop::Nonblocking, Some(self.textures.clone()))
+            .process(EventLoop::Nonblocking)
     }
 }
 
@@ -157,8 +155,7 @@ impl WebGLThread {
     pub(crate) fn run_on_current_thread(
         mut init: WebGLThreadInit,
         event_loop_waker: Box<dyn EventLoopWaker>,
-        textures: TexturesMap,
-    ) -> WebGLMainThread {
+    ) -> (WebGLMainThread, TexturesMap) {
         // Interpose a new channel in between the existing WebGL channel endpoints.
         // This will bounce all WebGL messages through a second thread adding a small
         // delay, but this will also ensure that the main thread will wake up and
@@ -178,11 +175,15 @@ impl WebGLThread {
             })
             .expect("Thread spawning failed");
 
-        WebGLMainThread {
-            thread_data,
+        let textures = thread_data.cached_context_info.clone();
+
+        (
+            WebGLMainThread {
+                thread_data,
+                shut_down: false,
+            },
             textures,
-            shut_down: false,
-        }
+        )
     }
 
     /// Perform all initialization required to run an instance of WebGLThread
@@ -192,18 +193,18 @@ impl WebGLThread {
             .name("WebGL thread".to_owned())
             .spawn(move || {
                 let mut data = WebGLThread::new(init);
-                data.process(EventLoop::Blocking, None);
+                data.process(EventLoop::Blocking);
             })
             .expect("Thread spawning failed");
     }
 
-    fn process(&mut self, loop_type: EventLoop, textures: Option<TexturesMap>) -> bool {
+    fn process(&mut self, loop_type: EventLoop) -> bool {
         let webgl_chan = WebGLChan(self.sender.clone());
         while let Ok(msg) = match loop_type {
             EventLoop::Blocking => self.receiver.recv(),
             EventLoop::Nonblocking => self.receiver.try_recv(),
         } {
-            let exit = self.handle_msg(msg, &webgl_chan, textures.as_ref());
+            let exit = self.handle_msg(msg, &webgl_chan);
             if exit {
                 return false;
             }
@@ -216,12 +217,11 @@ impl WebGLThread {
         &mut self,
         msg: WebGLMsg,
         webgl_chan: &WebGLChan,
-        textures: Option<&TexturesMap>,
     ) -> bool {
         trace!("processing {:?}", msg);
         match msg {
             WebGLMsg::CreateContext(version, size, attributes, result_sender) => {
-                let result = self.create_webgl_context(version, size, attributes, textures);
+                let result = self.create_webgl_context(version, size, attributes);
                 result_sender
                     .send(result.map(|(id, limits, share_mode, receiver)| {
                         let data = Self::make_current_if_needed(
@@ -267,16 +267,16 @@ impl WebGLThread {
                     .unwrap();
             },
             WebGLMsg::ResizeContext(ctx_id, size, sender) => {
-                self.resize_webgl_context(ctx_id, size, sender, textures);
+                self.resize_webgl_context(ctx_id, size, sender);
             },
             WebGLMsg::RemoveContext(ctx_id) => {
-                self.remove_webgl_context(ctx_id, textures);
+                self.remove_webgl_context(ctx_id);
             },
             WebGLMsg::WebGLCommand(ctx_id, command, backtrace) => {
                 self.handle_webgl_command(ctx_id, command, backtrace);
             },
             WebGLMsg::PresentWebGLFrame(ctx_id) => {
-                self.handle_present_webgl_frame(ctx_id, textures);
+                self.handle_present_webgl_frame(ctx_id);
             }
             WebGLMsg::WebVRCommand(ctx_id, command) => {
                 self.handle_webvr_command(ctx_id, command);
@@ -307,15 +307,11 @@ impl WebGLThread {
     fn handle_present_webgl_frame(
         &mut self,
         context_id: WebGLContextId,
-        textures: Option<&TexturesMap>,
     ) {
-        let info = self.cached_context_info.get_mut(&context_id).unwrap();
-        if let ContextRenderState::Locked(..) = info.render_state {
-            warn!("tried to swap while locked");
-            return;
-        }
-        if textures.as_ref().map_or(false, |t| t.borrow().get(&context_id).map_or(false, |c| c.2)) {
-            warn!("tried to swap while locked #2");
+        let mut cached_context_info = self.cached_context_info.borrow_mut();
+        let info = cached_context_info.get_mut(&context_id).unwrap();
+        if info.texture_info.render_state.is_locked() {
+            info!("tried to swap while locked; ignoring.");
             return;
         }
         let new_texture = match Self::make_current_if_needed_mut(
@@ -327,11 +323,11 @@ impl WebGLThread {
                 match info.share_mode {
                     WebGLContextShareMode::Readback => {
                         // Obtain the pixels for the current frame and notify webrender.
-                        let pixels = Self::raw_pixels(&data.ctx, info.size);
+                        let pixels = Self::raw_pixels(&data.ctx, info.texture_info.size);
                         if let Some(image_key) = info.image_key {
                             Self::update_wr_readback_image(
                                 &self.webrender_api,
-                                info.size,
+                                info.texture_info.size,
                                 info.alpha,
                                 image_key,
                                 pixels,
@@ -339,7 +335,7 @@ impl WebGLThread {
                         } else {
                             info.image_key = Some(Self::create_wr_readback_image(
                                 &self.webrender_api,
-                                info.size,
+                                info.texture_info.size,
                                 info.alpha,
                                 pixels,
                             ));
@@ -348,7 +344,7 @@ impl WebGLThread {
                     WebGLContextShareMode::SharedTexture if info.image_key.is_none() => {
                         info.image_key = Some(Self::create_wr_external_image(
                             &self.webrender_api,
-                            info.size,
+                            info.texture_info.size,
                             info.alpha,
                             context_id
                         ));
@@ -363,10 +359,7 @@ impl WebGLThread {
         };
 
         // Store the texture that represents the complete frame.
-        info.texture_id = new_texture;
-        if let Some(textures) = textures {
-            textures.borrow_mut().insert(context_id, (new_texture, info.size, false));
-        }
+        info.texture_info.texture_id = new_texture;
         if let Some(ref sender) = info.present_notifier {
             let _ = sender.send(());
         }
@@ -395,13 +388,18 @@ impl WebGLThread {
             Self::make_current_if_needed(context_id, &self.contexts, &mut self.bound_context_id)
         {
             let texture = match command {
-                WebVRCommand::SubmitFrame(..) => self.cached_context_info.get(&context_id),
+                WebVRCommand::SubmitFrame(..) => {
+                    let cached_context_info = self.cached_context_info.borrow_mut();
+                    cached_context_info
+                        .get(&context_id)
+                        .map(|t| (t.texture_info.texture_id, t.texture_info.size))
+                }
                 _ => None,
             };
             self.webvr_compositor.as_mut().unwrap().handle(
                 context.ctx.gl(),
                 command,
-                texture.map(|t| (t.texture_id, t.size)),
+                texture,
             );
         }
     }
@@ -429,8 +427,9 @@ impl WebGLThread {
         let data =
             Self::make_current_if_needed(context_id, &self.contexts, &mut self.bound_context_id)
                 .expect("WebGLContext not found in a WebGLMsg::Lock message");
-        let info = self.cached_context_info.get_mut(&context_id).unwrap();
-        info.render_state = ContextRenderState::Locked(None);
+        let mut cached_context_info = self.cached_context_info.borrow_mut();
+        let info = cached_context_info.get_mut(&context_id).unwrap();
+        info.texture_info.render_state = ContextRenderState::Locked(None);
         // Insert a OpenGL Fence sync object that sends a signal when all the WebGL commands are finished.
         // The related gl().wait_sync call is performed in the WR thread. See WebGLExternalImageApi for mor details.
         let gl_sync = data.ctx.gl().fence_sync(gl::SYNC_GPU_COMMANDS_COMPLETE, 0);
@@ -440,7 +439,7 @@ impl WebGLThread {
         data.ctx.gl().flush();
         let gl_sync = 0;
 
-        (info.texture_id, info.size, gl_sync as usize)
+        (info.texture_info.texture_id, info.texture_info.size, gl_sync as usize)
     }
 
     /// Handles an unlock external callback received from webrender::ExternalImageHandler
@@ -448,8 +447,9 @@ impl WebGLThread {
         let data =
             Self::make_current_if_needed(context_id, &self.contexts, &mut self.bound_context_id)
                 .expect("WebGLContext not found in a WebGLMsg::Unlock message");
-        let info = self.cached_context_info.get_mut(&context_id).unwrap();
-        info.render_state = ContextRenderState::Unlocked;
+        let mut cached_context_info = self.cached_context_info.borrow_mut();
+        let info = cached_context_info.get_mut(&context_id).unwrap();
+        info.texture_info.render_state = ContextRenderState::Unlocked;
         if let Some(gl_sync) = info.gl_sync.take() {
             // Release the GLSync object.
             data.ctx.gl().delete_sync(gl_sync);
@@ -462,7 +462,6 @@ impl WebGLThread {
         version: WebGLVersion,
         size: Size2D<u32>,
         attributes: GLContextAttributes,
-        textures: Option<&TexturesMap>,
     ) -> Result<(WebGLContextId, GLLimits, WebGLContextShareMode, Option<ipc::IpcReceiver<()>>), String> {
         // Creating a new GLContext may make the current bound context_id dirty.
         // Clear it to ensure that  make_current() is called in subsequent commands.
@@ -500,10 +499,6 @@ impl WebGLThread {
             },
         );
 
-        if let Some(ref textures) = textures {
-            textures.borrow_mut().insert(id, (texture_id, size, false));
-        }
-
         let (notifier_sender, notifier_receiver) = match share_mode {
             WebGLContextShareMode::SharedTexture => (None, None),
             WebGLContextShareMode::Readback => {
@@ -511,16 +506,18 @@ impl WebGLThread {
                 (Some(sender), Some(receiver))
             }
         };
-        self.cached_context_info.insert(
+        self.cached_context_info.borrow_mut().insert(
             id,
             WebGLContextInfo {
-                texture_id,
-                size,
+                texture_info: ContextTextureInfo {
+                    texture_id,
+                    size,
+                    render_state: ContextRenderState::Unlocked,
+                },
                 alpha: attributes.alpha,
                 image_key: None,
                 share_mode,
                 gl_sync: None,
-                render_state: ContextRenderState::Unlocked,
                 present_notifier: notifier_sender,
             },
         );
@@ -534,7 +531,6 @@ impl WebGLThread {
         context_id: WebGLContextId,
         size: Size2D<u32>,
         sender: WebGLSender<Result<(), String>>,
-        textures: Option<&TexturesMap>,
     ) {
         let data = Self::make_current_if_needed_mut(
             context_id,
@@ -545,8 +541,9 @@ impl WebGLThread {
         match data.ctx.resize(size) {
             Ok(old_draw_buffer) => {
                 let (real_size, texture_id, _) = data.ctx.get_info();
-                let info = self.cached_context_info.get_mut(&context_id).unwrap();
-                if let ContextRenderState::Locked(ref mut in_use) = info.render_state {
+                let mut cached_context_info = self.cached_context_info.borrow_mut();
+                let info = cached_context_info.get_mut(&context_id).unwrap();
+                if let ContextRenderState::Locked(ref mut in_use) = info.texture_info.render_state {
                     // If there's already an outdated draw buffer present, we can ignore
                     // the newly resized one since it's not in use by the renderer.
                     if in_use.is_none() {
@@ -557,15 +554,8 @@ impl WebGLThread {
                     }
                 }
                 // Update webgl texture size. Texture id may change too.
-                info.texture_id = texture_id;
-                info.size = real_size;
-
-                if let Some(ref textures) = textures {
-                    assert!(textures.borrow().get(&context_id).map_or(false, |t| !t.2));
-                    textures
-                        .borrow_mut()
-                        .insert(context_id, (texture_id, real_size, false));
-                }
+                info.texture_info.texture_id = texture_id;
+                info.texture_info.size = real_size;
 
                 // Update WR image if needed. Resize image updates are only required for SharedTexture mode.
                 // Readback mode already updates the image every frame to send the raw pixels.
@@ -574,7 +564,7 @@ impl WebGLThread {
                     (Some(image_key), WebGLContextShareMode::SharedTexture) => {
                         Self::update_wr_external_image(
                             &self.webrender_api,
-                            info.size,
+                            info.texture_info.size,
                             info.alpha,
                             context_id,
                             image_key,
@@ -592,9 +582,10 @@ impl WebGLThread {
     }
 
     /// Removes a WebGLContext and releases attached resources.
-    fn remove_webgl_context(&mut self, context_id: WebGLContextId, textures: Option<&TexturesMap>) {
+    fn remove_webgl_context(&mut self, context_id: WebGLContextId) {
         // Release webrender image keys.
-        if let Some(info) = self.cached_context_info.remove(&context_id) {
+        let mut cached_context_info = self.cached_context_info.borrow_mut();
+        if let Some(info) = cached_context_info.remove(&context_id) {
             let mut txn = webrender_api::Transaction::new();
 
             if let Some(image_key) = info.image_key {
@@ -611,10 +602,6 @@ impl WebGLThread {
         // Release GL context.
         self.contexts.remove(&context_id);
 
-        if let Some(ref textures) = textures {
-            textures.borrow_mut().remove(&context_id);
-        }
-
         // Removing a GLContext may make the current bound context_id dirty.
         self.bound_context_id = None;
     }
@@ -627,7 +614,8 @@ impl WebGLThread {
         context_id: WebGLContextId,
         sender: WebGLSender<webrender_api::ImageKey>,
     ) {
-        let info = self.cached_context_info.get(&context_id).unwrap();
+        let cached_context_info = self.cached_context_info.borrow();
+        let info = cached_context_info.get(&context_id).unwrap();
         let _ = sender.send(info.image_key.expect("no image key for webgl context?"));
     }
 
@@ -881,12 +869,12 @@ impl Drop for WebGLThread {
         // Call remove_context functions in order to correctly delete WebRender image keys.
         let context_ids: Vec<WebGLContextId> = self.contexts.keys().map(|id| *id).collect();
         for id in context_ids {
-            self.remove_webgl_context(id, None);
+            self.remove_webgl_context(id);
         }
     }
 }
 
-enum ContextRenderState {
+pub(crate) enum ContextRenderState {
     /// The context is not being actively rendered.
     Unlocked,
     /// The context is actively being rendered. If a DrawBuffer value is present,
@@ -894,12 +882,23 @@ enum ContextRenderState {
     Locked(Option<DrawBuffer>),
 }
 
+impl ContextRenderState {
+    pub fn is_locked(&self) -> bool {
+        match *self {
+            ContextRenderState::Unlocked => false,
+            ContextRenderState::Locked(..) => true,
+        }
+    }
+
+    pub fn is_unlocked(&self) -> bool {
+        !self.is_locked()
+    }
+}
+
 /// Helper struct to store cached WebGLContext information.
-struct WebGLContextInfo {
-    /// Render to texture identifier used by the WebGLContext.
-    texture_id: u32,
-    /// Size of the WebGLContext.
-    size: Size2D<i32>,
+pub(crate) struct WebGLContextInfo {
+    /// Information about the backing texture for this context.
+    texture_info: ContextTextureInfo,
     /// True if the WebGLContext uses an alpha channel.
     alpha: bool,
     /// Currently used WebRender image key.
@@ -908,10 +907,23 @@ struct WebGLContextInfo {
     share_mode: WebGLContextShareMode,
     /// GLSync Object used for a correct synchronization with Webrender external image callbacks.
     gl_sync: Option<gl::GLsync>,
-    /// The status of this context with respect to external consumers.
-    render_state: ContextRenderState,
     /// Signal that the webgl thread is ready to present a new frame to the compositor.
     present_notifier: Option<ipc::IpcSender<()>>,
+}
+
+pub(crate) struct ContextTextureInfo {
+    /// Render to texture identifier used by the WebGLContext.
+    pub texture_id: u32,
+    /// Size of the WebGLContext.
+    pub size: Size2D<i32>,
+    /// The status of this context with respect to external consumers.
+    pub render_state: ContextRenderState,
+}
+
+impl WebGLContextInfo {
+    pub fn texture_info_mut(&mut self) -> &mut ContextTextureInfo {
+        &mut self.texture_info
+    }
 }
 
 /// Data about the linked DOM<->WebGLTexture elements.
