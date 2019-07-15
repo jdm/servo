@@ -83,7 +83,7 @@ pub(crate) struct WebGLThread {
 /// Only used for accessing this information when the WebGL processing is run
 /// on the main thread and the compositor needs access to this information
 /// synchronously.
-pub(crate) type TexturesMap = Rc<RefCell<HashMap<WebGLContextId, (u32, Size2D<i32>)>>>;
+pub(crate) type TexturesMap = Rc<RefCell<HashMap<WebGLContextId, (u32, Size2D<i32>, bool)>>>;
 
 #[derive(PartialEq)]
 enum EventLoop {
@@ -276,7 +276,7 @@ impl WebGLThread {
                 self.handle_webgl_command(ctx_id, command, backtrace);
             },
             WebGLMsg::PresentWebGLFrame(ctx_id) => {
-                self.handle_present_webgl_frame(ctx_id);
+                self.handle_present_webgl_frame(ctx_id, textures);
             }
             WebGLMsg::WebVRCommand(ctx_id, command) => {
                 self.handle_webvr_command(ctx_id, command);
@@ -307,8 +307,17 @@ impl WebGLThread {
     fn handle_present_webgl_frame(
         &mut self,
         context_id: WebGLContextId,
+        textures: Option<&TexturesMap>,
     ) {
         let info = self.cached_context_info.get_mut(&context_id).unwrap();
+        if let ContextRenderState::Locked(..) = info.render_state {
+            warn!("tried to swap while locked");
+            return;
+        }
+        if textures.as_ref().map_or(false, |t| t.borrow().get(&context_id).map_or(false, |c| c.2)) {
+            warn!("tried to swap while locked #2");
+            return;
+        }
         let new_texture = match Self::make_current_if_needed_mut(
             context_id,
             &mut self.contexts,
@@ -355,6 +364,9 @@ impl WebGLThread {
 
         // Store the texture that represents the complete frame.
         info.texture_id = new_texture;
+        if let Some(textures) = textures {
+            textures.borrow_mut().insert(context_id, (new_texture, info.size, false));
+        }
         if let Some(ref sender) = info.present_notifier {
             let _ = sender.send(());
         }
@@ -489,7 +501,7 @@ impl WebGLThread {
         );
 
         if let Some(ref textures) = textures {
-            textures.borrow_mut().insert(id, (texture_id, size));
+            textures.borrow_mut().insert(id, (texture_id, size, false));
         }
 
         let (notifier_sender, notifier_receiver) = match share_mode {
@@ -549,9 +561,10 @@ impl WebGLThread {
                 info.size = real_size;
 
                 if let Some(ref textures) = textures {
+                    assert!(textures.borrow().get(&context_id).map_or(false, |t| !t.2));
                     textures
                         .borrow_mut()
-                        .insert(context_id, (texture_id, real_size));
+                        .insert(context_id, (texture_id, real_size, false));
                 }
 
                 // Update WR image if needed. Resize image updates are only required for SharedTexture mode.

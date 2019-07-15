@@ -161,10 +161,12 @@ impl WebrenderExternalImageApi for WebGLExternalImages {
             },
 
             WebGLExternalImages::MainThread { ref textures } => {
-                let textures = textures.borrow();
+                let mut textures = textures.borrow_mut();
                 let entry = textures
-                    .get(&WebGLContextId(id as usize))
+                    .get_mut(&WebGLContextId(id as usize))
                     .expect("no texture entry???");
+                assert!(!entry.2);
+                entry.2 = true;
                 (entry.0, entry.1)
             },
         }
@@ -180,7 +182,14 @@ impl WebrenderExternalImageApi for WebGLExternalImages {
                     .unwrap();
             },
 
-            WebGLExternalImages::MainThread { .. } => {},
+            WebGLExternalImages::MainThread { ref textures } => {
+                let mut textures = textures.borrow_mut();
+                let entry = textures
+                    .get_mut(&WebGLContextId(id as usize))
+                    .expect("no texture entry????");
+                assert!(entry.2);
+                entry.2 = false;
+            }
         }
     }
 }
