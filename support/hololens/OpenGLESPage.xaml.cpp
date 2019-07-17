@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+#include <atomic>
 #include "pch.h"
 #include "OpenGLESPage.xaml.h"
 #include "Servo.h"
@@ -10,6 +11,7 @@ using namespace hlservo;
 using namespace Platform;
 using namespace Concurrency;
 using namespace Windows::Foundation;
+using namespace Windows::Foundation::Collections;
 
 static char sWakeupEvent[] = "SIGNAL_WAKEUP";
 
@@ -118,9 +120,9 @@ void OpenGLESPage::StartRenderLoop()
       EGLint panelHeight = 0;
       mOpenGLES->GetSurfaceDimensions(mRenderSurface, &panelWidth, &panelHeight);
       glViewport(0, 0, panelWidth, panelHeight);
-      mServo = new Servo(panelWidth, panelHeight);
+      mServo.reset(new Servo(panelWidth, panelHeight));
 
-      while (action->Status == Windows::Foundation::AsyncStatus::Started) {
+      while (action->Status == Windows::Foundation::AsyncStatus::Started && !mTerminate.load()) {
         // Block until Servo::sWakeUp is called.
         // Or run full speed if animating (see on_animating_changed),
         // it will endup blocking on SwapBuffers to limit rendering to 60FPS
@@ -129,6 +131,8 @@ void OpenGLESPage::StartRenderLoop()
         }
         mServo->PerformUpdates();
       }
+
+      mServo.reset(nullptr);
     };
 
     auto workItemHandler = ref new Windows::System::Threading::WorkItemHandler(loop);
@@ -147,8 +151,29 @@ void OpenGLESPage::StartRenderLoop()
 
 void OpenGLESPage::StopRenderLoop()
 {
+    mTerminate.store(true);
+    Servo::sWakeUp();
     if (mRenderLoopWorker) {
         mRenderLoopWorker->Cancel();
         mRenderLoopWorker = nullptr;
     }
 }
+
+// Saves the current state of the app for suspend and terminate events.
+void OpenGLESPage::SaveInternalState(IPropertySet^ state)
+{
+	// Stop rendering when the app is suspended.
+	StopRenderLoop();
+
+	// Put code to save app state here.
+}
+
+// Loads the current state of the app for resume events.
+void OpenGLESPage::LoadInternalState(IPropertySet^ state)
+{
+	// Put code to load app state here.
+
+	// Start rendering when the app is resumed.
+	StartRenderLoop();
+}
+

@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <atomic>
 #include "OpenGLES.h"
 #include "OpenGLESPage.g.h"
 #include "Servo.h"
@@ -16,6 +17,9 @@ public:
     virtual ~OpenGLESPage();
 
     internal : OpenGLESPage(OpenGLES* openGLES);
+
+	void SaveInternalState(Windows::Foundation::Collections::IPropertySet^ state);
+	void LoadInternalState(Windows::Foundation::Collections::IPropertySet^ state);
 
 private:
     void OnPageLoaded(Platform::Object ^ sender, Windows::UI::Xaml::RoutedEventArgs ^ e);
@@ -32,6 +36,7 @@ private:
     EGLSurface mRenderSurface;
     Concurrency::critical_section mRenderSurfaceCriticalSection;
     Windows::Foundation::IAsyncAction ^ mRenderLoopWorker;
-    Servo* mServo;
+    std::unique_ptr<Servo> mServo;
+    std::atomic<bool> mTerminate;
 };
 }
