@@ -54,7 +54,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="ServoApp_TemporaryKey.pfx" />
-    <None Include="packages.config" />
     <None Include="..\..\target\debug\api-ms-win-crt-runtime-l1-1-0.dll">
       <Filter>ServoDLLsDebug</Filter>
     </None>
@@ -397,6 +396,34 @@
     <None Include="..\..\target\debug\simpleservo.dll">
       <Filter>ServoDLLsDebug</Filter>
     </None>
+    <None Include="..\..\target\aarch64-pc-windows-msvc\debug\libeay32.dll">
+      <Filter>ServoDLLsARM64Debug</Filter>
+    </None>
+    <None Include="..\..\target\aarch64-pc-windows-msvc\debug\msvcp140.dll">
+      <Filter>ServoDLLsARM64Debug</Filter>
+    </None>
+    <None Include="..\..\target\aarch64-pc-windows-msvc\debug\simpleservo.dll">
+      <Filter>ServoDLLsARM64Debug</Filter>
+    </None>
+    <None Include="..\..\target\aarch64-pc-windows-msvc\debug\vcruntime140.dll">
+      <Filter>ServoDLLsARM64Debug</Filter>
+    </None>
+    <None Include="packages.config" />
+    <None Include="..\..\target\aarch64-pc-windows-msvc\release\libeay32.dll">
+      <Filter>ServoDLLsARM64Release</Filter>
+    </None>
+    <None Include="..\..\target\aarch64-pc-windows-msvc\release\msvcp140.dll">
+      <Filter>ServoDLLsARM64Release</Filter>
+    </None>
+    <None Include="..\..\target\aarch64-pc-windows-msvc\release\simpleservo.dll">
+      <Filter>ServoDLLsARM64Release</Filter>
+    </None>
+    <None Include="..\..\target\aarch64-pc-windows-msvc\release\ssleay32.dll">
+      <Filter>ServoDLLsARM64Release</Filter>
+    </None>
+    <None Include="..\..\target\aarch64-pc-windows-msvc\release\vcruntime140.dll">
+      <Filter>ServoDLLsARM64Release</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Assets">
@@ -410,6 +437,12 @@
     </Filter>
     <Filter Include="ServoDLLsRelease">
       <UniqueIdentifier>{96a56d11-301b-46ec-b081-50010b467ebf}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ServoDLLsARM64Debug">
+      <UniqueIdentifier>{2119e0b5-47d2-48f9-b2a7-3f7b81466159}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ServoDLLsARM64Release">
+      <UniqueIdentifier>{f6acf137-4431-4aef-b743-84416e69be43}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

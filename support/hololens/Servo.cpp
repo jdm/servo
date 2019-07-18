@@ -44,7 +44,7 @@ Servo::Servo(GLsizei width, GLsizei height)
   , mWindowHeight(height)
   , mWindowWidth(width) {
 
-  CInitOptions o;
+  /*CInitOptions o;
   o.args = NULL;
   //o.url = "http://example.com";
   o.url = "https://mdn.github.io/webgl-examples/tutorial/sample4/";
@@ -64,7 +64,7 @@ Servo::Servo(GLsizei width, GLsizei height)
   c.on_animating_changed = &on_animating_changed;
   c.on_shutdown_complete = &on_shutdown_complete;
 
-  init_with_egl(o, &wakeup, c);
+  init_with_egl(o, &wakeup, c);*/
 }
 
 Servo::~Servo() {
@@ -72,13 +72,13 @@ Servo::~Servo() {
 }
 
 void Servo::PerformUpdates() {
-  perform_updates();
+  //perform_updates();
 }
 
 void Servo::SetSize(GLsizei width, GLsizei height) {
   if (width != mWindowWidth || height != mWindowHeight) {
     mWindowWidth = width;
     mWindowHeight = height;
-    resize(mWindowWidth, mWindowHeight);
+    //resize(mWindowWidth, mWindowHeight);
   }
 }
