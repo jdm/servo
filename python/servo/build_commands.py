@@ -541,6 +541,8 @@ class MachCommands(CommandBase):
         if sys.platform == "win32":
             env.setdefault("CC", "clang-cl.exe")
             env.setdefault("CXX", "clang-cl.exe")
+            vcinstalldir = env.get("VCINSTALLDIR", None)
+            del env["VCINSTALLDIR"]
         else:
             env.setdefault("CC", "clang")
             env.setdefault("CXX", "clang++")
@@ -609,7 +611,7 @@ class MachCommands(CommandBase):
                     if not package_gstreamer_dlls(servo_exe_dir, target_triple, uwp):
                         status = 1
                 print("Packaging MSVC DLLs")
-                if not package_msvc_dlls(servo_exe_dir, target_triple):
+                if not package_msvc_dlls(servo_exe_dir, target_triple, vcinstalldir):
                     status = 1
 
             elif sys.platform == "darwin":
@@ -799,7 +801,7 @@ def package_gstreamer_dlls(servo_exe_dir, target, uwp):
     return not missing
 
 
-def package_msvc_dlls(servo_exe_dir, target):
+def package_msvc_dlls(servo_exe_dir, target, vcinstalldir):
     # copy some MSVC DLLs to servo.exe dir
     msvc_redist_dir = None
     vs_platforms = {
@@ -809,7 +811,7 @@ def package_msvc_dlls(servo_exe_dir, target):
     }
     target_arch = target.split('-')[0]
     vs_platform = vs_platforms[target_arch]
-    vc_dir = os.environ.get("VCINSTALLDIR", "") or os.environ.get("VCINSTALLDIR_SERVO")
+    vc_dir = vcinstalldir or os.environ.get("VCINSTALLDIR", "") or os.environ.get("VCINSTALLDIR_SERVO")
     vs_version = os.environ.get("VisualStudioVersion", "")
     msvc_deps = [
         "msvcp140.dll",
