@@ -311,7 +311,7 @@ impl WebGLThread {
         let mut cached_context_info = self.cached_context_info.borrow_mut();
         let info = cached_context_info.get_mut(&context_id).unwrap();
         if info.texture_info.render_state.is_locked() {
-            info!("tried to swap while locked; ignoring.");
+            warn!("tried to swap while locked; ignoring.");
             return;
         }
         let new_texture = match Self::make_current_if_needed_mut(
@@ -351,6 +351,8 @@ impl WebGLThread {
                     }
                     WebGLContextShareMode::SharedTexture => {}
                 }
+                
+                data.ctx.gl().finish();
 
                 // Swap the backing textures now that this frame is complete.
                 data.ctx.swap_draw_buffer(data.state.clear_color)
