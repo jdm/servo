@@ -48,6 +48,9 @@ capture_webrender/
 
 support/hololens/x64/
 support/hololens/ARM/
+support/hololens/ARM64/
+support/hololens/AppPackages/
+support/hololens/BundleArtifacts/
 support/hololens/Generated\ Files
 
 # Ignore thumbnails created by Windows
