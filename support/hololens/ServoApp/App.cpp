@@ -6,10 +6,13 @@
 #include "App.h"
 #include "BrowserPage.h"
 
+#include "winrt/Windows.UI.ViewManagement.h"
+
 using namespace winrt::Windows::ApplicationModel;
 using namespace winrt::Windows::ApplicationModel::Activation;
 using namespace winrt::Windows::Foundation;
 using namespace winrt::Windows::UI::Xaml;
+using namespace winrt::Windows::UI::ViewManagement;
 using namespace winrt::Windows::UI::Xaml::Controls;
 using namespace winrt::Windows::UI::Xaml::Navigation;
 using namespace winrt::ServoApp;
@@ -17,6 +20,10 @@ using namespace winrt::ServoApp::implementation;
 
 App::App() {
   InitializeComponent();
+  ApplicationView::PreferredLaunchViewSize(Size(1600, 1000));
+  ApplicationView::PreferredLaunchWindowingMode(
+      ApplicationViewWindowingMode::PreferredLaunchViewSize);
+
   Suspending({this, &App::OnSuspending});
 
 #if defined _DEBUG &&                                                          \

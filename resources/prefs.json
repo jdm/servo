@@ -30,7 +30,7 @@
   "dom.webvr.enabled": false,
   "dom.webvr.event_polling_interval": 500,
   "dom.webvr.test": false,
-  "dom.webxr.enabled": false,
+  "dom.webxr.enabled": true,
   "dom.webxr.glwindow": false,
   "dom.webxr.test": false,
   "dom.worklet.timeout_ms": 10,
