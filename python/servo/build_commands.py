@@ -235,7 +235,8 @@ class MachCommands(CommandBase):
         env["CARGO_TARGET_DIR"] = target_path
 
         host = host_triple()
-        if 'apple-darwin' in host and (not target or target == host):
+        target_triple = target or host_triple()
+        if 'apple-darwin' in target_triple:
             if 'CXXFLAGS' not in env:
                 env['CXXFLAGS'] = ''
             env["CXXFLAGS"] += "-mmacosx-version-min=10.10"
@@ -246,14 +247,24 @@ class MachCommands(CommandBase):
 
             # Ensure that the NuGet ANGLE package containing libEGL is accessible
             # to the Rust linker.
-            append_to_path_env(
-                path.join(
-                    os.getcwd(), "support", "hololens", "packages",
-                    "ANGLE.WindowsStore.2.1.13", "bin", "UAP", "x64"
-                ),
-                env,
-                "LIB"
-            )
+            #append_to_path_env(
+            #    path.join(
+            #        os.getcwd(), "support", "hololens", "packages",
+            #        "ANGLE.WindowsStore.2.1.13", "bin", "UAP", "x64"
+            #    ),
+            #    env,
+            #    "LIB"
+            #)
+            base_angle_path = path.join(os.getcwd(), "..", "angle", "winrt", "10", "src")
+            angle_kind = "Debug" if dev else "Release"
+            if "aarch64" in target_triple:
+                arch_dir = "ARM64"
+            elif "x86_64" in target_triple:
+                arch_dir = "x64"
+            else:
+                print("Unsupported UWP target: " + target_triple)
+                return 0
+            append_to_path_env(path.join(base_angle_path, "%s_%s" % (angle_kind, arch_dir), "lib"), env, "LIB")
 
         if android:
             if "ANDROID_NDK" not in env:
@@ -605,7 +616,6 @@ class MachCommands(CommandBase):
                     package_generated_shared_libraries(["libEGL.dll", "libGLESv2.dll"], build_path, servo_exe_dir)
 
                 # copy needed gstreamer DLLs in to servo.exe dir
-                target_triple = target or host_triple()
                 if "aarch64" not in target_triple:
                     print("Packaging gstreamer DLLs")
                     if not package_gstreamer_dlls(servo_exe_dir, target_triple, uwp):
