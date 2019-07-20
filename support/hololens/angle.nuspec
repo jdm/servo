@@ -1,0 +1,65 @@
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+    <metadata>
+        <id>ANGLE.WindowsStore.Servo</id>
+        <version>0.0.0-SpecifyVersionOnCommandline</version>
+        <title>Servo's fork of ANGLE for Windows Store (UWP)</title>
+        <authors>Microsoft & the Servo team</authors>
+        <owners>jdm</owners>
+        <description>Runs OpenGL ES content on Windows by translating OpenGL ES API calls to DirectX 11 API calls.
+Targets Universal Windows 10 apps (UWP). See 'ANGLE.WindowsStore' for non-ARM64 apps.</description>
+        <projectUrl>http://github.com/microsoft/angle/wiki</projectUrl>
+        <licenseUrl>http://github.com/microsoft/angle/blob/ms-master/LICENSE</licenseUrl>
+        <requireLicenseAcceptance>false</requireLicenseAcceptance>
+        <copyright>Copyright (C) 2002-2013 The ANGLE Project Authors. Portions Copyright (C) Microsoft Corporation.</copyright>
+        <tags>OpenGL ES GLES GLSL Direct3D graphics 3D</tags>
+    </metadata>
+
+    <files>
+      <!-- UAP -->
+      <file src="$bin$\10\src\Release_Win32\libEGL.dll" target="bin\UAP\Win32" />
+      <file src="$bin$\10\src\Release_Win32\libGLESv2.dll" target="bin\UAP\Win32" />
+      <file src="..\Enlistment\winrt\10\src\Release_Win32\lib\libEGL.lib" target="bin\UAP\Win32" />
+      <file src="..\Enlistment\winrt\10\src\Release_Win32\lib\libGLESv2.lib" target="bin\UAP\Win32" />
+
+      <file src="$bin$\10\src\Release_x64\libEGL.dll" target="bin\UAP\x64" />
+      <file src="$bin$\10\src\Release_x64\libGLESv2.dll" target="bin\UAP\x64" />
+      <file src="..\Enlistment\winrt\10\src\Release_x64\lib\libEGL.lib" target="bin\UAP\x64" />
+      <file src="..\Enlistment\winrt\10\src\Release_x64\lib\libGLESv2.lib" target="bin\UAP\x64" />
+
+      <file src="$bin$\10\src\Release_ARM\libEGL.dll" target="bin\UAP\ARM" />
+      <file src="$bin$\10\src\Release_ARM\libGLESv2.dll" target="bin\UAP\ARM" />
+      <file src="..\Enlistment\winrt\10\src\Release_ARM\lib\libEGL.lib" target="bin\UAP\ARM" />
+      <file src="..\Enlistment\winrt\10\src\Release_ARM\lib\libGLESv2.lib" target="bin\UAP\ARM" />
+
+      <file src="$bin$\10\src\Release_ARM64\libEGL.dll" target="bin\UAP\ARM64" />
+      <file src="$bin$\10\src\Release_ARM64\libGLESv2.dll" target="bin\UAP\ARM64" />
+      <file src="..\Enlistment\winrt\10\src\Release_ARM64\lib\libEGL.lib" target="bin\UAP\ARM64" />
+      <file src="..\Enlistment\winrt\10\src\Release_ARM64\lib\libGLESv2.lib" target="bin\UAP\ARM64" />
+
+      <!-- Headers -->
+      <file src="..\Enlistment\include\GLES2\gl2.h" target="Include\GLES2" />
+      <file src="..\Enlistment\include\GLES2\gl2ext.h" target="Include\GLES2" />
+      <file src="..\Enlistment\include\GLES2\gl2platform.h" target="Include\GLES2" />
+      <file src="..\Enlistment\include\GLES3\gl3.h" target="Include\GLES3" />
+      <file src="..\Enlistment\include\GLES3\gl3platform.h" target="Include\GLES3" />
+      <file src="..\Enlistment\include\GLES3\gl31.h" target="Include\GLES3" />
+      <file src="..\Enlistment\include\GLES3\gl32.h" target="Include\GLES3" />
+      <file src="..\Enlistment\include\EGL\egl.h" target="Include\EGL" />
+      <file src="..\Enlistment\include\EGL\eglext.h" target="Include\EGL" />
+      <file src="..\Enlistment\include\EGL\eglplatform.h" target="Include\EGL" />
+      <file src="..\Enlistment\include\KHR\khrplatform.h" target="Include\KHR" />
+      <file src="..\Enlistment\include\angle_windowsstore.h" target="Include" />
+
+      <!-- Build scripts -->
+      <file src="ANGLE.WindowsStore.targets" target="build\native" />
+
+      <!-- Other files -->
+      <file src="..\Enlistment\AUTHORS" />
+      <file src="..\Enlistment\CONTRIBUTORS" />
+      <file src="..\Enlistment\LICENSE" />
+      <file src="privacy.txt" />
+
+      <!-- SHA-1 hash of the git HEAD this package was built from -->
+      <file src="obj\ANGLE.githash.txt" />
+    </files>
+</package>

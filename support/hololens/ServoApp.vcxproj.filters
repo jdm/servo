@@ -409,19 +409,19 @@
       <Filter>ServoDLLsARM64Debug</Filter>
     </None>
     <None Include="packages.config" />
-    <None Include="..\..\target\aarch64-pc-windows-msvc\release\libeay32.dll">
-      <Filter>ServoDLLsARM64Release</Filter>
-    </None>
     <None Include="..\..\target\aarch64-pc-windows-msvc\release\msvcp140.dll">
       <Filter>ServoDLLsARM64Release</Filter>
     </None>
     <None Include="..\..\target\aarch64-pc-windows-msvc\release\simpleservo.dll">
       <Filter>ServoDLLsARM64Release</Filter>
     </None>
-    <None Include="..\..\target\aarch64-pc-windows-msvc\release\ssleay32.dll">
+    <None Include="..\..\target\aarch64-pc-windows-msvc\release\vcruntime140.dll">
       <Filter>ServoDLLsARM64Release</Filter>
     </None>
-    <None Include="..\..\target\aarch64-pc-windows-msvc\release\vcruntime140.dll">
+    <None Include="..\..\target\aarch64-pc-windows-msvc\release\libcrypto.dll">
+      <Filter>ServoDLLsARM64Release</Filter>
+    </None>
+    <None Include="..\..\target\aarch64-pc-windows-msvc\release\libssl.dll">
       <Filter>ServoDLLsARM64Release</Filter>
     </None>
   </ItemGroup>

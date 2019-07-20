@@ -247,16 +247,6 @@ class MachCommands(CommandBase):
 
             # Ensure that the NuGet ANGLE package containing libEGL is accessible
             # to the Rust linker.
-            #append_to_path_env(
-            #    path.join(
-            #        os.getcwd(), "support", "hololens", "packages",
-            #        "ANGLE.WindowsStore.2.1.13", "bin", "UAP", "x64"
-            #    ),
-            #    env,
-            #    "LIB"
-            #)
-            base_angle_path = path.join(os.getcwd(), "..", "angle", "winrt", "10", "src")
-            angle_kind = "Debug" if dev else "Release"
             if "aarch64" in target_triple:
                 arch_dir = "ARM64"
             elif "x86_64" in target_triple:
@@ -264,7 +254,14 @@ class MachCommands(CommandBase):
             else:
                 print("Unsupported UWP target: " + target_triple)
                 return 0
-            append_to_path_env(path.join(base_angle_path, "%s_%s" % (angle_kind, arch_dir), "lib"), env, "LIB")
+            append_to_path_env(
+                path.join(
+                    os.getcwd(), "support", "hololens", "packages",
+                    "ANGLE.WindowsStore.2.1.13", "bin", "UAP", arch_dir,
+                ),
+                env,
+                "LIB"
+            )
 
         if android:
             if "ANDROID_NDK" not in env:
@@ -591,7 +588,7 @@ class MachCommands(CommandBase):
                     call(["editbin", "/nologo", "/subsystem:windows", path.join(servo_exe_dir, "servo.exe")],
                          verbose=verbose)
                 # on msvc, we need to copy in some DLLs in to the servo.exe dir
-                for ssl_lib in ["libeay32.dll", "ssleay32.dll"]:
+                for ssl_lib in ["libssl.dll", "libcrypto.dll"]:
                     shutil.copy(path.join(env['OPENSSL_LIB_DIR'], "../bin", ssl_lib),
                                 servo_exe_dir)
                 # Search for the generated nspr4.dll
