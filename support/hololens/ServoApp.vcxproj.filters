@@ -396,9 +396,6 @@
     <None Include="..\..\target\debug\simpleservo.dll">
       <Filter>ServoDLLsDebug</Filter>
     </None>
-    <None Include="..\..\target\aarch64-pc-windows-msvc\debug\libeay32.dll">
-      <Filter>ServoDLLsARM64Debug</Filter>
-    </None>
     <None Include="..\..\target\aarch64-pc-windows-msvc\debug\msvcp140.dll">
       <Filter>ServoDLLsARM64Debug</Filter>
     </None>
@@ -423,6 +420,12 @@
     </None>
     <None Include="..\..\target\aarch64-pc-windows-msvc\release\libssl.dll">
       <Filter>ServoDLLsARM64Release</Filter>
+    </None>
+    <None Include="..\..\target\aarch64-pc-windows-msvc\debug\libcrypto.dll">
+      <Filter>ServoDLLsARM64Debug</Filter>
+    </None>
+    <None Include="..\..\target\aarch64-pc-windows-msvc\debug\libssl.dll">
+      <Filter>ServoDLLsARM64Debug</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>

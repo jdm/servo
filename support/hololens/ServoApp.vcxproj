@@ -173,7 +173,12 @@
     </Page>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\target\aarch64-pc-windows-msvc\debug\libeay32.dll">
+    <None Include="..\..\target\aarch64-pc-windows-msvc\debug\libcrypto.dll">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">true</DeploymentContent>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">true</ExcludedFromBuild>
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">false</DeploymentContent>
+    </None>
+    <None Include="..\..\target\aarch64-pc-windows-msvc\debug\libssl.dll">
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">true</DeploymentContent>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">true</ExcludedFromBuild>
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">false</DeploymentContent>
