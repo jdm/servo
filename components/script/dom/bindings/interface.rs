@@ -16,7 +16,7 @@ use js::error::throw_type_error;
 use js::glue::{UncheckedUnwrapObject, RUST_SYMBOL_TO_JSID};
 use js::jsapi::HandleObject as RawHandleObject;
 use js::jsapi::MutableHandleValue as RawMutableHandleValue;
-use js::jsapi::{Class, ClassOps, RealmOptions};
+use js::jsapi::{Class, ClassOps};
 use js::jsapi::{GetNonCCWObjectGlobal, GetWellKnownSymbol};
 use js::jsapi::{JSAutoRealm, JSClass, JSContext, JSFunctionSpec, JSObject, JSFUN_CONSTRUCTOR};
 use js::jsapi::{JSPropertySpec, JSString, JSTracer, JS_AtomizeAndPinString};
@@ -32,7 +32,7 @@ use js::rust::wrappers::{JS_DefineProperty3, JS_DefineProperty4, JS_DefineProper
 use js::rust::wrappers::{JS_FireOnNewGlobalObject, JS_GetPrototype};
 use js::rust::wrappers::{JS_LinkConstructorAndPrototype, JS_NewObjectWithUniqueType};
 use js::rust::{define_methods, define_properties, get_object_class};
-use js::rust::{HandleObject, HandleValue, MutableHandleObject};
+use js::rust::{HandleObject, HandleValue, MutableHandleObject, RealmOptions};
 use std::convert::TryFrom;
 use std::ptr;
 
@@ -145,7 +145,7 @@ pub unsafe fn create_global_object(
         class,
         ptr::null_mut(),
         OnNewGlobalHookOption::DontFireOnNewGlobalHook,
-        &options,
+        &*options,
     ));
     assert!(!rval.is_null());
 

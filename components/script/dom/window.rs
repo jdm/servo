@@ -2094,15 +2094,18 @@ impl Window {
         user_agent: Cow<'static, str>,
         player_context: WindowGLContext,
     ) -> DomRoot<Self> {
+		warn!("window::new start");
         let layout_rpc: Box<dyn LayoutRPC + Send> = {
             let (rpc_send, rpc_recv) = unbounded();
             layout_chan.send(Msg::GetRPC(rpc_send)).unwrap();
             rpc_recv.recv().unwrap()
         };
+		warn!("window::new 2");
         let error_reporter = CSSErrorReporter {
             pipelineid,
             script_chan: Arc::new(Mutex::new(control_chan)),
         };
+		warn!("window::new 3");
         let win = Box::new(Self {
             globalscope: GlobalScope::new_inherited(
                 pipelineid,
@@ -2176,8 +2179,10 @@ impl Window {
             replace_surrogates,
             player_context,
         });
-
-        unsafe { WindowBinding::Wrap(runtime.cx(), win) }
+		warn!("window::new 4");
+        let a = unsafe { WindowBinding::Wrap(runtime.cx(), win) };
+		warn!("window::new 5");
+		a
     }
 
     pub fn pipeline_id(&self) -> Option<PipelineId> {
