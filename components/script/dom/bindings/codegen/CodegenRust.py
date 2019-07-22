@@ -3035,8 +3035,8 @@ assert!((*cache)[PrototypeList::Constructor::%(id)s as usize].is_null());
         if aliasedMembers:
             def defineAlias(alias):
                 if alias == "@@iterator":
-                    symbolJSID = "RUST_SYMBOL_TO_JSID(GetWellKnownSymbol(cx, SymbolCode::iterator))"
-                    getSymbolJSID = CGGeneric(fill("rooted!(in(cx) let iteratorId = ${symbolJSID});",
+                    symbolJSID = "RUST_SYMBOL_TO_JSID(GetWellKnownSymbol(cx, SymbolCode::iterator), iteratorId.handle_mut())"
+                    getSymbolJSID = CGGeneric(fill("rooted!(in(cx) let mut iteratorId: jsid);\n${symbolJSID};\n",
                                                    symbolJSID=symbolJSID))
                     defineFn = "JS_DefinePropertyById2"
                     prop = "iteratorId.handle()"
@@ -5192,8 +5192,9 @@ class CGDOMJSProxyHandler_ownPropertyKeys(CGAbstractExternMethod):
             body += dedent(
                 """
                 for i in 0..(*unwrapped_proxy).Length() {
-                    rooted!(in(cx) let rooted_jsid = int_to_jsid(i as i32));
-                    AppendToAutoIdVector(props, rooted_jsid.handle().get());
+                    rooted!(in(cx) let mut rooted_jsid: jsid);
+                    int_to_jsid(i as i32, rooted_jsid.handle_mut());
+                    AppendToAutoIdVector(props, rooted_jsid.handle());
                 }
                 """)
 
@@ -5204,9 +5205,9 @@ class CGDOMJSProxyHandler_ownPropertyKeys(CGAbstractExternMethod):
                     let cstring = CString::new(name).unwrap();
                     let jsstring = JS_AtomizeAndPinString(cx, cstring.as_ptr());
                     rooted!(in(cx) let rooted = jsstring);
-                    let jsid = INTERNED_STRING_TO_JSID(cx, rooted.handle().get());
-                    rooted!(in(cx) let rooted_jsid = jsid);
-                    AppendToAutoIdVector(props, rooted_jsid.handle().get());
+                    rooted!(in(cx) let mut rooted_jsid: jsid);
+                    RUST_INTERNED_STRING_TO_JSID(cx, rooted.handle().get(), rooted_jsid.handle_mut());
+                    AppendToAutoIdVector(props, rooted_jsid.handle());
                 }
                 """)
 
@@ -5248,8 +5249,9 @@ class CGDOMJSProxyHandler_getOwnEnumerablePropertyKeys(CGAbstractExternMethod):
             body += dedent(
                 """
                 for i in 0..(*unwrapped_proxy).Length() {
-                    rooted!(in(cx) let rooted_jsid = int_to_jsid(i as i32));
-                    AppendToAutoIdVector(props, rooted_jsid.handle().get());
+                    rooted!(in(cx) let mut rooted_jsid: jsid);
+                    int_to_jsid(i as i32, rooted_jsid.handle_mut());
+                    AppendToAutoIdVector(props, rooted_jsid.handle());
                 }
                 """)
 
@@ -5792,7 +5794,7 @@ def generate_imports(config, cgthings, descriptors, callbacks=None, dictionaries
         'js::jsapi::HandleValue as RawHandleValue',
         'js::jsapi::HandleValueArray',
         'js::jsapi::Heap',
-        'js::jsapi::INTERNED_STRING_TO_JSID',
+        'js::rust::wrappers::RUST_INTERNED_STRING_TO_JSID',
         'js::jsapi::IsCallable',
         'js::jsapi::JSAutoRealm',
         'js::jsapi::JSCLASS_FOREGROUND_FINALIZE',
@@ -5876,7 +5878,7 @@ def generate_imports(config, cgthings, descriptors, callbacks=None, dictionaries
         'js::jsval::PrivateValue',
         'js::jsval::UndefinedValue',
         'js::jsapi::UndefinedHandleValue',
-        'js::glue::AppendToAutoIdVector',
+        'js::rust::wrappers::AppendToAutoIdVector',
         'js::glue::CallJitGetterOp',
         'js::glue::CallJitMethodOp',
         'js::glue::CallJitSetterOp',
@@ -5887,8 +5889,8 @@ def generate_imports(config, cgthings, descriptors, callbacks=None, dictionaries
         'js::glue::ProxyTraps',
         'js::glue::RUST_JSID_IS_INT',
         'js::glue::RUST_JSID_IS_STRING',
-        'js::glue::RUST_SYMBOL_TO_JSID',
-        'js::glue::int_to_jsid',
+        'js::rust::wrappers::RUST_SYMBOL_TO_JSID',
+        'js::rust::wrappers::int_to_jsid',
         'js::glue::UnwrapObjectDynamic',
         'js::panic::maybe_resume_unwind',
         'js::panic::wrap_panic',

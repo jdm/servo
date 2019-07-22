@@ -13,10 +13,11 @@ use crate::dom::bindings::utils::{
     get_proto_or_iface_array, ProtoOrIfaceArray, DOM_PROTOTYPE_SLOT,
 };
 use js::error::throw_type_error;
-use js::glue::{UncheckedUnwrapObject, RUST_SYMBOL_TO_JSID};
+use js::glue::UncheckedUnwrapObject;
+use js::rust::wrappers::RUST_SYMBOL_TO_JSID;
 use js::jsapi::HandleObject as RawHandleObject;
 use js::jsapi::MutableHandleValue as RawMutableHandleValue;
-use js::jsapi::{Class, ClassOps};
+use js::jsapi::{Class, ClassOps, jsid};
 use js::jsapi::{GetNonCCWObjectGlobal, GetWellKnownSymbol};
 use js::jsapi::{JSAutoRealm, JSClass, JSContext, JSFunctionSpec, JSObject, JSFUN_CONSTRUCTOR};
 use js::jsapi::{JSPropertySpec, JSString, JSTracer, JS_AtomizeAndPinString};
@@ -208,7 +209,8 @@ pub unsafe fn create_interface_prototype_object(
         let unscopable_symbol = GetWellKnownSymbol(cx, SymbolCode::unscopables);
         assert!(!unscopable_symbol.is_null());
 
-        rooted!(in(cx) let unscopable_id = RUST_SYMBOL_TO_JSID(unscopable_symbol));
+        rooted!(in(cx) let mut unscopable_id: jsid);
+        RUST_SYMBOL_TO_JSID(unscopable_symbol, unscopable_id.handle_mut());
         assert!(JS_DefinePropertyById5(
             cx,
             rval.handle(),
