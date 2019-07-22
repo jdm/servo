@@ -261,10 +261,15 @@ void OpenGLES::DestroySurface(const EGLSurface surface) {
 
 void OpenGLES::MakeCurrent(const EGLSurface surface) {
   if (eglMakeCurrent(mEglDisplay, surface, surface, mEglContext) == EGL_FALSE) {
+    log_gl_error(eglGetError());
     throw winrt::hresult_error(E_FAIL, L"Failed to make EGLSurface current");
   }
 }
 
 EGLBoolean OpenGLES::SwapBuffers(const EGLSurface surface) {
-  return (eglSwapBuffers(mEglDisplay, surface));
+  auto res = eglSwapBuffers(mEglDisplay, surface);
+  if (!res) {
+    log_gl_error(eglGetError());
+  }
+  return res;
 }

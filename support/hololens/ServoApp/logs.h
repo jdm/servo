@@ -5,3 +5,4 @@
 #pragma once
 
 void log(const char *format, ...);
+void log_gl_error(GLenum const err);

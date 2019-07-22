@@ -29,6 +29,9 @@ public:
   virtual void OnURLChanged(std::wstring) = 0;
   virtual void Flush() = 0;
   virtual void MakeCurrent() = 0;
+  virtual void FlushXR() = 0;
+  virtual void MakeCurrentXR() = 0;
+  virtual void ToImmersiveMode() = 0;
   virtual bool OnAllowNavigation(std::wstring) = 0;
   virtual void OnAnimatingChanged(bool) = 0;
 

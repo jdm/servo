@@ -21,12 +21,21 @@ void on_url_changed(const char *url) {
 }
 void flush() { sServo->Delegate().Flush(); }
 void make_current() { sServo->Delegate().MakeCurrent(); }
+void flush_xr() {
+	sServo->Delegate().FlushXR();
+}
+void make_current_xr() {
+	sServo->Delegate().MakeCurrentXR();
+}
 void wakeup() { sServo->Delegate().WakeUp(); }
 bool on_allow_navigation(const char *url) {
  return sServo->Delegate().OnAllowNavigation(char2w(url));
 };
 void on_animating_changed(bool aAnimating) {
   sServo->Delegate().OnAnimatingChanged(aAnimating);
+}
+void to_immersive_mode() {
+	sServo->Delegate().ToImmersiveMode();
 }
 
 Servo::Servo(GLsizei width, GLsizei height, ServoDelegate &aDelegate)
@@ -46,6 +55,8 @@ Servo::Servo(GLsizei width, GLsizei height, ServoDelegate &aDelegate)
   capi::CHostCallbacks c;
   c.flush = &flush;
   c.make_current = &make_current;
+  c.flush_xr = &flush_xr;
+  c.make_current_xr = &make_current_xr;
   c.on_alert = &on_alert;
   c.on_load_started = &on_load_started;
   c.on_load_ended = &on_load_ended;
@@ -55,6 +66,7 @@ Servo::Servo(GLsizei width, GLsizei height, ServoDelegate &aDelegate)
   c.on_animating_changed = &on_animating_changed;
   c.on_shutdown_complete = &on_shutdown_complete;
   c.on_allow_navigation = &on_allow_navigation;
+  c.to_immersive_mode = &to_immersive_mode;
 
   init_with_egl(o, &wakeup, c);
 }
