@@ -405,7 +405,6 @@
     <None Include="..\..\target\aarch64-pc-windows-msvc\debug\vcruntime140.dll">
       <Filter>ServoDLLsARM64Debug</Filter>
     </None>
-    <None Include="packages.config" />
     <None Include="..\..\target\aarch64-pc-windows-msvc\release\msvcp140.dll">
       <Filter>ServoDLLsARM64Release</Filter>
     </None>
@@ -427,6 +426,7 @@
     <None Include="..\..\target\aarch64-pc-windows-msvc\debug\libssl.dll">
       <Filter>ServoDLLsARM64Debug</Filter>
     </None>
+    <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Assets">
