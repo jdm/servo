@@ -645,9 +645,10 @@ class MachCommands(CommandBase):
                     print("Packaging gstreamer DLLs")
                     if not package_gstreamer_dlls(servo_exe_dir, target_triple, uwp):
                         status = 1
-                print("Packaging MSVC DLLs")
-                if not package_msvc_dlls(servo_exe_dir, target_triple, vcinstalldir):
-                    status = 1
+                if not uwp:
+                    print("Packaging MSVC DLLs")
+                    if not package_msvc_dlls(servo_exe_dir, target_triple, vcinstalldir):
+                        status = 1
 
             elif sys.platform == "darwin":
                 # On the Mac, set a lovely icon. This makes it easier to pick out the Servo binary in tools
@@ -724,6 +725,7 @@ def package_gstreamer_dlls(servo_exe_dir, target, uwp):
         "avfilter-7.dll",
         "avformat-58.dll",
         "avcodec-58.dll",
+        "avresample-4.dll",
         "avutil-56.dll",
         "bz2.dll",
         "ffi-7.dll",
@@ -749,14 +751,12 @@ def package_gstreamer_dlls(servo_exe_dir, target, uwp):
         "gstwebrtc-1.0-0.dll",
         "intl-8.dll",
         "orc-0.4-0.dll",
+        "postproc-55.dll",
         "swresample-3.dll",
+        "swscale-5.dll",
+        "x264-157.dll",
         "z-1.dll",
     ]
-
-    # FIXME: until we build with UWP-enabled GStreamer binaries,
-    #        almost every UWP-friendly DLL depends on this
-    #        incompatible DLL.
-    gst_dlls += ["libwinpthread-1.dll"]
 
     if not uwp:
         gst_dlls += [
@@ -776,6 +776,7 @@ def package_gstreamer_dlls(servo_exe_dir, target, uwp):
             "libtheoraenc-1.dll",
             "libvorbis-0.dll",
             "libvorbisenc-2.dll",
+            "libwinpthread-1.dll",
             "nice-10.dll",
         ]
 

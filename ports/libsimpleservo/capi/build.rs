@@ -6,6 +6,7 @@ use std::env;
 use std::path::PathBuf;
 
 fn main() {
+    //hi
     let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     let target_dir = env::var("CARGO_TARGET_DIR").unwrap();
     let mut path: PathBuf = [crate_dir.clone(), target_dir].iter().collect();

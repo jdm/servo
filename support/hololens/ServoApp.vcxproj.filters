@@ -54,9 +54,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="ServoApp_TemporaryKey.pfx" />
-    <None Include="..\..\target\debug\api-ms-win-crt-runtime-l1-1-0.dll">
-      <Filter>ServoDLLsDebug</Filter>
-    </None>
     <None Include="..\..\target\debug\avcodec-58.dll">
       <Filter>ServoDLLsDebug</Filter>
     </None>
@@ -198,32 +195,14 @@
     <None Include="..\..\target\debug\intl-8.dll">
       <Filter>ServoDLLsDebug</Filter>
     </None>
-    <None Include="..\..\target\debug\libeay32.dll">
-      <Filter>ServoDLLsDebug</Filter>
-    </None>
-    <None Include="..\..\target\debug\libwinpthread-1.dll">
-      <Filter>ServoDLLsDebug</Filter>
-    </None>
-    <None Include="..\..\target\debug\msvcp140.dll">
-      <Filter>ServoDLLsDebug</Filter>
-    </None>
     <None Include="..\..\target\debug\orc-0.4-0.dll">
-      <Filter>ServoDLLsDebug</Filter>
-    </None>
-    <None Include="..\..\target\debug\ssleay32.dll">
       <Filter>ServoDLLsDebug</Filter>
     </None>
     <None Include="..\..\target\debug\swresample-3.dll">
       <Filter>ServoDLLsDebug</Filter>
     </None>
-    <None Include="..\..\target\debug\vcruntime140.dll">
-      <Filter>ServoDLLsDebug</Filter>
-    </None>
     <None Include="..\..\target\debug\z-1.dll">
       <Filter>ServoDLLsDebug</Filter>
-    </None>
-    <None Include="..\..\target\release\api-ms-win-crt-runtime-l1-1-0.dll">
-      <Filter>ServoDLLsRelease</Filter>
     </None>
     <None Include="..\..\target\release\avcodec-58.dll">
       <Filter>ServoDLLsRelease</Filter>
@@ -366,28 +345,13 @@
     <None Include="..\..\target\release\intl-8.dll">
       <Filter>ServoDLLsRelease</Filter>
     </None>
-    <None Include="..\..\target\release\libeay32.dll">
-      <Filter>ServoDLLsRelease</Filter>
-    </None>
-    <None Include="..\..\target\release\libwinpthread-1.dll">
-      <Filter>ServoDLLsRelease</Filter>
-    </None>
-    <None Include="..\..\target\release\msvcp140.dll">
-      <Filter>ServoDLLsRelease</Filter>
-    </None>
     <None Include="..\..\target\release\orc-0.4-0.dll">
       <Filter>ServoDLLsRelease</Filter>
     </None>
     <None Include="..\..\target\release\simpleservo.dll">
       <Filter>ServoDLLsRelease</Filter>
     </None>
-    <None Include="..\..\target\release\ssleay32.dll">
-      <Filter>ServoDLLsRelease</Filter>
-    </None>
     <None Include="..\..\target\release\swresample-3.dll">
-      <Filter>ServoDLLsRelease</Filter>
-    </None>
-    <None Include="..\..\target\release\vcruntime140.dll">
       <Filter>ServoDLLsRelease</Filter>
     </None>
     <None Include="..\..\target\release\z-1.dll">
@@ -427,6 +391,42 @@
       <Filter>ServoDLLsARM64Debug</Filter>
     </None>
     <None Include="packages.config" />
+    <None Include="..\..\target\debug\libcrypto.dll">
+      <Filter>ServoDLLsDebug</Filter>
+    </None>
+    <None Include="..\..\target\debug\libssl.dll">
+      <Filter>ServoDLLsDebug</Filter>
+    </None>
+    <None Include="..\..\target\debug\avresample-4.dll">
+      <Filter>ServoDLLsDebug</Filter>
+    </None>
+    <None Include="..\..\target\debug\postproc-55.dll">
+      <Filter>ServoDLLsDebug</Filter>
+    </None>
+    <None Include="..\..\target\debug\swscale-5.dll">
+      <Filter>ServoDLLsDebug</Filter>
+    </None>
+    <None Include="..\..\target\debug\x264-157.dll">
+      <Filter>ServoDLLsDebug</Filter>
+    </None>
+    <None Include="..\..\target\release\avresample-4.dll">
+      <Filter>ServoDLLsRelease</Filter>
+    </None>
+    <None Include="..\..\target\release\postproc-55.dll">
+      <Filter>ServoDLLsRelease</Filter>
+    </None>
+    <None Include="..\..\target\release\swscale-5.dll">
+      <Filter>ServoDLLsRelease</Filter>
+    </None>
+    <None Include="..\..\target\release\x264-157.dll">
+      <Filter>ServoDLLsRelease</Filter>
+    </None>
+    <None Include="..\..\target\release\libcrypto.dll">
+      <Filter>ServoDLLsRelease</Filter>
+    </None>
+    <None Include="..\..\target\release\libssl.dll">
+      <Filter>ServoDLLsRelease</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Assets">
@@ -434,9 +434,6 @@
     </Filter>
     <Filter Include="src">
       <UniqueIdentifier>{45140811-c74b-4497-ba07-a7610fe2fef9}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ServoDLLsDebug">
-      <UniqueIdentifier>{851a4628-484c-4859-bb9b-3153914487f5}</UniqueIdentifier>
     </Filter>
     <Filter Include="ServoDLLsRelease">
       <UniqueIdentifier>{96a56d11-301b-46ec-b081-50010b467ebf}</UniqueIdentifier>
@@ -446,6 +443,9 @@
     </Filter>
     <Filter Include="ServoDLLsARM64Release">
       <UniqueIdentifier>{f6acf137-4431-4aef-b743-84416e69be43}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ServoDLLsDebug">
+      <UniqueIdentifier>{851a4628-484c-4859-bb9b-3153914487f5}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
