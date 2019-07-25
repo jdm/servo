@@ -3037,7 +3037,7 @@ assert!((*cache)[PrototypeList::Constructor::%(id)s as usize].is_null());
             def defineAlias(alias):
                 if alias == "@@iterator":
                     symbolJSID = "RUST_SYMBOL_TO_JSID(GetWellKnownSymbol(*cx, SymbolCode::iterator), iteratorId.handle_mut())"
-                    getSymbolJSID = CGGeneric(fill("rooted!(in((cx) let mut iteratorId: jsid);\n${symbolJSID};\n",
+                    getSymbolJSID = CGGeneric(fill("rooted!(in(*cx) let mut iteratorId: jsid);\n${symbolJSID};\n",
                                                    symbolJSID=symbolJSID))
                     defineFn = "JS_DefinePropertyById2"
                     prop = "iteratorId.handle()"
