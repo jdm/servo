@@ -15,7 +15,7 @@ use servo::compositing::windowing::{
 };
 use servo::embedder_traits::resources::{self, Resource, ResourceReaderMethods};
 use servo::embedder_traits::EmbedderMsg;
-use servo::euclid::{Point2D, Rect, Scale, Size2D, Vector2D};
+use servo::euclid::{default::Size2D as UntypedSize2D, Point2D, Rect, Scale, Size2D, Vector2D};
 use servo::keyboard_types::{Key, KeyState, KeyboardEvent};
 use servo::msg::constellation_msg::TraversalDirection;
 use servo::script_traits::{TouchEventType, TouchId};
@@ -32,6 +32,8 @@ use std::mem;
 use std::os::raw::c_void;
 use std::path::PathBuf;
 use std::rc::Rc;
+
+use webxr::hololens::GlWindow;
 
 thread_local! {
     pub static SERVO: RefCell<Option<ServoGlue>> = RefCell::new(None);
@@ -128,6 +130,12 @@ pub trait HostTrait {
     fn get_clipboard_contents(&self) -> Option<String>;
     /// Sets system clipboard contents
     fn set_clipboard_contents(&self, contents: String);
+    /// FIXME
+    fn to_immersive_mode(&self);
+    /// FIXME
+    fn flush_xr(&self);
+    /// FIXME
+    fn make_current_xr(&self);
 }
 
 pub struct ServoGlue {
@@ -187,9 +195,16 @@ pub fn init(
     gl.clear(gl::COLOR_BUFFER_BIT);
     gl.finish();
 
+    let host_callbacks = Rc::new(callbacks);
+
+    let xr_window = XRWindow {
+        host_callbacks: host_callbacks.clone(),
+        coordinates: Rc::new(init_opts.coordinates.clone()),
+    };
+
     let window_callbacks = Rc::new(ServoWindowCallbacks {
+        host_callbacks,
         gl: gl.clone(),
-        host_callbacks: callbacks,
         coordinates: RefCell::new(init_opts.coordinates),
         density: init_opts.density,
         gl_context_pointer: init_opts.gl_context_pointer,
@@ -197,8 +212,10 @@ pub fn init(
     });
 
     let embedder_callbacks = Box::new(ServoEmbedderCallbacks {
+        xr_window,
         vr_init: init_opts.vr_init,
         waker,
+        gl: gl.clone(),
     });
 
     let servo = Servo::new(embedder_callbacks, window_callbacks.clone());
@@ -577,15 +594,47 @@ impl ServoGlue {
 struct ServoEmbedderCallbacks {
     waker: Box<dyn EventLoopWaker>,
     vr_init: VRInitOptions,
+    xr_window: XRWindow,
+    gl: Rc<dyn gl::Gl>,
 }
 
 struct ServoWindowCallbacks {
     gl: Rc<dyn gl::Gl>,
-    host_callbacks: Box<dyn HostTrait>,
+    host_callbacks: Rc<Box<dyn HostTrait>>,
     coordinates: RefCell<Coordinates>,
     density: f32,
     gl_context_pointer: Option<*const c_void>,
     native_display_pointer: Option<*const c_void>,
+}
+
+
+#[derive(Clone)]
+struct XRWindow {
+    host_callbacks: Rc<Box<dyn HostTrait>>,
+    coordinates: Rc<Coordinates>,
+}
+
+impl webxr::hololens::GlWindow for XRWindow {
+    fn make_current(&mut self) {
+        self.host_callbacks.make_current_xr();
+    }
+
+    fn swap_buffers(&mut self) {
+        self.host_callbacks.flush_xr();
+    }
+
+    fn size(&self) -> UntypedSize2D<gl::GLsizei> {
+        self.coordinates.viewport.size.to_untyped()
+    }
+
+    // FIXME: I don't understand why this has to be part of the Trait.
+    // If it lives in its own XRWindow impl, it doesn't compile.
+    fn new_window(&self) -> Result<Box<dyn webxr::hololens::GlWindow>, ()> {
+        Ok(Box::new(XRWindow {
+            host_callbacks: self.host_callbacks.clone(),
+            coordinates: self.coordinates.clone(),
+        }))
+    }
 }
 
 impl EmbedderMethods for ServoEmbedderCallbacks {
@@ -610,6 +659,18 @@ impl EmbedderMethods for ServoEmbedderCallbacks {
     fn create_event_loop_waker(&mut self) -> Box<dyn EventLoopWaker> {
         debug!("EmbedderMethods::create_event_loop_waker");
         self.waker.clone()
+    }
+
+    fn register_webxr(&mut self, xr: &mut webxr_api::MainThreadRegistry) {
+        let gl = self.gl.clone();
+        let win = self.xr_window.clone();
+        let factory = Box::new(move || {
+            warn!("PAUL: Factory called");
+            win.host_callbacks.to_immersive_mode();
+            win.new_window()
+        });
+        let discovery = webxr::hololens::GlWindowDiscovery::new(gl, factory);
+        xr.register(discovery);
     }
 }
 
