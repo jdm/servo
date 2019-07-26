@@ -56,8 +56,12 @@ public:
   virtual void OnURLChanged(std::wstring);
   virtual void Flush();
   virtual void MakeCurrent();
+  virtual void FlushXR();
+  virtual void MakeCurrentXR();
   virtual bool OnAllowNavigation(std::wstring);
   virtual void OnAnimatingChanged(bool);
+  virtual void ToImmersiveMode();
+
 
 private:
   void OnVisibilityChanged(
@@ -78,11 +82,14 @@ private:
   std::unique_ptr<Concurrency::task<void>> mLoopTask;
   winrt::ServoApp::ImmersiveViewSource mImmersiveViewSource;
   EGLSurface mRenderSurface{EGL_NO_SURFACE};
+  EGLSurface mXRSurface{EGL_NO_SURFACE};
   std::unique_ptr<servo::Servo> mServo;
 
   void BrowserPage::SendEventToServo(Event event);
   std::vector<Event> mEvents;
   std::mutex mEventsMutex;
+
+  bool mImmersiveMode = false;
 
   OpenGLES mOpenGLES; // FIXME: shared pointer
 

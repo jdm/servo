@@ -26,11 +26,15 @@
         <Button x:Name="stopButton" IsEnabled="false" Content="stop" Click="OnStopButtonClicked"/>
       </StackPanel>
       <TextBox Text="" AcceptsReturn="True" PlaceholderText="Type a URL" x:Name="urlTextbox" Grid.Column="1" IsReadOnly="True"/>
-      <StackPanel Orientation="Horizontal" Grid.Column="2">
-        <Button x:Name="immersiveButton" Click="OnImmersiveButtonClicked">Run Immersive</Button>
-      </StackPanel>
+      <Button x:Name="immersiveButton" Click="OnImmersiveButtonClicked" Grid.Column="2">Run Immersive</Button>
     </Grid>
-    <SwapChainPanel x:Name="swapChainPanel" MinHeight="200" MinWidth="200" Grid.Row="1" ManipulationMode="All">
-    </SwapChainPanel>
+    <Grid Grid.Row="1">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="*"/>
+      </Grid.ColumnDefinitions>
+      <SwapChainPanel x:Name="swapChainPanel" MinWidth="200" MinHeight="200" Grid.Column="0" ManipulationMode="All"/>
+      <SwapChainPanel x:Name="swapChainPanel2" MinWidth="200" MinHeight="200" Grid.Column="1"/>
+    </Grid>
   </Grid>
 </Page>

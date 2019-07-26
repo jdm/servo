@@ -32,15 +32,14 @@ void BrowserPage::Shutdown() {
 
   if (mServo != nullptr) {
     if (!IsLoopRunning()) {
-      // FIXME: this should not happen. In that case, we can't send the
-      // shutdown event to Servo.
+      log("meh");
     } else {
       HANDLE hEvent = ::CreateEventA(nullptr, FALSE, FALSE, sShutdownEvent);
       SendEventToServo({{Event::SHUTDOWN}});
       log("Waiting for Servo to shutdown");
       ::WaitForSingleObject(hEvent, INFINITE);
       StopRenderLoop();
-      mServo.reset();
+      mServo.reset(); // will call servo::deinit
     }
   }
 }
@@ -72,25 +71,17 @@ void BrowserPage::OnVisibilityChanged(CoreWindow const &,
 }
 
 void BrowserPage::CreateRenderSurface() {
-  log("BrowserPage::CreateRenderSurface()");
   if (mRenderSurface == EGL_NO_SURFACE) {
     mRenderSurface = mOpenGLES.CreateSurface(swapChainPanel());
-  }
-  if (mXRSurface == EGL_NO_SURFACE) {
-    mXRSurface = mOpenGLES.CreateSurface(swapChainPanel2());
   }
 }
 
 void BrowserPage::DestroyRenderSurface() {
-  log("BrowserPage::DestroyRenderSurface()");
   mOpenGLES.DestroySurface(mRenderSurface);
   mRenderSurface = EGL_NO_SURFACE;
-  mOpenGLES.DestroySurface(mXRSurface);
-  mXRSurface = EGL_NO_SURFACE;
 }
 
 void BrowserPage::RecoverFromLostDevice() {
-  log("BrowserPage::RecoverFromLostDevice()");
   StopRenderLoop();
   DestroyRenderSurface();
   mOpenGLES.Reset();
@@ -109,13 +100,10 @@ void BrowserPage::Loop(cancellation_token cancel) {
 
   HANDLE hEvent = ::CreateEventA(nullptr, FALSE, FALSE, sWakeupEvent);
 
-  mOpenGLES.MakeCurrent(mXRSurface);
+  mOpenGLES.MakeCurrent(mRenderSurface);
+
   EGLint panelWidth = 0;
   EGLint panelHeight = 0;
-  mOpenGLES.GetSurfaceDimensions(mXRSurface, &panelWidth, &panelHeight);
-  glViewport(0, 0, panelWidth, panelHeight);
-
-  mOpenGLES.MakeCurrent(mRenderSurface);
   mOpenGLES.GetSurfaceDimensions(mRenderSurface, &panelWidth, &panelHeight);
   glViewport(0, 0, panelWidth, panelHeight);
 
@@ -179,13 +167,10 @@ void BrowserPage::Loop(cancellation_token cancel) {
     mServo->PerformUpdates();
   }
   log("Leaving loop");
-  mServo->DeInit();
   cancel_current_task();
 } // namespace winrt::ServoApp::implementation
 
 void BrowserPage::StartRenderLoop() {
-  log("BrowserPage:StartRenderLoop()");
-
   if (IsLoopRunning()) {
 #if defined _DEBUG
     throw winrt::hresult_error(E_FAIL, L"GL thread is already looping");
@@ -200,10 +185,8 @@ void BrowserPage::StartRenderLoop() {
 }
 
 void BrowserPage::StopRenderLoop() {
-  log("BrowserPage:StopRenderLoop()");
   if (IsLoopRunning()) {
     mLoopCancel.cancel();
-    WakeUp();
     mLoopTask->wait();
     mLoopTask.reset();
   }
@@ -265,17 +248,6 @@ void BrowserPage::Flush() {
 
 void BrowserPage::MakeCurrent() { mOpenGLES.MakeCurrent(mRenderSurface); }
 
-void BrowserPage::FlushXR() {
-  if (mOpenGLES.SwapBuffers(mXRSurface) != GL_TRUE) {
-    // The call to eglSwapBuffers might not be successful (i.e. due to Device
-    // Lost) If the call fails, then we must reinitialize EGL and the GL
-    // resources.
-    RunOnUIThread([=] { RecoverFromLostDevice(); });
-  }
-}
-
-void BrowserPage::MakeCurrentXR() { mOpenGLES.MakeCurrent(mXRSurface); }
-
 void BrowserPage::WakeUp() {
   // FIXME: this won't work if it's triggered while the thread is not
   // waiting. We need a better looping logic.
@@ -286,8 +258,6 @@ void BrowserPage::WakeUp() {
 bool BrowserPage::OnAllowNavigation(std::wstring) { return true; }
 
 void BrowserPage::OnAnimatingChanged(bool animating) { mAnimating = animating; }
-
-void BrowserPage::ToImmersiveMode() { mImmersiveMode = true; }
 
 template <typename Callable> void BrowserPage::RunOnUIThread(Callable cb) {
   swapChainPanel().Dispatcher().RunAsync(
