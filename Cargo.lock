@@ -1088,7 +1088,7 @@ dependencies = [
  "servo_url 0.0.1",
  "style_traits 0.0.1",
  "webrender_api 0.60.0 (git+https://github.com/servo/webrender)",
- "webxr-api 0.0.1 (git+https://github.com/servo/webxr)",
+ "webxr-api 0.0.1",
 ]
 
 [[package]]
@@ -1194,6 +1194,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "euclid_macros 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-traits 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 1.0.88 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -5498,12 +5499,8 @@ dependencies = [
 [[package]]
 name = "webxr"
 version = "0.0.1"
-<<<<<<< HEAD
-source = "git+https://github.com/servo/webxr#0418277175dbccf83e575c99d6b9c778bfdbe70b"
-=======
->>>>>>> wip
 dependencies = [
- "euclid 0.20.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "euclid 0.19.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "gleam 0.6.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "glutin 0.21.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -5513,12 +5510,8 @@ dependencies = [
 [[package]]
 name = "webxr-api"
 version = "0.0.1"
-<<<<<<< HEAD
-source = "git+https://github.com/servo/webxr#0418277175dbccf83e575c99d6b9c778bfdbe70b"
-=======
->>>>>>> wip
 dependencies = [
- "euclid 0.20.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "euclid 0.19.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "gleam 0.6.18 (registry+https://github.com/rust-lang/crates.io-index)",
  "ipc-channel 0.11.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.88 (registry+https://github.com/rust-lang/crates.io-index)",
