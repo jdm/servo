@@ -339,6 +339,11 @@ impl WebGLRenderingContext {
             .unwrap();
     }
 
+    pub fn send_command_ignored(&self, command: WebGLCommand) {
+        let _ = self.webgl_sender
+            .send(command, capture_webgl_backtrace(self));
+    }
+
     #[inline]
     pub fn send_vr_command(&self, command: WebVRCommand) {
         self.webgl_sender.send_vr(command).unwrap();
@@ -1039,7 +1044,7 @@ impl WebGLRenderingContext {
                 self.current_vao.set(None);
                 self.send_command(WebGLCommand::BindVertexArray(None));
             }
-            vao.delete();
+            vao.delete(false);
         }
     }
 
@@ -2172,7 +2177,7 @@ impl WebGLRenderingContextMethods for WebGLRenderingContext {
             self.bound_buffer_array.set(None);
             buffer.decrement_attached_counter();
         }
-        buffer.mark_for_deletion();
+        buffer.mark_for_deletion(false);
     }
 
     // https://www.khronos.org/registry/webgl/specs/latest/1.0/#5.14.6
@@ -2188,7 +2193,7 @@ impl WebGLRenderingContextMethods for WebGLRenderingContext {
                     WebGLFramebufferBindingRequest::Default
                 ))
             );
-            framebuffer.delete()
+            framebuffer.delete(false)
         }
     }
 
@@ -2205,7 +2210,7 @@ impl WebGLRenderingContextMethods for WebGLRenderingContext {
                     None
                 ))
             );
-            renderbuffer.delete()
+            renderbuffer.delete(false)
         }
     }
 
@@ -2240,7 +2245,7 @@ impl WebGLRenderingContextMethods for WebGLRenderingContext {
                 ));
             }
 
-            texture.delete()
+            texture.delete(false)
         }
     }
 
@@ -2248,7 +2253,7 @@ impl WebGLRenderingContextMethods for WebGLRenderingContext {
     fn DeleteProgram(&self, program: Option<&WebGLProgram>) {
         if let Some(program) = program {
             handle_potential_webgl_error!(self, self.validate_ownership(program), return);
-            program.mark_for_deletion()
+            program.mark_for_deletion(false)
         }
     }
 
@@ -2256,7 +2261,7 @@ impl WebGLRenderingContextMethods for WebGLRenderingContext {
     fn DeleteShader(&self, shader: Option<&WebGLShader>) {
         if let Some(shader) = shader {
             handle_potential_webgl_error!(self, self.validate_ownership(shader), return);
-            shader.mark_for_deletion()
+            shader.mark_for_deletion(false)
         }
     }
 

@@ -21,7 +21,7 @@ void on_url_changed(const char *url) {
 }
 void flush() { sServo->Delegate().Flush(); }
 void make_current() { sServo->Delegate().MakeCurrent(); }
-void wakeup() { sServo->Delegate().WakeUp(); }
+void wakeup() { if (sServo) { sServo->Delegate().WakeUp(); } }
 bool on_allow_navigation(const char *url) {
  return sServo->Delegate().OnAllowNavigation(char2w(url));
 };
@@ -34,7 +34,8 @@ Servo::Servo(GLsizei width, GLsizei height, ServoDelegate &aDelegate)
 
   capi::CInitOptions o;
   o.args = NULL;
-  o.url = "https://servo.org";
+  o.url = "https://mrdoob.neocities.org/027/";
+  //o.url = "https://servo.org";
   o.width = mWindowWidth;
   o.height = mWindowHeight;
   o.density = 1.0;
