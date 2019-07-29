@@ -74,6 +74,7 @@ impl AudioContext {
         let context = AudioContext::new_inherited(options, browsing_context_id);
         let context = reflect_dom_object(Box::new(context), window, AudioContextBinding::Wrap);
         context.resume();
+        window.register_audio_context(&*context);
         context
     }
 
