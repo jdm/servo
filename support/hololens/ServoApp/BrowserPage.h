@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <atomic>
 #include "BrowserPage.g.h"
 #include "ImmersiveView.h"
 #include "OpenGLES.h"
@@ -79,6 +80,7 @@ private:
   winrt::ServoApp::ImmersiveViewSource mImmersiveViewSource;
   EGLSurface mRenderSurface{EGL_NO_SURFACE};
   std::unique_ptr<servo::Servo> mServo;
+  std::atomic<bool> mTerminate;
 
   void BrowserPage::SendEventToServo(Event event);
   std::vector<Event> mEvents;

@@ -19,7 +19,7 @@ using namespace concurrency;
 using namespace servo;
 
 namespace winrt::ServoApp::implementation {
-BrowserPage::BrowserPage() {
+BrowserPage::BrowserPage() : mTerminate(false) {
   log("BrowserPage::BrowserPage()");
   InitializeComponent();
   Loaded(std::bind(&BrowserPage::OnPageLoaded, this, _1, _2));
@@ -40,7 +40,6 @@ void BrowserPage::Shutdown() {
       log("Waiting for Servo to shutdown");
       ::WaitForSingleObject(hEvent, INFINITE);
       StopRenderLoop();
-      mServo.reset(); // will call servo::deinit
     }
   }
 }
@@ -125,7 +124,7 @@ void BrowserPage::Loop(cancellation_token cancel) {
   // waiting on the hEvent object. See the "wakeup" comment.
 
   log("Entering loop");
-  while (!cancel.is_canceled()) {
+  while (!cancel.is_canceled() && !mTerminate.load()) {
     // Block until wakeup is called.
     // Or run full speed if animating (see OnAnimatingChanged),
     // it will endup blocking on Flush to limit rendering to 60FPS
@@ -168,6 +167,7 @@ void BrowserPage::Loop(cancellation_token cancel) {
     mServo->PerformUpdates();
   }
   log("Leaving loop");
+  mServo.reset(nullptr); // will call Servo::deinit.
   cancel_current_task();
 } // namespace winrt::ServoApp::implementation
 
@@ -186,6 +186,8 @@ void BrowserPage::StartRenderLoop() {
 }
 
 void BrowserPage::StopRenderLoop() {
+  mTerminate.store(true);
+  WakeUp();
   if (IsLoopRunning()) {
     mLoopCancel.cancel();
     mLoopTask->wait();
