@@ -45,6 +45,7 @@ use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 use style::str::{StaticStringVec, HTML_SPACE_CHARACTERS};
 use uuid::Uuid;
 
@@ -171,6 +172,8 @@ struct ScriptContext {
     status: Result<(), NetworkError>,
     /// Timing object for this resource
     resource_timing: ResourceFetchTiming,
+    ///
+    start_time: Instant,
 }
 
 impl FetchResponseListener for ScriptContext {
@@ -179,6 +182,8 @@ impl FetchResponseListener for ScriptContext {
     fn process_request_eof(&mut self) {} // TODO(KiChjang): Perhaps add custom steps to perform fetch here?
 
     fn process_response(&mut self, metadata: Result<FetchMetadata, NetworkError>) {
+        warn!("script HTTP response took {:?} ({:?})", Instant::now() - self.start_time, self.url);
+        self.start_time = Instant::now();
         self.metadata = metadata.ok().map(|meta| match meta {
             FetchMetadata::Unfiltered(m) => m,
             FetchMetadata::Filtered { unsafe_, .. } => unsafe_,
@@ -214,6 +219,7 @@ impl FetchResponseListener for ScriptContext {
     /// <https://html.spec.whatwg.org/multipage/#fetch-a-classic-script>
     /// step 4-9
     fn process_response_eof(&mut self, response: Result<ResourceFetchTiming, NetworkError>) {
+        warn!("script response body took {:?} ({:?})", Instant::now() - self.start_time, self.url);
         // Step 5.
         let load = response.and(self.status.clone()).map(|_| {
             let metadata = self.metadata.take().unwrap();
@@ -256,6 +262,7 @@ impl FetchResponseListener for ScriptContext {
     }
 
     fn submit_resource_timing(&mut self) {
+        //warn!("script network timing: {:?}", self.resource_timing);
         network_listener::submit_timing(self)
     }
 }
@@ -322,6 +329,7 @@ fn fetch_a_classic_script(
         url: url.clone(),
         status: Ok(()),
         resource_timing: ResourceFetchTiming::new(ResourceTimingType::Resource),
+        start_time: Instant::now(),
     }));
 
     let (action_sender, action_receiver) = ipc::channel().unwrap();
@@ -655,6 +663,7 @@ impl HTMLScriptElement {
             self.line_number as u32
         };
         rooted!(in(*window.get_cx()) let mut rval = UndefinedValue());
+        let start = std::time::Instant::now();
         let global = window.upcast::<GlobalScope>();
         global.evaluate_script_on_global_with_result(
             &script.text,
@@ -662,6 +671,7 @@ impl HTMLScriptElement {
             rval.handle_mut(),
             line_number,
         );
+        warn!("script execution took {:?}", std::time::Instant::now() - start);
     }
 
     pub fn queue_error_event(&self) {

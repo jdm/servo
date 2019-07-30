@@ -39,13 +39,15 @@ impl HTMLAudioElement {
         prefix: Option<Prefix>,
         document: &Document,
     ) -> DomRoot<HTMLAudioElement> {
-        Node::reflect_node(
+        let node = Node::reflect_node(
             Box::new(HTMLAudioElement::new_inherited(
                 local_name, prefix, document,
             )),
             document,
             HTMLAudioElementBinding::Wrap,
-        )
+        );
+        document.window().register_media_player((&*node).upcast());
+        node
     }
 
     // https://html.spec.whatwg.org/multipage/#dom-audio

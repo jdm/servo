@@ -425,7 +425,7 @@ impl HTMLMediaElement {
         }
     }
 
-    fn play_media(&self) {
+    pub(crate) fn play_media(&self) {
         if let Some(ref player) = *self.player.borrow() {
             if let Err(e) = player.lock().unwrap().set_rate(self.playbackRate.get()) {
                 warn!("Could not set the playback rate {:?}", e);
@@ -465,6 +465,14 @@ impl HTMLMediaElement {
         }
     }
 
+	pub(crate) fn pause_playback(&self) {
+		if let Some(ref player) = *self.player.borrow() {
+			if let Err(e) = player.lock().unwrap().pause() {
+				eprintln!("Could not pause player {:?}", e);
+            }
+        }
+	}
+
     /// <https://html.spec.whatwg.org/multipage/#internal-pause-steps>
     fn internal_pause_steps(&self) {
         // Step 1.
@@ -496,11 +504,7 @@ impl HTMLMediaElement {
                         // Step 2.3.2.
                         this.upcast::<EventTarget>().fire_event(atom!("pause"));
 
-                        if let Some(ref player) = *this.player.borrow() {
-                            if let Err(e) = player.lock().unwrap().pause() {
-                                eprintln!("Could not pause player {:?}", e);
-                            }
-                        }
+                        this.pause_playback();
 
                         // Step 2.3.3.
                         // Done after running this closure in

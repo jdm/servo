@@ -79,13 +79,15 @@ impl HTMLVideoElement {
         prefix: Option<Prefix>,
         document: &Document,
     ) -> DomRoot<HTMLVideoElement> {
-        Node::reflect_node(
+        let node = Node::reflect_node(
             Box::new(HTMLVideoElement::new_inherited(
                 local_name, prefix, document,
             )),
             document,
             HTMLVideoElementBinding::Wrap,
-        )
+        );
+        document.window().register_media_player((&*node).upcast());
+        node
     }
 
     pub fn get_video_width(&self) -> u32 {
