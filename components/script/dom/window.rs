@@ -1437,14 +1437,14 @@ impl Window {
         }
 
         let for_display = reflow_goal == ReflowGoal::Full;
-        if for_display && self.suppress_reflow.get() {
+        /*if for_display && self.suppress_reflow.get() {
             debug!(
                 "Suppressing reflow pipeline {} for reason {:?} before FirstLoad or RefreshTick",
                 self.upcast::<GlobalScope>().pipeline_id(),
                 reason
             );
             return false;
-        }
+        }*/
 
         debug!("script: performing reflow for reason {:?}", reason);
 

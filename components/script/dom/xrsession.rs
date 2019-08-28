@@ -39,6 +39,7 @@ use crate::dom::xrsessionevent::XRSessionEvent;
 use crate::dom::xrspace::XRSpace;
 use crate::dom::xrwebgllayer::XRWebGLLayer;
 use crate::task_source::TaskSource;
+use canvas_traits::webgl::WebGLCommand;
 use dom_struct::dom_struct;
 use euclid::default::Size2D;
 use euclid::RigidTransform3D;
@@ -219,6 +220,8 @@ impl XRSession {
         // Step 6,7
         frame.set_active(true);
         frame.set_animation_frame(true);
+        
+        base_layer.Context().send_command(WebGLCommand::StartXRFrame);
 
         // Step 8
         for (_, callback) in callbacks.drain(..) {
@@ -226,6 +229,10 @@ impl XRSession {
                 let _ = callback.Call__(Finite::wrap(time), &frame, ExceptionHandling::Report);
             }
         }
+
+        base_layer.Context().Finish();
+        
+        base_layer.Context().send_command(WebGLCommand::EndXRFrame);
 
         frame.set_active(false);
         self.session.borrow_mut().render_animation_frame();

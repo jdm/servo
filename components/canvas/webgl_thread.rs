@@ -887,6 +887,60 @@ impl WebGLImpl {
         _backtrace: WebGLCommandBacktrace,
     ) {
         match command {
+            WebGLCommand::StartXRFrame | WebGLCommand::EndXRFrame => (),
+            WebGLCommand::CreateXRWebGLLayer(ref resolution, ref sender) => {
+                let gl = ctx.gl();
+
+                let mut value = [0];
+                unsafe {
+                    gl.get_integer_v(gl::TEXTURE_BINDING_2D, &mut value);
+                }
+				assert_eq!(gl.get_error(), gl::NO_ERROR);
+                let old_texture = value[0] as gl::GLuint;
+                unsafe {
+                    gl.get_integer_v(gl::FRAMEBUFFER_BINDING, &mut value);
+                }
+				assert_eq!(gl.get_error(), gl::NO_ERROR);
+                let old_framebuffer = value[0] as gl::GLuint;
+                
+                let texture = gl.gen_textures(1)[0];
+				assert_eq!(gl.get_error(), gl::NO_ERROR);
+                gl.bind_texture(gl::TEXTURE_2D, texture);
+				assert_eq!(gl.get_error(), gl::NO_ERROR);
+                gl.tex_image_2d(
+                    gl::TEXTURE_2D,
+                    0,
+                    gl::RGBA as gl::GLint,
+                    resolution.width,
+                    resolution.height,
+                    0,
+                    gl::RGBA,
+                    gl::UNSIGNED_BYTE,
+                    None,
+                );
+				assert_eq!(gl.get_error(), gl::NO_ERROR);
+
+                let framebuffer = gl.gen_framebuffers(1)[0];
+				assert_eq!(gl.get_error(), gl::NO_ERROR);
+                gl.bind_framebuffer(gl::FRAMEBUFFER, framebuffer);
+				assert_eq!(gl.get_error(), gl::NO_ERROR);
+                gl.framebuffer_texture_2d(
+                    gl::FRAMEBUFFER,
+                    gl::COLOR_ATTACHMENT0,
+                    gl::TEXTURE_2D,
+                    texture,
+                    0,
+                );
+				assert_eq!(gl.get_error(), gl::NO_ERROR);
+                
+                gl.bind_texture(gl::TEXTURE_2D, old_texture);
+				assert_eq!(gl.get_error(), gl::NO_ERROR);
+                gl.bind_framebuffer(gl::FRAMEBUFFER, old_framebuffer);
+				assert_eq!(gl.get_error(), gl::NO_ERROR);
+                unsafe {
+                    let _ = sender.send(Ok((WebGLFramebufferId::new(framebuffer), WebGLTextureId::new(texture))));
+                }
+            }
             WebGLCommand::GetContextAttributes(ref sender) => sender
                 .send(map_attrs_to_script_attrs(*ctx.borrow_attributes()))
                 .unwrap(),

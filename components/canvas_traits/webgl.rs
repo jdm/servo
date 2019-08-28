@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 use euclid::default::{Rect, Size2D};
+use euclid::Size2D as TypedSize2D;
 use gleam::gl;
 use gleam::gl::Gl;
 use ipc_channel::ipc::{IpcBytesReceiver, IpcBytesSender, IpcSharedMemory};
@@ -213,6 +214,9 @@ impl<T> Deref for TruncatedDebug<T> {
 /// WebGL Commands for a specific WebGLContext
 #[derive(Debug, Deserialize, Serialize)]
 pub enum WebGLCommand {
+    StartXRFrame,
+    EndXRFrame,
+    CreateXRWebGLLayer(TypedSize2D<i32, webxr_api::Viewport>, WebGLSender<Result<(WebGLFramebufferId, WebGLTextureId), ()>>),
     GetContextAttributes(WebGLSender<GLContextAttributes>),
     ActiveTexture(u32),
     BlendColor(f32, f32, f32, f32),

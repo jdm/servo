@@ -33,6 +33,7 @@ use js::rust::wrappers::{
 use js::rust::wrappers::{GetPromiseState, IsPromiseObject};
 use js::rust::wrappers::{NewPromiseObject, RejectPromise, ResolvePromise};
 use js::rust::{HandleObject, HandleValue, MutableHandleObject, Runtime};
+use std::cell::Cell;
 use std::ptr;
 use std::rc::Rc;
 
@@ -46,6 +47,7 @@ pub struct Promise {
     /// while native code could still interact with its native representation.
     #[ignore_malloc_size_of = "SM handles JS values"]
     permanent_js_root: Heap<JSVal>,
+    sanity_test: Cell<usize>,
 }
 
 /// Private helper to enable adding new methods to Rc<Promise>.
@@ -58,6 +60,7 @@ impl PromiseHelper for Rc<Promise> {
     fn initialize(&self, cx: SafeJSContext) {
         let obj = self.reflector().get_jsobject();
         self.permanent_js_root.set(ObjectValue(*obj));
+        self.sanity_test.set(self.permanent_js_root.get_unsafe() as usize);
         unsafe {
             assert!(AddRawValueRoot(
                 *cx,
@@ -72,6 +75,7 @@ impl Drop for Promise {
     #[allow(unsafe_code)]
     fn drop(&mut self) {
         unsafe {
+            self.sanity_check();
             let object = self.permanent_js_root.get().to_object();
             assert!(!object.is_null());
             let cx = Runtime::get();
@@ -82,6 +86,11 @@ impl Drop for Promise {
 }
 
 impl Promise {
+    pub fn sanity_check(&self) {
+        assert_eq!(self.sanity_test.get(), self.permanent_js_root.get_unsafe() as usize);
+        assert_eq!(self.permanent_js_root.get().to_object(), *self.reflector.get_jsobject());
+    }
+
     pub fn new(global: &GlobalScope) -> Rc<Promise> {
         let compartment = enter_realm(&*global);
         let comp = InCompartment::Entered(&compartment);
@@ -108,6 +117,7 @@ impl Promise {
             let promise = Promise {
                 reflector: Reflector::new(),
                 permanent_js_root: Heap::default(),
+                sanity_test: Cell::new(0),
             };
             let mut promise = Rc::new(promise);
             Rc::get_mut(&mut promise).unwrap().init_reflector(obj.get());
@@ -226,6 +236,7 @@ impl Promise {
 
     #[allow(unsafe_code)]
     fn promise_obj(&self) -> HandleObject {
+        self.sanity_check();
         let obj = self.reflector().get_jsobject();
         unsafe {
             assert!(IsPromiseObject(obj));

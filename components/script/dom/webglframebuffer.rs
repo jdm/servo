@@ -13,9 +13,11 @@ use crate::dom::webglobject::WebGLObject;
 use crate::dom::webglrenderbuffer::WebGLRenderbuffer;
 use crate::dom::webglrenderingcontext::WebGLRenderingContext;
 use crate::dom::webgltexture::WebGLTexture;
+use crate::dom::webgl_validations::types::TexImageTarget;
 use canvas_traits::webgl::{webgl_channel, WebGLError, WebGLResult};
-use canvas_traits::webgl::{WebGLCommand, WebGLFramebufferBindingRequest, WebGLFramebufferId};
+use canvas_traits::webgl::{TexFormat, TexDataType, WebGLCommand, WebGLFramebufferBindingRequest, WebGLFramebufferId, WebGLTextureId};
 use dom_struct::dom_struct;
+use euclid::default::Size2D;
 use std::cell::Cell;
 
 pub enum CompleteForRendering {
@@ -117,6 +119,29 @@ impl WebGLFramebuffer {
             &*context.global(),
             WebGLFramebufferBinding::Wrap,
         )
+    }
+    
+    pub(crate) fn new_with_color_attachment(
+        context: &WebGLRenderingContext,
+        id: WebGLFramebufferId,
+        texture: WebGLTextureId,
+        size: Size2D<u32>,
+    ) -> DomRoot<Self> {
+        let fb = reflect_dom_object(
+            Box::new(WebGLFramebuffer::new_inherited(context, id)),
+            &*context.global(),
+            WebGLFramebufferBinding::Wrap,
+        );
+        let texture = WebGLTexture::new(context, texture);
+        texture.init_as_if_bound(constants::TEXTURE_2D).unwrap();
+        texture.initialize(TexImageTarget::Texture2D, size.width, size.height, 1, TexFormat::RGBA, 0, Some(TexDataType::UnsignedByte)).unwrap();
+        *fb.color.borrow_mut() = Some(WebGLFramebufferAttachment::Texture {
+            texture: Dom::from_ref(&*texture),
+            level: 0,
+        });
+        //fb.status.set(constants::FRAMEBUFFER_COMPLETE);
+        fb.update_status();
+        fb
     }
 }
 

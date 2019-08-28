@@ -88,6 +88,17 @@ impl WebGLTexture {
     pub fn id(&self) -> WebGLTextureId {
         self.id
     }
+    
+    pub(crate) fn init_as_if_bound(&self, target: u32) -> WebGLResult<()> {
+        let face_count = match target {
+            constants::TEXTURE_2D => 1,
+            constants::TEXTURE_CUBE_MAP => 6,
+            _ => return Err(WebGLError::InvalidEnum),
+        };
+        self.face_count.set(face_count);
+        self.target.set(Some(target));
+        Ok(())
+    }
 
     // NB: Only valid texture targets come here
     pub fn bind(&self, target: u32) -> WebGLResult<()> {
@@ -101,13 +112,7 @@ impl WebGLTexture {
             }
         } else {
             // This is the first time binding
-            let face_count = match target {
-                constants::TEXTURE_2D => 1,
-                constants::TEXTURE_CUBE_MAP => 6,
-                _ => return Err(WebGLError::InvalidEnum),
-            };
-            self.face_count.set(face_count);
-            self.target.set(Some(target));
+            self.init_as_if_bound(target)?;
         }
 
         self.upcast::<WebGLObject>()

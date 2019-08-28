@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+use canvas_traits::webgl::{WebGLCommand, TexFormat, TexDataType};
+use canvas_traits::webgl::webgl_channel;
 use crate::dom::bindings::codegen::Bindings::XRViewBinding::{XREye, XRViewMethods};
 use crate::dom::bindings::codegen::Bindings::XRWebGLLayerBinding;
 use crate::dom::bindings::codegen::Bindings::XRWebGLLayerBinding::XRWebGLLayerInit;
@@ -21,6 +23,7 @@ use crate::dom::xrsession::XRSession;
 use crate::dom::xrview::XRView;
 use crate::dom::xrviewport::XRViewport;
 use dom_struct::dom_struct;
+use euclid::default::Size2D;
 use js::rust::CustomAutoRooter;
 use std::convert::TryInto;
 use webxr_api::Views;
@@ -90,20 +93,30 @@ impl XRWebGLLayer {
         // XXXManishearth step 4: check XR compat flag for immersive sessions
 
         let cx = global.get_cx();
-        let old_fbo = context.bound_framebuffer();
+        /*let old_fbo = context.bound_framebuffer();
         let old_texture = context
             .textures()
-            .active_texture_for_image_target(TexImageTarget::Texture2D);
+            .active_texture_for_image_target(TexImageTarget::Texture2D);*/
+            
+        let resolution = session.with_session(|s| s.recommended_framebuffer_resolution());
+        let (sender, receiver) = webgl_channel().unwrap();;
+        context.send_command(WebGLCommand::CreateXRWebGLLayer(resolution, sender));
+        let (framebuffer, texture) = receiver.recv().unwrap().map_err(|()| Error::Operation)?;
+        let framebuffer = WebGLFramebuffer::new_with_color_attachment(
+            context,
+            framebuffer,
+            texture,
+            Size2D::new(resolution.width as u32, resolution.height as u32)
+        );
 
         // Step 8.2. "Initialize layer’s framebuffer to a new opaque framebuffer created with context."
-        let framebuffer = context.CreateFramebuffer().ok_or(Error::Operation)?;
+        /*let framebuffer = context.CreateFramebuffer().ok_or(Error::Operation)?;
 
         // Step 8.3. "Allocate and initialize resources compatible with session’s XR device,
         // including GPU accessible memory buffers, as required to support the compositing of layer."
 
         // Create a new texture with size given by the session's recommended resolution
         let texture = context.CreateTexture().ok_or(Error::Operation)?;
-        let resolution = session.with_session(|s| s.recommended_framebuffer_resolution());
         let mut pixels = CustomAutoRooter::new(None);
         context.BindTexture(constants::TEXTURE_2D, Some(&texture));
         let sc = context.TexImage2D(
@@ -134,7 +147,7 @@ impl XRWebGLLayer {
 
         // Step 8.4: "If layer’s resources were unable to be created for any reason,
         // throw an OperationError and abort these steps."
-        sc.or(Err(Error::Operation))?;
+        sc.or(Err(Error::Operation))?;*/
 
         // Step 9. "Return layer."
         Ok(XRWebGLLayer::new(

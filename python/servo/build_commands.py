@@ -705,8 +705,8 @@ class MachCommands(CommandBase):
                     status = 1
 
                 # UWP build hololens
-                if uwp:
-                    build_uwp_hololens(target_triple, dev, msbuildinstalldir)
+                #if uwp:
+                #    build_uwp_hololens(target_triple, dev, msbuildinstalldir)
 
             elif sys.platform == "darwin":
                 # On the Mac, set a lovely icon. This makes it easier to pick out the Servo binary in tools
