@@ -95,8 +95,8 @@ private:
   float mDPI = 1;
   //hstring mInitialURL = L"https://www.joshmatthews.net/demos/";
   //hstring mInitialURL = L"http://manishearth.github.io/webgl-to-webxr/webxr-ar.html";
-  //hstring mInitialURL = L"http://rawcdn.githack.com/mrdoob/three.js/r105/examples/webvr_rollercoaster.html";
-  hstring mInitialURL = L"https://www.google.com";
+  hstring mInitialURL = L"http://rawcdn.githack.com/mrdoob/three.js/r105/examples/webvr_rollercoaster.html";
+  //hstring mInitialURL = L"https://www.google.com";
   //hstring mInitialURL = L"http://rawcdn.githack.com/mrdoob/three.js/r105/examples/webgl_animation_cloth.html";
 
 

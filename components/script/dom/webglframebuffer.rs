@@ -6,6 +6,7 @@
 use crate::dom::bindings::cell::DomRefCell;
 use crate::dom::bindings::codegen::Bindings::WebGLFramebufferBinding;
 use crate::dom::bindings::codegen::Bindings::WebGLRenderingContextBinding::WebGLRenderingContextConstants as constants;
+use crate::dom::bindings::codegen::Bindings::WebGL2RenderingContextBinding::WebGL2RenderingContextBinding::WebGL2RenderingContextConstants as constants2;
 use crate::dom::bindings::inheritance::Castable;
 use crate::dom::bindings::reflector::{reflect_dom_object, DomObject};
 use crate::dom::bindings::root::{Dom, DomRoot};
@@ -15,7 +16,10 @@ use crate::dom::webglrenderingcontext::WebGLRenderingContext;
 use crate::dom::webgltexture::WebGLTexture;
 use crate::dom::webgl_validations::types::TexImageTarget;
 use canvas_traits::webgl::{webgl_channel, WebGLError, WebGLResult};
-use canvas_traits::webgl::{TexFormat, TexDataType, WebGLCommand, WebGLFramebufferBindingRequest, WebGLFramebufferId, WebGLTextureId};
+use canvas_traits::webgl::{
+    GLFormats, TexFormat, TexDataType, WebGLCommand, WebGLFramebufferBindingRequest, WebGLFramebufferId, WebGLRenderbufferId,
+    WebGLTextureId
+};
 use dom_struct::dom_struct;
 use euclid::default::Size2D;
 use std::cell::Cell;
@@ -121,10 +125,14 @@ impl WebGLFramebuffer {
         )
     }
     
-    pub(crate) fn new_with_color_attachment(
+    pub(crate) fn new_with_attachments(
         context: &WebGLRenderingContext,
         id: WebGLFramebufferId,
         texture: WebGLTextureId,
+        depth: Option<WebGLRenderbufferId>,
+        stencil: Option<WebGLRenderbufferId>,
+        packed: Option<WebGLRenderbufferId>,
+        formats: GLFormats,
         size: Size2D<u32>,
     ) -> DomRoot<Self> {
         let fb = reflect_dom_object(
@@ -134,12 +142,26 @@ impl WebGLFramebuffer {
         );
         let texture = WebGLTexture::new(context, texture);
         texture.init_as_if_bound(constants::TEXTURE_2D).unwrap();
-        texture.initialize(TexImageTarget::Texture2D, size.width, size.height, 1, TexFormat::RGBA, 0, Some(TexDataType::UnsignedByte)).unwrap();
+        texture.initialize(TexImageTarget::Texture2D, size.width, size.height, 1, formats.texture_internal, 0, Some(formats.texture_type)).unwrap();
         *fb.color.borrow_mut() = Some(WebGLFramebufferAttachment::Texture {
             texture: Dom::from_ref(&*texture),
             level: 0,
         });
-        //fb.status.set(constants::FRAMEBUFFER_COMPLETE);
+        if let Some(depth) = depth {
+            let depth = WebGLRenderbuffer::new(context, depth);
+            depth.init_with_existing_storage(formats.depth, size.width as i32, size.height as i32);
+            *fb.depth.borrow_mut() = Some(WebGLFramebufferAttachment::Renderbuffer(Dom::from_ref(&*depth)));
+        }
+        if let Some(stencil) = stencil {
+            let stencil = WebGLRenderbuffer::new(context, stencil);
+            stencil.init_with_existing_storage(formats.stencil, size.width as i32, size.height as i32);
+            *fb.stencil.borrow_mut() = Some(WebGLFramebufferAttachment::Renderbuffer(Dom::from_ref(&*stencil)));
+        }
+        if let Some(packed) = packed {
+            let packed = WebGLRenderbuffer::new(context, packed);
+            packed.init_with_existing_storage(constants2::DEPTH24_STENCIL8, size.width as i32, size.height as i32);
+            *fb.depthstencil.borrow_mut() = Some(WebGLFramebufferAttachment::Renderbuffer(Dom::from_ref(&*packed)));
+        }
         fb.update_status();
         fb
     }
@@ -202,8 +224,11 @@ impl WebGLFramebuffer {
                 constants::RGB5_A1,
                 constants::RGB565,
                 constants::RGBA,
+				constants::RGB,
+				constants2::RGB8,
+				constants2::RGBA8,
             ][..],
-            &[constants::DEPTH_COMPONENT16][..],
+            &[constants::DEPTH_COMPONENT16, constants2::DEPTH_COMPONENT24][..],
             &[constants::STENCIL_INDEX8][..],
             &[constants::DEPTH_STENCIL][..],
         ];

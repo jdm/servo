@@ -12,7 +12,7 @@ use gleam::gl;
 use half::f16;
 use ipc_channel::ipc::{self, OpaqueIpcMessage};
 use ipc_channel::router::ROUTER;
-use offscreen_gl_context::{DrawBuffer, GLContext, NativeGLContextMethods};
+use offscreen_gl_context::{ColorAttachmentType, DrawBuffer, GLContext, NativeGLContextMethods, RenderbufferAttachments};
 use pixels::{self, PixelFormat};
 use std::borrow::Cow;
 use std::cell::Cell;
@@ -39,6 +39,7 @@ pub struct GLState {
     stencil_clear_value: i32,
     depth_write_mask: bool,
     depth_clear_value: f64,
+    draw_buffer: Option<DrawBuffer>,
 }
 
 impl Default for GLState {
@@ -50,6 +51,7 @@ impl Default for GLState {
             stencil_clear_value: 0,
             depth_write_mask: true,
             depth_clear_value: 1.,
+            draw_buffer: None,
         }
     }
 }
@@ -865,6 +867,7 @@ struct WebGLContextInfo {
     gl_sync: Option<gl::GLsync>,
     /// The status of this context with respect to external consumers.
     render_state: ContextRenderState,
+    
 }
 
 /// Data about the linked DOM<->WebGLTexture elements.
@@ -888,10 +891,44 @@ impl WebGLImpl {
     ) {
         match command {
             WebGLCommand::StartXRFrame | WebGLCommand::EndXRFrame => (),
-            WebGLCommand::CreateXRWebGLLayer(ref resolution, ref sender) => {
-                let gl = ctx.gl();
+            WebGLCommand::CreateXRWebGLLayer(ref resolution, ref sender, ref alpha, ref depth, ref stencil, ref antialias) => {
+                //let gl = ctx.gl();
+                let raw_formats = ctx.borrow_formats();
+                let formats = GLFormats {
+                    texture_internal: TexFormat::from_gl_constant(raw_formats.texture_internal).expect("unknown format"),
+                    texture_type: TexDataType::from_gl_constant(raw_formats.texture_type).expect("unknown type"),
+                    depth: raw_formats.depth,
+                    stencil: raw_formats.stencil,
+                };
 
-                let mut value = [0];
+                let attrs = offscreen_gl_context::GLContextAttributes {
+                    alpha: *alpha,
+                    depth: *depth,
+                    stencil: *stencil,
+                    antialias: *antialias,
+                    premultiplied_alpha: false,
+                    preserve_drawing_buffer: false,
+                };
+                
+                let draw_buffer = match DrawBuffer::new_with_attributes(ctx, Size2D::new(resolution.width, resolution.height),
+                                                                        ColorAttachmentType::Texture, &attrs) {
+                    Ok(d) => d,
+                    Err(s) => {
+                        error!("couldn't create XR draw buffer: {}", s);
+                        let _ = sender.send(Err(()));
+                        return;
+                    }
+                };
+                let framebuffer = draw_buffer.get_framebuffer();
+                let attachments = draw_buffer.get_renderbuffer_attachments();
+                let (depth, stencil, packed) = match attachments {
+                    RenderbufferAttachments::DepthAndStencil(depth, stencil) => (depth, stencil, None),
+                    RenderbufferAttachments::PackedDepthAndStencil(packed) => (None, None, Some(packed)),
+                };
+                let texture = draw_buffer.get_bound_texture_id().expect("should have a texture");
+                state.draw_buffer = Some(draw_buffer);
+
+                /*let mut value = [0];
                 unsafe {
                     gl.get_integer_v(gl::TEXTURE_BINDING_2D, &mut value);
                 }
@@ -901,9 +938,9 @@ impl WebGLImpl {
                     gl.get_integer_v(gl::FRAMEBUFFER_BINDING, &mut value);
                 }
 				assert_eq!(gl.get_error(), gl::NO_ERROR);
-                let old_framebuffer = value[0] as gl::GLuint;
+                let old_framebuffer = value[0] as gl::GLuint;*/
                 
-                let texture = gl.gen_textures(1)[0];
+                /*let texture = gl.gen_textures(1)[0];
 				assert_eq!(gl.get_error(), gl::NO_ERROR);
                 gl.bind_texture(gl::TEXTURE_2D, texture);
 				assert_eq!(gl.get_error(), gl::NO_ERROR);
@@ -931,14 +968,21 @@ impl WebGLImpl {
                     texture,
                     0,
                 );
-				assert_eq!(gl.get_error(), gl::NO_ERROR);
+				assert_eq!(gl.get_error(), gl::NO_ERROR);*/
                 
-                gl.bind_texture(gl::TEXTURE_2D, old_texture);
+                /*gl.bind_texture(gl::TEXTURE_2D, old_texture);
 				assert_eq!(gl.get_error(), gl::NO_ERROR);
                 gl.bind_framebuffer(gl::FRAMEBUFFER, old_framebuffer);
-				assert_eq!(gl.get_error(), gl::NO_ERROR);
+				assert_eq!(gl.get_error(), gl::NO_ERROR);*/
                 unsafe {
-                    let _ = sender.send(Ok((WebGLFramebufferId::new(framebuffer), WebGLTextureId::new(texture))));
+                    let _ = sender.send(Ok((
+                        formats,
+                        WebGLFramebufferId::new(framebuffer),
+                        WebGLTextureId::new(texture),
+                        depth.map(|d| WebGLRenderbufferId::new(d)),
+                        stencil.map(|s| WebGLRenderbufferId::new(s)),
+                        packed.map(|p| WebGLRenderbufferId::new(p)),
+                    )));
                 }
             }
             WebGLCommand::GetContextAttributes(ref sender) => sender

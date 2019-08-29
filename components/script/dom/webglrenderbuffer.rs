@@ -183,9 +183,6 @@ impl WebGLRenderbuffer {
             _ => return Err(WebGLError::InvalidEnum),
         };
 
-        self.internal_format.set(Some(internal_format));
-        self.is_initialized.set(false);
-
         self.upcast::<WebGLObject>()
             .context()
             .send_command(WebGLCommand::RenderbufferStorage(
@@ -195,9 +192,16 @@ impl WebGLRenderbuffer {
                 height,
             ));
 
-        self.size.set(Some((width, height)));
+        self.init_with_existing_storage(internal_format, width, height);
 
         Ok(())
+    }
+    
+    pub fn init_with_existing_storage(&self, internal_format: u32, width: i32, height: i32) {
+        self.internal_format.set(Some(internal_format));
+        self.is_initialized.set(false);
+        self.size.set(Some((width, height)));
+        self.ever_bound.set(true);
     }
 }
 

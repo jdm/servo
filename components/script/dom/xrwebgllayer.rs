@@ -100,12 +100,16 @@ impl XRWebGLLayer {
             
         let resolution = session.with_session(|s| s.recommended_framebuffer_resolution());
         let (sender, receiver) = webgl_channel().unwrap();;
-        context.send_command(WebGLCommand::CreateXRWebGLLayer(resolution, sender));
-        let (framebuffer, texture) = receiver.recv().unwrap().map_err(|()| Error::Operation)?;
-        let framebuffer = WebGLFramebuffer::new_with_color_attachment(
+        context.send_command(WebGLCommand::CreateXRWebGLLayer(resolution, sender, init.alpha, init.depth, init.stencil, init.antialias));
+        let (formats, framebuffer, texture, depth, stencil, packed) = receiver.recv().unwrap().map_err(|()| Error::Operation)?;
+        let framebuffer = WebGLFramebuffer::new_with_attachments(
             context,
             framebuffer,
             texture,
+            depth,
+            stencil,
+            packed,
+            formats,
             Size2D::new(resolution.width as u32, resolution.height as u32)
         );
 

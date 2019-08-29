@@ -211,12 +211,34 @@ impl<T> Deref for TruncatedDebug<T> {
     }
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GLFormats {
+    pub texture_internal: TexFormat,
+    pub texture_type: TexDataType,
+    pub depth: u32,
+    pub stencil: u32,
+}
+
 /// WebGL Commands for a specific WebGLContext
 #[derive(Debug, Deserialize, Serialize)]
 pub enum WebGLCommand {
     StartXRFrame,
     EndXRFrame,
-    CreateXRWebGLLayer(TypedSize2D<i32, webxr_api::Viewport>, WebGLSender<Result<(WebGLFramebufferId, WebGLTextureId), ()>>),
+    CreateXRWebGLLayer(
+        TypedSize2D<i32, webxr_api::Viewport>,
+        WebGLSender<Result<(
+            GLFormats,
+            WebGLFramebufferId,
+            WebGLTextureId,
+            Option<WebGLRenderbufferId>, // depth
+            Option<WebGLRenderbufferId>, // stencil
+            Option<WebGLRenderbufferId>, // packed
+        ), ()>>,
+        bool, // alpha
+        bool, // depth
+        bool, // stencil
+        bool, // antialias
+    ),
     GetContextAttributes(WebGLSender<GLContextAttributes>),
     ActiveTexture(u32),
     BlendColor(f32, f32, f32, f32),
@@ -786,6 +808,7 @@ gl_enums! {
         DepthComponent = gl::DEPTH_COMPONENT,
         Alpha = gl::ALPHA,
         RGB = gl::RGB,
+        RGB8 = gl::RGB8,
         RGBA = gl::RGBA,
         Luminance = gl::LUMINANCE,
         LuminanceAlpha = gl::LUMINANCE_ALPHA,

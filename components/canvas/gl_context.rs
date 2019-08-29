@@ -4,7 +4,7 @@
 
 use super::webgl_thread::{GLState, WebGLImpl};
 use canvas_traits::webgl::{
-    GLContextAttributes, GLLimits, WebGLCommand, WebGLCommandBacktrace, WebGLVersion,
+    GLContextAttributes, GLFormats, GLLimits, TexFormat, TexDataType, WebGLCommand, WebGLCommandBacktrace, WebGLVersion,
 };
 use euclid::default::Size2D;
 use gleam::gl;
