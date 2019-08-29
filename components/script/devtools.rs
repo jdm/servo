@@ -192,7 +192,7 @@ pub fn handle_get_cached_messages(
     if message_types.contains(CachedConsoleMessageTypes::PAGE_ERROR) {
         // TODO: make script error reporter pass all reported errors
         //      to devtools and cache them for returning here.
-        let msg = PageError {
+        /*let msg = PageError {
             type_: "PageError".to_owned(),
             errorMessage: "page error test".to_owned(),
             sourceName: String::new(),
@@ -207,11 +207,11 @@ pub fn handle_get_cached_messages(
             strict: false,
             private: false,
         };
-        messages.push(CachedConsoleMessage::PageError(msg));
+        messages.push(CachedConsoleMessage::PageError(msg));*/
     }
     if message_types.contains(CachedConsoleMessageTypes::CONSOLE_API) {
         // TODO: do for real
-        let msg = ConsoleAPI {
+        /*let msg = ConsoleAPI {
             type_: "ConsoleAPI".to_owned(),
             level: "error".to_owned(),
             filename: "http://localhost/~mihai/mozilla/test.html".to_owned(),
@@ -221,7 +221,7 @@ pub fn handle_get_cached_messages(
             private: false,
             arguments: vec!["console error test".to_owned()],
         };
-        messages.push(CachedConsoleMessage::ConsoleAPI(msg));
+        messages.push(CachedConsoleMessage::ConsoleAPI(msg));*/
     }
     reply.send(messages).unwrap();
 }

@@ -31,6 +31,8 @@
     </Application>
   </Applications>
   <Capabilities>
-    <Capability Name="internetClient" />
+    <Capability Name="internetClientServer"/>
+    <Capability Name="privateNetworkClientServer"/>
+    <Capability Name="codeGeneration"/>
   </Capabilities>
 </Package>

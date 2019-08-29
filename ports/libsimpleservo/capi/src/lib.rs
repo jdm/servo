@@ -259,7 +259,7 @@ unsafe fn init(
     callbacks: CHostCallbacks,
 ) {
     init_logger();
-
+    
     if let Err(reason) = redirect_stdout_stderr() {
         warn!("Error redirecting stdout/stderr: {}", reason);
     }

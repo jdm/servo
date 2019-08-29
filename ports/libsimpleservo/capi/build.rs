@@ -17,11 +17,12 @@ fn main() {
     let profile_dir = env::var("PROFILE").unwrap();
     path.push(profile_dir);
     path.push("simpleservo.h");
-    cbindgen::Builder::new()
+    if let Ok(b) = cbindgen::Builder::new()
         .with_crate(crate_dir)
         .with_language(cbindgen::Language::C)
         .exclude_item("OutputDebugStringA")
         .generate()
-        .expect("Unable to generate bindings")
-        .write_to_file(path);
+    {
+        b.write_to_file(path);
+    }
 }

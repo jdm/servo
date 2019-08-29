@@ -82,6 +82,8 @@ pub enum ScriptToDevtoolsControlMsg {
 
     /// Report a CSS parse error for the given pipeline
     ReportCSSError(PipelineId, CSSError),
+    
+    ReportPageError(PipelineId, PageError),
 }
 
 /// Serialized JS return values
@@ -253,7 +255,7 @@ bitflags! {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct PageError {
     #[serde(rename = "_type")]
     pub type_: String,
