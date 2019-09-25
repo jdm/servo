@@ -82,7 +82,7 @@ webvr_traits = {path = "../webvr_traits"}
 webxr-api = {git = "https://github.com/servo/webxr"}
 
 [dependencies.surfman]
-path = "/Users/jdm/src/rust-offscreen-rendering-context/surfman"
+path = "../../../rust-offscreen-rendering-context/surfman"
 
 [target.'cfg(all(not(target_os = "windows"), not(target_os = "ios"), not(target_os="android"), not(target_arch="arm"), not(target_arch="aarch64")))'.dependencies]
 gaol = {git = "https://github.com/servo/gaol"}

@@ -188,6 +188,9 @@ pub fn init(
     gl.clear(gl::COLOR_BUFFER_BIT);
     gl.finish();
 
+    let adapter = surfman::Adapter::default().expect("no default adapter??");
+    let device = Rc::new(surfman::Device::new(&adapter).expect("no device??"));
+
     let window_callbacks = Rc::new(ServoWindowCallbacks {
         host_callbacks: callbacks,
         gl: gl.clone(),
@@ -195,6 +198,7 @@ pub fn init(
         density: init_opts.density,
         gl_context_pointer: init_opts.gl_context_pointer,
         native_display_pointer: init_opts.native_display_pointer,
+        device,
     });
 
     let embedder_callbacks = Box::new(ServoEmbedderCallbacks {
@@ -597,6 +601,7 @@ struct ServoWindowCallbacks {
     density: f32,
     gl_context_pointer: Option<*const c_void>,
     native_display_pointer: Option<*const c_void>,
+    device: Rc<surfman::Device>,
 }
 
 impl EmbedderMethods for ServoEmbedderCallbacks {
@@ -645,7 +650,11 @@ impl EmbedderMethods for ServoEmbedderCallbacks {
 }
 
 impl WindowMethods for ServoWindowCallbacks {
-    fn prepare_for_composite(&self) {
+    fn surfman_device(&self) -> Rc<surfman::Device> {
+        self.device.clone()
+    }
+
+    fn make_gl_context_current(&self) {
         debug!("WindowMethods::prepare_for_composite");
         self.host_callbacks.make_current();
     }

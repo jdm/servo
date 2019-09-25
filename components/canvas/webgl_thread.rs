@@ -384,7 +384,7 @@ impl WebGLThread {
 
         //FIXME(jdm)
         let framebuffer_formats = GLFormats {
-            texture_format: gl::RGBA,
+            texture_format: gl::RGB,
             texture_type: gl::UNSIGNED_BYTE,
         };
         Ok((id, limits, framebuffer_formats))
