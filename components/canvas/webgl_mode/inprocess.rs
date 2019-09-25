@@ -135,6 +135,7 @@ impl WebGLExternalImages {
 impl WebrenderExternalImageApi for WebGLExternalImages {
     // FIXME(pcwalton): What is the ID for?
     fn lock(&mut self, id: u64) -> (u32, Size2D<i32>) {
+        self.context.borrow().debug("lock");
         let (gl_texture, size);
         match self.front_buffer.take() {
             None => {
@@ -155,6 +156,7 @@ impl WebrenderExternalImageApi for WebGLExternalImages {
     }
 
     fn unlock(&mut self, id: u64) {
+        self.context.borrow().debug("unlock");
         self.sendable.unlock(id as usize);
 
         let locked_front_buffer = match self.locked_front_buffer.take() {
@@ -173,7 +175,7 @@ impl WebrenderExternalImageApi for WebGLExternalImages {
             return;
         }
 
-        self.device.destroy_surface(&mut *context, locked_front_buffer).unwrap();
+        let _ = self.device.destroy_surface(&mut *context, locked_front_buffer)/*.unwrap()*/;
     }
 }
 
