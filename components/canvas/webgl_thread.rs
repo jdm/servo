@@ -94,6 +94,8 @@ pub(crate) struct WebGLThread {
     sender: WebGLSender<WebGLMsg>,
     /// FIXME(pcwalton): Should be one front buffer per context ID!!
     front_buffer: Arc<FrontBuffer>,
+    ///
+    api_type: gl::GlType,
 }
 
 #[derive(PartialEq)]
@@ -111,6 +113,7 @@ pub(crate) struct WebGLThreadInit {
     pub receiver: WebGLReceiver<WebGLMsg>,
     pub front_buffer: Arc<FrontBuffer>,
     pub adapter: Adapter,
+    pub api_type: gl::GlType,
 }
 
 /// The extra data required to run an instance of WebGLThread when it is
@@ -155,6 +158,7 @@ impl WebGLThread {
             receiver,
             front_buffer,
             adapter,
+            api_type,
         }: WebGLThreadInit,
     ) -> Self {
         WebGLThread {
@@ -169,6 +173,7 @@ impl WebGLThread {
             sender,
             receiver,
             front_buffer,
+            api_type,
         }
     }
 
@@ -361,9 +366,15 @@ impl WebGLThread {
                 .0 as usize,
         );
 
-        let gl = unsafe {
-            let fns = gl::ffi_gl::Gl::load_with(|symbol_name| self.device.get_proc_address(&ctx, symbol_name));
-            Gl::gl_fns(fns)
+        let gl = match self.api_type {
+            gl::GlType::Gl => unsafe {
+                let fns = gl::ffi_gl::Gl::load_with(|symbol_name| self.device.get_proc_address(&ctx, symbol_name));
+                Gl::gl_fns(fns)
+            },
+            gl::GlType::Gles => unsafe {
+                let fns = gl::ffi_gles::Gles2::load_with(|symbol_name| self.device.get_proc_address(&ctx, symbol_name));
+                Gl::gles_fns(fns)
+            },
         };
 
         let limits = GLLimits::detect(&*gl);

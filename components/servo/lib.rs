@@ -1017,8 +1017,8 @@ fn create_webgl_threads<W>(window: &W,
                            webvr_compositor: Option<Box<WebVRCompositorHandler>>,
                            webxr_main_thread: &mut webxr_api::MainThreadRegistry,
                            external_image_handlers: &mut WebrenderExternalImageHandlers,
-                           external_images: Arc<Mutex<WebrenderExternalImageRegistry>>)
-                           -> WebGLThreads
+                           external_images: Arc<Mutex<WebrenderExternalImageRegistry>>,
+                           ) -> WebGLThreads
                            where W: WindowMethods + 'static + ?Sized {
     // Create a `surfman` device and context.
     //
@@ -1029,6 +1029,10 @@ fn create_webgl_threads<W>(window: &W,
         Device::from_current_context().expect("Failed to create graphics context!")
     };
 
+    let api_type = match window.gl().get_type() {
+        gleam::gl::GlType::Gl => sparkle::gl::GlType::Gl,
+        gleam::gl::GlType::Gles => sparkle::gl::GlType::Gles,
+    };
     let WebGLComm {
         webgl_threads,
         webxr_handler,
@@ -1039,7 +1043,9 @@ fn create_webgl_threads<W>(window: &W,
                        window.gl(),
                        webrender_api_sender,
                        webvr_compositor.map(|compositor| compositor as Box<_>),
-                       external_images);
+                       external_images,
+                       api_type,
+                       );
 
     // Set webrender external image handler for WebGL textures
     external_image_handlers.set_handler(image_handler, WebrenderImageHandlerType::WebGL);
