@@ -38,7 +38,6 @@ layout-2013 = ["libservo/layout-2013"]
 layout-2020 = ["libservo/layout-2020"]
 max_log_level = ["log/release_max_level_info"]
 native-bluetooth = ["libservo/native-bluetooth"]
-no_wgl = ["libservo/no_wgl"]
 profilemozjs = ["libservo/profilemozjs"]
 webdriver = ["libservo/webdriver"]
 webgl_backtrace = ["libservo/webgl_backtrace"]
@@ -61,6 +60,7 @@ servo-media = {git = "https://github.com/servo/media"}
 tinyfiledialogs = "3.0"
 webxr-api = { git = "https://github.com/servo/webxr", features = ["ipc"] }
 webxr = { git = "https://github.com/servo/webxr", features = ["ipc", "glwindow", "headless"] }
+surfman = { git = "https://github.com/pcwalton/surfman" }
 
 [target.'cfg(any(target_os = "linux", target_os = "windows"))'.dependencies]
 image = "0.22"

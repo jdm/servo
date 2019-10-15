@@ -12,6 +12,7 @@ use crate::WindowSizeType;
 use crate::WorkerGlobalScopeInit;
 use crate::WorkerScriptLoadOrigin;
 use canvas_traits::canvas::{CanvasId, CanvasMsg};
+use canvas_traits::webgl::WebGLContextId;
 use devtools_traits::{ScriptToDevtoolsControlMsg, WorkerId};
 use embedder_traits::EmbedderMsg;
 use euclid::default::Size2D as UntypedSize2D;

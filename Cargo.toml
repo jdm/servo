@@ -33,3 +33,12 @@ rand_core = { git = "https://github.com/servo/rand", branch = "servo-rand_os-0.1
 autocfg = { git = "https://github.com/servo/autocfg", branch = "rustflags" }
 # https://github.com/retep998/winapi-rs/pull/816
 winapi = { git = "https://github.com/servo/winapi-rs", branch = "patch-1" }
+
+core-foundation = { git = "https://github.com/zakorgy/core-foundation-rs", branch = "io-surface-alpha" }
+io-surface = { git = "https://github.com/zakorgy/core-foundation-rs", branch = "io-surface-alpha" }
+
+[patch."https://github.com/servo/webxr"]
+# webxr = { git = "https://github.com/asajeffrey/webxr", branch = "surfman" }
+# webxr-api = { git = "https://github.com/asajeffrey/webxr", branch = "surfman" }
+webxr = { path = "../webxr/webxr" }
+webxr-api = { path = "../webxr/webxr-api" }

@@ -22,6 +22,7 @@ use crate::wrapper::ThreadSafeLayoutNodeHelpers;
 use crate::ServoArc;
 use app_units::Au;
 use canvas_traits::canvas::{CanvasId, CanvasMsg};
+use canvas_traits::webgl::WebGLContextId;
 use euclid::default::{Point2D, Rect, Size2D, Vector2D};
 use gfx::text::glyph::ByteIndex;
 use gfx::text::text_run::{TextRun, TextRunSlice};
@@ -337,7 +338,10 @@ impl InlineAbsoluteFragmentInfo {
 
 #[derive(Clone)]
 pub enum CanvasFragmentSource {
-    WebGL(webrender_api::ImageKey),
+    WebGL {
+        image_key: webrender_api::ImageKey,
+        context_id: WebGLContextId,
+    },
     Image(Option<Arc<Mutex<IpcSender<CanvasMsg>>>>),
 }
 
@@ -352,7 +356,13 @@ pub struct CanvasFragmentInfo {
 impl CanvasFragmentInfo {
     pub fn new(data: HTMLCanvasData) -> CanvasFragmentInfo {
         let source = match data.source {
-            HTMLCanvasDataSource::WebGL(texture_id) => CanvasFragmentSource::WebGL(texture_id),
+            HTMLCanvasDataSource::WebGL {
+                image_key,
+                context_id,
+            } => CanvasFragmentSource::WebGL {
+                image_key,
+                context_id,
+            },
             HTMLCanvasDataSource::Image(ipc_sender) => CanvasFragmentSource::Image(
                 ipc_sender.map(|renderer| Arc::new(Mutex::new(renderer))),
             ),

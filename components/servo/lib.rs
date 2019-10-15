@@ -64,8 +64,8 @@ fn webdriver(_port: u16, _constellation: Sender<ConstellationMsg>) {}
 
 use bluetooth::BluetoothThreadFactory;
 use bluetooth_traits::BluetoothRequest;
-use canvas::gl_context::{CloneableDispatcher, GLContextFactory};
-use canvas::webgl_thread::{ThreadMode, WebGLMainThread, WebGLThreads};
+use canvas::WebGLComm;
+use canvas_traits::webgl::WebGLThreads;
 use compositing::compositor_thread::{
     CompositorProxy, CompositorReceiver, InitialCompositorState, Msg,
 };
@@ -100,7 +100,6 @@ use media::{GLPlayerThreads, WindowGLContext};
 use msg::constellation_msg::{PipelineNamespace, PipelineNamespaceId};
 use net::resource_thread::new_resource_threads;
 use net_traits::IpcSend;
-use offscreen_gl_context::GLContextDispatcher;
 use profile::mem as profile_mem;
 use profile::time as profile_time;
 use profile_traits::mem;
@@ -111,11 +110,15 @@ use servo_config::{pref, prefs};
 use servo_media::player::context::GlContext;
 use servo_media::ServoMedia;
 use std::borrow::Cow;
+use std::cell::RefCell;
 use std::cmp::max;
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::sync::{Arc, Mutex};
+use surfman::Device;
 use webrender::{RendererKind, ShaderPrecacheFlags};
-use webrender_traits::{WebrenderExternalImageHandlers, WebrenderImageHandlerType};
+use webrender_traits::WebrenderImageHandlerType;
+use webrender_traits::{WebrenderExternalImageHandlers, WebrenderExternalImageRegistry};
 use webvr::{VRServiceManager, WebVRCompositorHandler, WebVRThread};
 use webvr_traits::WebVRMsg;
 
@@ -260,7 +263,6 @@ pub struct Servo<Window: WindowMethods + 'static + ?Sized> {
     embedder_receiver: EmbedderReceiver,
     embedder_events: Vec<(Option<BrowserId>, EmbedderMsg)>,
     profiler_enabled: bool,
-    webgl_thread_data: Option<Rc<WebGLMainThread>>,
 }
 
 #[derive(Clone)]
@@ -315,7 +317,7 @@ where
         }
 
         // Make sure the gl context is made current.
-        window.prepare_for_composite();
+        window.make_gl_context_current();
 
         // Reserving a namespace to create TopLevelBrowserContextId.
         PipelineNamespace::install(PipelineNamespaceId(0));
@@ -438,6 +440,7 @@ where
                 (None, None, None)
             };
 
+        /*
         // GLContext factory used to create WebGL Contexts
         let gl_factory = if opts.should_use_osmesa() {
             GLContextFactory::current_osmesa_handle()
@@ -450,46 +453,20 @@ where
             };
             GLContextFactory::current_native_handle(dispatcher, gl_type)
         };
+        */
 
         let (external_image_handlers, external_images) = WebrenderExternalImageHandlers::new();
         let mut external_image_handlers = Box::new(external_image_handlers);
 
-        let run_webgl_on_main_thread =
-            cfg!(windows) || std::env::var("SERVO_WEBGL_MAIN_THREAD").is_ok();
-
-        // Initialize WebGL Thread entry point.
-        let webgl_result = gl_factory.map(|factory| {
-            let (webgl_threads, thread_data, webxr_handler, image_handler, output_handler) =
-                WebGLThreads::new(
-                    factory,
-                    window.gl(),
-                    webrender_api_sender.clone(),
-                    webvr_compositor.map(|c| c as Box<_>),
-                    external_images.clone(),
-                    if run_webgl_on_main_thread {
-                        ThreadMode::MainThread(embedder.create_event_loop_waker())
-                    } else {
-                        ThreadMode::OffThread
-                    },
-                );
-
-            // Set webrender external image handler for WebGL textures
-            external_image_handlers.set_handler(image_handler, WebrenderImageHandlerType::WebGL);
-
-            // Set webxr external image handler for WebGL textures
-            webxr_main_thread.set_webgl(webxr_handler);
-
-            // Set DOM to texture handler, if enabled.
-            if let Some(output_handler) = output_handler {
-                webrender.set_output_image_handler(output_handler);
-            }
-
-            (webgl_threads, thread_data)
-        });
-        let (webgl_threads, webgl_thread_data) = match webgl_result {
-            Some((a, b)) => (Some(a), b),
-            None => (None, None),
-        };
+        let webgl_threads = create_webgl_threads(
+            &*window,
+            &mut webrender,
+            webrender_api_sender.clone(),
+            webvr_compositor,
+            &mut webxr_main_thread,
+            &mut external_image_handlers,
+            external_images.clone(),
+        );
 
         let glplayer_threads = match window.get_gl_context() {
             GlContext::Unknown => None,
@@ -510,16 +487,7 @@ where
 
         webrender.set_external_image_handler(external_image_handlers);
 
-        // When webgl execution occurs on the main thread, and the script thread
-        // lives in the same process, then the script thread needs the ability to
-        // wake up the main thread's event loop when webgl commands need processing.
-        // When there are multiple processes, this is handled automatically by
-        // the IPC receiving handler instead.
-        let event_loop_waker = if run_webgl_on_main_thread && !opts.multiprocess {
-            Some(embedder.create_event_loop_waker())
-        } else {
-            None
-        };
+        let event_loop_waker = None;
 
         // Create the constellation, which maintains the engine
         // pipelines, including the script and layout threads, as well
@@ -537,7 +505,7 @@ where
             webrender_api_sender,
             webxr_main_thread.registry(),
             player_context,
-            webgl_threads,
+            Some(webgl_threads),
             webvr_chan,
             webvr_constellation_sender,
             glplayer_threads,
@@ -582,7 +550,6 @@ where
             embedder_receiver: embedder_receiver,
             embedder_events: Vec::new(),
             profiler_enabled: false,
-            webgl_thread_data,
         }
     }
 
@@ -774,10 +741,6 @@ where
     }
 
     pub fn handle_events(&mut self, events: Vec<WindowEvent>) {
-        if let Some(ref mut webgl_thread) = self.webgl_thread_data {
-            webgl_thread.process();
-        }
-
         if self.compositor.receive_messages() {
             self.receive_messages();
         }
@@ -1049,15 +1012,58 @@ impl MainThreadDispatcher {
         }
     }
 }
-impl GLContextDispatcher for MainThreadDispatcher {
-    fn dispatch(&self, f: Box<dyn Fn() + Send>) {
-        self.compositor_proxy.send(Msg::Dispatch(f));
+
+// Initializes the WebGL thread.
+fn create_webgl_threads<W>(
+    window: &W,
+    webrender: &mut webrender::Renderer,
+    webrender_api_sender: webrender_api::RenderApiSender,
+    webvr_compositor: Option<Box<WebVRCompositorHandler>>,
+    webxr_main_thread: &mut webxr_api::MainThreadRegistry,
+    external_image_handlers: &mut WebrenderExternalImageHandlers,
+    external_images: Arc<Mutex<WebrenderExternalImageRegistry>>,
+) -> WebGLThreads
+where
+    W: WindowMethods + 'static + ?Sized,
+{
+    // Create a `surfman` device and context.
+    //
+    // FIXME(pcwalton): The `NoopContextReleaser` is an unsafe hack to get around the fact that
+    // Glutin doesn't provide an obvious way to reference count windows.
+    window.make_gl_context_current();
+    let (device, context) =
+        unsafe { Device::from_current_context().expect("Failed to create graphics context!") };
+
+    let gl_type = match window.gl().get_type() {
+        gleam::gl::GlType::Gl => sparkle::gl::GlType::Gl,
+        gleam::gl::GlType::Gles => sparkle::gl::GlType::Gles,
+    };
+
+    let WebGLComm {
+        webgl_threads,
+        webxr_swap_chains,
+        image_handler,
+        output_handler,
+    } = WebGLComm::new(
+        Rc::new(device),
+        Rc::new(RefCell::new(context)),
+        window.gl(),
+        webrender_api_sender,
+        webvr_compositor.map(|compositor| compositor as Box<_>),
+        external_images,
+        gl_type,
+    );
+
+    // Set webrender external image handler for WebGL textures
+    external_image_handlers.set_handler(image_handler, WebrenderImageHandlerType::WebGL);
+
+    // Set webxr external image handler for WebGL textures
+    webxr_main_thread.set_swap_chains(webxr_swap_chains);
+
+    // Set DOM to texture handler, if enabled.
+    if let Some(output_handler) = output_handler {
+        webrender.set_output_image_handler(output_handler);
     }
-}
-impl CloneableDispatcher for MainThreadDispatcher {
-    fn clone(&self) -> Box<dyn GLContextDispatcher> {
-        Box::new(MainThreadDispatcher {
-            compositor_proxy: self.compositor_proxy.clone(),
-        }) as Box<_>
-    }
+
+    webgl_threads
 }

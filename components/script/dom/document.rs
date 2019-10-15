@@ -98,6 +98,7 @@ use crate::dom::treewalker::TreeWalker;
 use crate::dom::uievent::UIEvent;
 use crate::dom::virtualmethods::vtable_for;
 use crate::dom::webglcontextevent::WebGLContextEvent;
+use crate::dom::webglrenderingcontext::WebGLCommandSender;
 use crate::dom::wheelevent::WheelEvent;
 use crate::dom::window::{ReflowReason, Window};
 use crate::dom::windowproxy::WindowProxy;
@@ -109,7 +110,7 @@ use crate::stylesheet_set::StylesheetSetRef;
 use crate::task::TaskBox;
 use crate::task_source::{TaskSource, TaskSourceName};
 use crate::timers::OneshotTimerCallback;
-use canvas_traits::webgl::{self, WebGLContextId, WebGLMsg};
+use canvas_traits::webgl::{self, SwapChainId, WebGLContextId, WebGLMsg};
 use cookie::Cookie;
 use devtools_traits::ScriptToDevtoolsControlMsg;
 use dom_struct::dom_struct;
@@ -2499,10 +2500,13 @@ impl Document {
     }
 
     pub fn flush_dirty_canvases(&self) {
-        let dirty_context_ids: Vec<_> = self.dirty_webgl_contexts.borrow_mut().drain().collect();
-        if dirty_context_ids.is_empty() {
-            return;
-        }
+        let dirty_context_ids: Vec<_> = self
+            .dirty_webgl_contexts
+            .borrow_mut()
+            .drain()
+            .map(SwapChainId::Context)
+            .collect();
+
         let (sender, receiver) = webgl::webgl_channel().unwrap();
         self.window
             .webgl_chan()
@@ -4682,6 +4686,8 @@ pub enum AnimationFrameCallback {
     FrameRequestCallback {
         #[ignore_malloc_size_of = "Rc is hard"]
         callback: Rc<FrameRequestCallback>,
+        #[ignore_malloc_size_of = "channels are hard"]
+        webgl_chan: Option<WebGLCommandSender>,
     },
 }
 
@@ -4697,7 +4703,10 @@ impl AnimationFrameCallback {
                     .unwrap();
                 devtools_sender.send(msg).unwrap();
             },
-            AnimationFrameCallback::FrameRequestCallback { ref callback } => {
+            AnimationFrameCallback::FrameRequestCallback {
+                ref callback,
+                webgl_chan: _,
+            } => {
                 // TODO(jdm): The spec says that any exceptions should be suppressed:
                 // https://github.com/servo/servo/issues/6928
                 let _ = callback.Call__(Finite::wrap(now), ExceptionHandling::Report);

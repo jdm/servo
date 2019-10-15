@@ -10,6 +10,7 @@ publish = false
 libservo = { path = "../../../components/servo" }
 log = "0.4"
 servo-media = { git = "https://github.com/servo/media" }
+surfman = { git = "https://github.com/pcwalton/surfman" }
 
 webxr-api = { git = "https://github.com/servo/webxr", features = ["ipc"] }
 webxr = { git = "https://github.com/servo/webxr" , optional = true}
@@ -43,7 +44,6 @@ layout-2020 = ["libservo/layout-2020"]
 max_log_level = ["log/release_max_level_info"]
 native-bluetooth = ["libservo/native-bluetooth"]
 no_static_freetype = ["libservo/no_static_freetype"]
-no_wgl = ["libservo/no_wgl"]
 oculusvr = ["libservo/oculusvr"]
 webdriver = ["libservo/webdriver"]
 uwp = ["libservo/uwp", "webxr", "webxr/openxr-api"]

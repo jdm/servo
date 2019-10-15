@@ -6,8 +6,6 @@ use crate::compartments::InCompartment;
 use crate::dom::bindings::callback::ExceptionHandling;
 use crate::dom::bindings::cell::DomRefCell;
 use crate::dom::bindings::codegen::Bindings::NavigatorBinding::NavigatorBinding::NavigatorMethods;
-use crate::dom::bindings::codegen::Bindings::WebGLRenderingContextBinding::WebGLRenderingContextConstants as constants;
-use crate::dom::bindings::codegen::Bindings::WebGLRenderingContextBinding::WebGLRenderingContextMethods;
 use crate::dom::bindings::codegen::Bindings::WindowBinding::WindowBinding::WindowMethods;
 use crate::dom::bindings::codegen::Bindings::XRReferenceSpaceBinding::XRReferenceSpaceType;
 use crate::dom::bindings::codegen::Bindings::XRRenderStateBinding::XRRenderStateInit;
@@ -17,7 +15,6 @@ use crate::dom::bindings::codegen::Bindings::XRSessionBinding::XREnvironmentBlen
 use crate::dom::bindings::codegen::Bindings::XRSessionBinding::XRFrameRequestCallback;
 use crate::dom::bindings::codegen::Bindings::XRSessionBinding::XRSessionMethods;
 use crate::dom::bindings::codegen::Bindings::XRSessionBinding::XRVisibilityState;
-use crate::dom::bindings::codegen::Bindings::XRWebGLLayerBinding::XRWebGLLayerMethods;
 use crate::dom::bindings::error::{Error, ErrorResult};
 use crate::dom::bindings::inheritance::Castable;
 use crate::dom::bindings::num::Finite;
@@ -27,10 +24,7 @@ use crate::dom::bindings::root::{Dom, DomRoot, MutDom, MutNullableDom};
 use crate::dom::event::Event;
 use crate::dom::eventtarget::EventTarget;
 use crate::dom::globalscope::GlobalScope;
-use crate::dom::node::Node;
-use crate::dom::node::NodeDamage;
 use crate::dom::promise::Promise;
-use crate::dom::webglframebuffer::WebGLFramebufferAttachmentRoot;
 use crate::dom::xrframe::XRFrame;
 use crate::dom::xrinputsourcearray::XRInputSourceArray;
 use crate::dom::xrinputsourceevent::XRInputSourceEvent;
@@ -41,7 +35,6 @@ use crate::dom::xrspace::XRSpace;
 use crate::dom::xrwebgllayer::XRWebGLLayer;
 use crate::task_source::TaskSource;
 use dom_struct::dom_struct;
-use euclid::default::Size2D;
 use euclid::RigidTransform3D;
 use ipc_channel::ipc::IpcSender;
 use ipc_channel::router::ROUTER;
@@ -77,6 +70,9 @@ pub struct XRSession {
     end_promises: DomRefCell<Vec<Rc<Promise>>>,
     /// https://immersive-web.github.io/webxr/#ended
     ended: Cell<bool>,
+    /// Opaque framebuffers need to know the session is "outside of a requestAnimationFrame"
+    /// https://immersive-web.github.io/webxr/#opaque-framebuffer
+    outside_raf: Cell<bool>,
 }
 
 impl XRSession {
@@ -102,6 +98,7 @@ impl XRSession {
             input_sources: Dom::from_ref(input_sources),
             end_promises: DomRefCell::new(vec![]),
             ended: Cell::new(false),
+            outside_raf: Cell::new(true),
         }
     }
 
@@ -129,6 +126,10 @@ impl XRSession {
 
     pub fn is_ended(&self) -> bool {
         self.ended.get()
+    }
+
+    pub fn is_outside_raf(&self) -> bool {
+        self.outside_raf.get()
     }
 
     fn attach_event_handler(&self) {
@@ -238,6 +239,8 @@ impl XRSession {
 
     /// https://immersive-web.github.io/webxr/#xr-animation-frame
     fn raf_callback(&self, (time, mut frame): (f64, Frame)) {
+        println!("WebXR RAF callback");
+
         // Step 1
         if let Some(pending) = self.pending_render_state.take() {
             // https://immersive-web.github.io/webxr/#apply-the-pending-render-state
@@ -247,19 +250,8 @@ impl XRSession {
             // Step 6-7: XXXManishearth handle inlineVerticalFieldOfView
 
             // XXXManishearth handle inline sessions and composition disabled flag
-            if let Some(layer) = pending.GetBaseLayer() {
-                let attachment = layer.framebuffer().attachment(constants::COLOR_ATTACHMENT0);
-                if let Some(WebGLFramebufferAttachmentRoot::Texture(texture)) = attachment {
-                    let context = layer.Context().context_id().0;
-                    let texture_id = texture.id().get();
-                    if let Some((width, height)) = layer.framebuffer().size() {
-                        let size = Size2D::new(width, height);
-                        self.session
-                            .borrow_mut()
-                            .set_texture(context, texture_id, size);
-                    }
-                }
-            }
+            let swap_chain_id = pending.GetBaseLayer().map(|layer| layer.swap_chain_id());
+            self.session.borrow_mut().set_swap_chain(swap_chain_id);
         }
 
         for event in frame.events.drain(..) {
@@ -283,22 +275,17 @@ impl XRSession {
         frame.set_animation_frame(true);
 
         // Step 8
+        self.outside_raf.set(false);
         for (_, callback) in callbacks.drain(..) {
             if let Some(callback) = callback {
                 let _ = callback.Call__(Finite::wrap(time), &frame, ExceptionHandling::Report);
             }
         }
+        self.outside_raf.set(true);
 
         frame.set_active(false);
+        base_layer.swap_buffers();
         self.session.borrow_mut().render_animation_frame();
-
-        // If the canvas element is attached to the DOM, it is now dirty,
-        // and we need to trigger a reflow.
-        base_layer
-            .Context()
-            .Canvas()
-            .upcast::<Node>()
-            .dirty(NodeDamage::OtherNodeDamage);
     }
 }
 
