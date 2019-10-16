@@ -644,7 +644,7 @@ checksum = "cf79daa4e11e5def06e55306aa3601b87de6b5149671529318da048f67cdd77b"
 dependencies = [
  "bitflags",
  "block",
- "core-foundation 0.6.2",
+ "core-foundation",
  "core-graphics",
  "foreign-types",
  "libc",
@@ -659,7 +659,7 @@ checksum = "8cd20045e880893b4a8286d5639e9ade85fb1f6a14c291f882cf8cf2149d37d9"
 dependencies = [
  "bitflags",
  "block",
- "core-foundation 0.6.2",
+ "core-foundation",
  "core-graphics",
  "foreign-types",
  "libc",
@@ -771,20 +771,10 @@ dependencies = [
 
 [[package]]
 name = "core-foundation"
-version = "0.6.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "58667b9a618a37ea8c4c4cb5298703e5dfadcd3698c79f54fc43e6a2e94733ea"
-dependencies = [
- "core-foundation-sys 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "libc",
-]
-
-[[package]]
-name = "core-foundation"
 version = "0.6.4"
 source = "git+https://github.com/zakorgy/core-foundation-rs?branch=io-surface-alpha#8a15cb91c4ee05b2098ee16c5fcd930b084f3150"
 dependencies = [
- "core-foundation-sys 0.6.2 (git+https://github.com/zakorgy/core-foundation-rs?branch=io-surface-alpha)",
+ "core-foundation-sys",
  "libc",
 ]
 
@@ -792,12 +782,6 @@ dependencies = [
 name = "core-foundation-sys"
 version = "0.6.2"
 source = "git+https://github.com/zakorgy/core-foundation-rs?branch=io-surface-alpha#8a15cb91c4ee05b2098ee16c5fcd930b084f3150"
-
-[[package]]
-name = "core-foundation-sys"
-version = "0.6.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e7ca8a5221364ef15ce201e8ed2f609fc312682a8f4e0e3d4aa5879764e0fa3b"
 
 [[package]]
 name = "core-graphics"
@@ -806,7 +790,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "56790968ab1c8a1202a102e6de05fc6e1ec87da99e4e93e9a7d13efbfc1e95a9"
 dependencies = [
  "bitflags",
- "core-foundation 0.6.2",
+ "core-foundation",
  "foreign-types",
  "libc",
 ]
@@ -817,7 +801,7 @@ version = "13.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d95a72b5e50e549969dd88eff3047495fe5b8c6f028635442c2b708be707e669"
 dependencies = [
- "core-foundation 0.6.2",
+ "core-foundation",
  "core-graphics",
  "foreign-types",
  "libc",
@@ -1382,7 +1366,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "17b7ff8d2a0a660875d01689807925a45c5843bf90a1ef97ec52ef86ab0cafba"
 dependencies = [
  "byteorder",
- "core-foundation 0.6.2",
+ "core-foundation",
  "core-graphics",
  "core-text",
  "dirs",
@@ -1535,7 +1519,7 @@ dependencies = [
  "app_units",
  "bitflags",
  "byteorder",
- "core-foundation 0.6.2",
+ "core-foundation",
  "core-graphics",
  "core-text",
  "dwrote",
@@ -1660,7 +1644,7 @@ dependencies = [
  "android_glue",
  "cgl 0.2.3",
  "cocoa 0.18.4",
- "core-foundation 0.6.2",
+ "core-foundation",
  "core-graphics",
  "derivative",
  "glutin_egl_sys",
@@ -2331,7 +2315,7 @@ version = "0.11.1"
 source = "git+https://github.com/zakorgy/core-foundation-rs?branch=io-surface-alpha#8a15cb91c4ee05b2098ee16c5fcd930b084f3150"
 dependencies = [
  "cgl 0.2.3",
- "core-foundation 0.6.4",
+ "core-foundation",
  "gleam",
  "leaky-cow",
  "libc",
@@ -2344,7 +2328,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6f5a64038dc1dd3cbe84042e8b50619e06884ebf7eea03608b683dfa017a01d9"
 dependencies = [
  "cgl 0.2.3",
- "core-foundation 0.6.2",
+ "core-foundation",
  "gleam",
  "leaky-cow",
  "libc",
@@ -4819,7 +4803,7 @@ source = "git+https://github.com/pcwalton/signpost.git#7ed712507f343c38646b9d1fe
 name = "simpleservo"
 version = "0.0.1"
 dependencies = [
- "core-foundation 0.6.2",
+ "core-foundation",
  "gl_generator 0.11.0",
  "libc",
  "libloading",
@@ -5124,7 +5108,7 @@ dependencies = [
  "bitflags",
  "cgl 0.3.2",
  "cocoa 0.19.0",
- "core-foundation 0.6.2",
+ "core-foundation",
  "core-graphics",
  "display-link",
  "euclid",
@@ -5929,7 +5913,7 @@ dependencies = [
  "bitflags",
  "byteorder",
  "cfg-if",
- "core-foundation 0.6.2",
+ "core-foundation",
  "core-graphics",
  "core-text",
  "cstr",
@@ -5968,7 +5952,7 @@ dependencies = [
  "app_units",
  "bitflags",
  "byteorder",
- "core-foundation 0.6.2",
+ "core-foundation",
  "core-graphics",
  "derive_more",
  "euclid",
@@ -6030,6 +6014,7 @@ dependencies = [
 [[package]]
 name = "webxr"
 version = "0.0.1"
+source = "git+https://github.com/asajeffrey/webxr?branch=surfman#515083b1d8661160e5061901ca90a93d0b30d1f3"
 dependencies = [
  "bindgen",
  "euclid",
@@ -6048,6 +6033,7 @@ dependencies = [
 [[package]]
 name = "webxr-api"
 version = "0.0.1"
+source = "git+https://github.com/asajeffrey/webxr?branch=surfman#515083b1d8661160e5061901ca90a93d0b30d1f3"
 dependencies = [
  "euclid",
  "ipc-channel",
@@ -6114,7 +6100,7 @@ dependencies = [
  "backtrace",
  "bitflags",
  "cocoa 0.18.4",
- "core-foundation 0.6.2",
+ "core-foundation",
  "core-graphics",
  "lazy_static",
  "libc",

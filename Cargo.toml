@@ -38,7 +38,7 @@ core-foundation = { git = "https://github.com/zakorgy/core-foundation-rs", branc
 io-surface = { git = "https://github.com/zakorgy/core-foundation-rs", branch = "io-surface-alpha" }
 
 [patch."https://github.com/servo/webxr"]
-# webxr = { git = "https://github.com/asajeffrey/webxr", branch = "surfman" }
-# webxr-api = { git = "https://github.com/asajeffrey/webxr", branch = "surfman" }
-webxr = { path = "../webxr/webxr" }
-webxr-api = { path = "../webxr/webxr-api" }
+webxr = { git = "https://github.com/asajeffrey/webxr", branch = "surfman" }
+webxr-api = { git = "https://github.com/asajeffrey/webxr", branch = "surfman" }
+# webxr = { path = "../webxr/webxr" }
+# webxr-api = { path = "../webxr/webxr-api" }
