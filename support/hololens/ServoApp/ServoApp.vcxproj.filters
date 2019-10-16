@@ -878,18 +878,6 @@
     <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\swresample-3.dll">
       <Filter>ReleaseServoDLLs</Filter>
     </None>
-    <None Include="..\..\..\target\debug\msvcp140.dll">
-      <Filter>DebugServoDLLs</Filter>
-    </None>
-    <None Include="..\..\..\target\debug\vcruntime140.dll">
-      <Filter>DebugServoDLLs</Filter>
-    </None>
-    <None Include="..\..\..\target\release\msvcp140.dll">
-      <Filter>ReleaseServoDLLs</Filter>
-    </None>
-    <None Include="..\..\..\target\release\vcruntime140.dll">
-      <Filter>ReleaseServoDLLs</Filter>
-    </None>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Assets">
