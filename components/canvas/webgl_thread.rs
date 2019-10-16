@@ -1309,10 +1309,37 @@ impl WebGLImpl {
             WebGLCommand::Finish(ref sender) => Self::finish(gl, sender),
             WebGLCommand::Flush => gl.flush(),
             WebGLCommand::GenerateMipmap(target) => gl.generate_mipmap(target),
-            WebGLCommand::CreateVertexArray(ref chan) => Self::create_vertex_array(gl, chan),
-            WebGLCommand::DeleteVertexArray(id) => gl.delete_vertex_arrays(&[id.get()]),
+            WebGLCommand::CreateVertexArray(ref chan) => {
+                let use_apple_vertex_array = Self::needs_apple_vertex_arrays(device, ctx);
+                Self::create_vertex_array(gl, use_apple_vertex_array, chan)
+            },
+            WebGLCommand::DeleteVertexArray(id) => {
+                let ids = [id.get()];
+                let use_apple_vertex_array = Self::needs_apple_vertex_arrays(device, ctx);
+                if use_apple_vertex_array {
+                    match gl {
+                        Gl::Gl(gl) => unsafe {
+                            gl.DeleteVertexArraysAPPLE(ids.len() as gl::GLsizei, ids.as_ptr());
+                        },
+                        Gl::Gles(_) => unimplemented!("No GLES on macOS"),
+                    }
+                } else {
+                    gl.delete_vertex_arrays(&ids)
+                }
+            },
             WebGLCommand::BindVertexArray(id) => {
-                gl.bind_vertex_array(id.map_or(0, WebGLVertexArrayId::get))
+                let id = id.map_or(0, WebGLVertexArrayId::get);
+                let use_apple_vertex_array = Self::needs_apple_vertex_arrays(device, ctx);
+                if use_apple_vertex_array {
+                    match gl {
+                        Gl::Gl(gl) => unsafe {
+                            gl.BindVertexArrayAPPLE(id);
+                        },
+                        Gl::Gles(_) => unimplemented!("No GLES on macOS"),
+                    }
+                } else {
+                    gl.bind_vertex_array(id)
+                }
             },
             WebGLCommand::GetParameterBool(param, ref sender) => {
                 let mut value = [0];
@@ -1787,6 +1814,20 @@ impl WebGLImpl {
         chan.send(result).unwrap();
     }
 
+    // surfman creates a legacy OpenGL context on macOS when
+    // OpenGL 2 support is requested. Legacy contexts return GL errors for the vertex
+    // array object functions, but support a set of APPLE extension functions that
+    // provide VAO support instead.
+    fn needs_apple_vertex_arrays(device: &Device, ctx: &Context) -> bool {
+        cfg!(target_os = "macos") && Self::gl_version(device, ctx).major < 3
+    }
+
+    fn gl_version(device: &Device, ctx: &Context) -> GLVersion {
+        let descriptor = device.context_descriptor(ctx);
+        let attributes = device.context_descriptor_attributes(&descriptor);
+        attributes.version
+    }
+
     #[allow(unsafe_code)]
     fn get_extensions(gl: &Gl, chan: &WebGLSender<String>) {
         let mut ext_count = [0];
@@ -1908,8 +1949,25 @@ impl WebGLImpl {
     }
 
     #[allow(unsafe_code)]
-    fn create_vertex_array(gl: &Gl, chan: &WebGLSender<Option<WebGLVertexArrayId>>) {
-        let vao = gl.gen_vertex_arrays(1)[0];
+    fn create_vertex_array(
+        gl: &Gl,
+        use_apple_ext: bool,
+        chan: &WebGLSender<Option<WebGLVertexArrayId>>,
+    ) {
+        let vao = if use_apple_ext {
+            match gl {
+                Gl::Gl(gl) => {
+                    let mut ids = vec![0];
+                    unsafe {
+                        gl.GenVertexArraysAPPLE(ids.len() as gl::GLsizei, ids.as_mut_ptr());
+                    }
+                    ids[0]
+                },
+                Gl::Gles(_) => unimplemented!("No GLES on macOS"),
+            }
+        } else {
+            gl.gen_vertex_arrays(1)[0]
+        };
         let vao = if vao == 0 {
             None
         } else {
