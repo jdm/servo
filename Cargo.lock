@@ -1607,6 +1607,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "gl_generator"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1a95dfc23a2b4a9a2f5ab41d194f8bfda3cabec42af4e39f08c339eb2a0c124d"
+dependencies = [
+ "khronos_api",
+ "log",
+ "xml-rs",
+]
+
+[[package]]
 name = "gleam"
 version = "0.6.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5111,7 +5122,6 @@ dependencies = [
 [[package]]
 name = "surfman"
 version = "0.23.0"
-source = "git+https://github.com/pcwalton/surfman#4efffbe533a2e4034778f2826d4c8be7a2ec34ec"
 dependencies = [
  "bitflags",
  "cgl 0.3.2",
@@ -5120,11 +5130,10 @@ dependencies = [
  "core-graphics",
  "display-link",
  "euclid",
- "gl_generator 0.11.0",
+ "gl_generator 0.14.0",
  "io-surface",
  "lazy_static",
  "libc",
- "mozangle",
  "objc",
  "winapi",
  "winit",
@@ -6024,7 +6033,6 @@ dependencies = [
 [[package]]
 name = "webxr"
 version = "0.0.1"
-source = "git+https://github.com/asajeffrey/webxr?branch=surfman#d7f905238b219264f054201a22d601b64345e0ae"
 dependencies = [
  "bindgen",
  "euclid",
@@ -6043,7 +6051,6 @@ dependencies = [
 [[package]]
 name = "webxr-api"
 version = "0.0.1"
-source = "git+https://github.com/asajeffrey/webxr?branch=surfman#d7f905238b219264f054201a22d601b64345e0ae"
 dependencies = [
  "euclid",
  "ipc-channel",

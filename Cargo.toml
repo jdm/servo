@@ -35,5 +35,10 @@ autocfg = { git = "https://github.com/servo/autocfg", branch = "rustflags2" }
 winapi = { git = "https://github.com/servo/winapi-rs", branch = "patch-1" }
 
 [patch."https://github.com/servo/webxr"]
-webxr = { git = "https://github.com/asajeffrey/webxr", branch = "surfman" }
-webxr-api = { git = "https://github.com/asajeffrey/webxr", branch = "surfman" }
+#webxr = { git = "https://github.com/asajeffrey/webxr", branch = "surfman" }
+#webxr-api = { git = "https://github.com/asajeffrey/webxr", branch = "surfman" }
+webxr = { path = "../webxr/webxr" }
+webxr-api = { path = "../webxr/webxr-api" }
+
+[patch."https://github.com/pcwalton/surfman"]
+surfman = { path = "../rust-offscreen-rendering-context/surfman" }

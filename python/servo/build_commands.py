@@ -300,6 +300,8 @@ class MachCommands(CommandBase):
 
             # Ensure that the NuGet ANGLE package containing libEGL is accessible
             # to the Rust linker.
+            ang = angle_root(target_triple, env)
+            print(ang)
             append_to_path_env(angle_root(target_triple, env), env, "LIB")
 
             # Don't want to mix non-UWP libraries with vendored UWP libraries.
@@ -780,6 +782,7 @@ class MachCommands(CommandBase):
 
 
 def angle_root(target, nuget_env):
+    return os.path.join('c:\\', 'users', 'image', 'angle', 'winrt', '10', 'src', 'Debug_x64', 'lib')
     arch = {
 
         "aarch64": "arm64",
