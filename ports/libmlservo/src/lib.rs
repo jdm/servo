@@ -158,7 +158,7 @@ pub unsafe extern "C" fn init_servo(
         VRInitOptions::None
     };
 
-    let xr_discovery: Option<Box<dyn webxr_api::Discovery>> = if !landscape {
+    let xr_discovery: Option<Box<dyn webxr_api::Discovery<SwapChains=webxr::SwapChains>> = if !landscape {
         let discovery = MagicLeapDiscovery::new(ctxt, gl.gl_wrapper.clone());
         Some(Box::new(discovery))
     } else {

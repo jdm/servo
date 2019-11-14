@@ -1010,7 +1010,7 @@ fn create_webgl_threads<W>(
     webrender: &mut webrender::Renderer,
     webrender_api_sender: webrender_api::RenderApiSender,
     webvr_compositor: Option<Box<WebVRCompositorHandler>>,
-    webxr_main_thread: &mut webxr_api::MainThreadRegistry,
+    webxr_main_thread: &mut webxr_api::MainThreadRegistry<webxr::SwapChains>,
     external_image_handlers: &mut WebrenderExternalImageHandlers,
     external_images: Arc<Mutex<WebrenderExternalImageRegistry>>,
 ) -> WebGLThreads
@@ -1060,7 +1060,7 @@ where
     external_image_handlers.set_handler(image_handler, WebrenderImageHandlerType::WebGL);
 
     // Set webxr external image handler for WebGL textures
-    webxr_main_thread.set_swap_chains(webxr_swap_chains);
+    webxr_main_thread.set_swap_chains(webxr::SwapChains(webxr_swap_chains));
 
     // Set DOM to texture handler, if enabled.
     if let Some(output_handler) = output_handler {

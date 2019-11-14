@@ -176,7 +176,7 @@ pub trait EmbedderMethods {
     }
 
     /// Register services with a WebXR Registry.
-    fn register_webxr(&mut self, _: &mut webxr_api::MainThreadRegistry) {}
+    fn register_webxr(&mut self, _: &mut webxr_api::MainThreadRegistry<webxr::SwapChains>) {}
 }
 
 #[derive(Clone, Copy, Debug)]

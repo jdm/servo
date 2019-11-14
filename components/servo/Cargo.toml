@@ -81,6 +81,7 @@ webrender_traits = {path = "../webrender_traits"}
 webdriver_server = {path = "../webdriver_server", optional = true}
 webvr = {path = "../webvr"}
 webvr_traits = {path = "../webvr_traits"}
+webxr = {git = "https://github.com/servo/webxr"}
 webxr-api = {git = "https://github.com/servo/webxr"}
 surfman = { version = "0.1", features = ["sm-osmesa"] }
 

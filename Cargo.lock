@@ -713,6 +713,7 @@ dependencies = [
  "webrender_api",
  "webvr",
  "webvr_traits",
+ "webxr",
  "webxr-api",
 ]
 
@@ -2761,6 +2762,7 @@ dependencies = [
  "webrender_traits",
  "webvr",
  "webvr_traits",
+ "webxr",
  "webxr-api",
 ]
 
@@ -5998,7 +6000,6 @@ dependencies = [
 [[package]]
 name = "webxr"
 version = "0.0.1"
-source = "git+https://github.com/servo/webxr#4953e60dd9ff80324739eee22283d9b80f5c9559"
 dependencies = [
  "bindgen",
  "euclid",
@@ -6009,6 +6010,7 @@ dependencies = [
  "openxr",
  "serde",
  "surfman",
+ "surfman-chains",
  "webxr-api",
  "winapi",
  "wio",
@@ -6017,14 +6019,11 @@ dependencies = [
 [[package]]
 name = "webxr-api"
 version = "0.0.1"
-source = "git+https://github.com/servo/webxr#4953e60dd9ff80324739eee22283d9b80f5c9559"
 dependencies = [
  "euclid",
  "ipc-channel",
  "log",
  "serde",
- "surfman",
- "surfman-chains",
  "winit",
 ]
 
