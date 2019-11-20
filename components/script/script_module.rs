@@ -42,9 +42,9 @@ use js::jsapi::{AutoObjectVector, JSAutoRealm, JSObject, JSString};
 use js::jsapi::{GetModuleResolveHook, JSRuntime, SetModuleResolveHook};
 use js::jsapi::{GetRequestedModules, SetModuleMetadataHook};
 use js::jsapi::{GetWaitForAllPromise, ModuleEvaluate, ModuleInstantiate, SourceText};
-use js::jsapi::{Heap, JSContext, JS_ClearPendingException};
+use js::jsapi::{Heap, JSContext, JS_ClearPendingException, SetModulePrivate};
 use js::jsapi::{SetModuleDynamicImportHook, SetScriptPrivateReferenceHooks};
-use js::jsval::{JSVal, UndefinedValue};
+use js::jsval::{JSVal, PrivateValue, UndefinedValue};
 use js::rust::jsapi_wrapped::{CompileModule, JS_GetArrayLength, JS_GetElement};
 use js::rust::jsapi_wrapped::{GetRequestedModuleSpecifier, JS_GetPendingException};
 use js::rust::wrappers::JS_SetPendingException;
@@ -64,7 +64,7 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use url::ParseError as UrlParseError;
 
-pub fn get_source_text(source: Vec<u16>) -> SourceText<u16> {
+pub fn get_source_text(source: &[u16]) -> SourceText<u16> {
     SourceText {
         units_: source.as_ptr() as *const _,
         length_: source.len() as u32,
@@ -233,6 +233,10 @@ pub enum ModuleStatus {
     Finished,
 }
 
+struct ModuleScript {
+    base_url: ServoUrl,
+}
+
 impl ModuleTree {
     #[allow(unsafe_code)]
     /// https://html.spec.whatwg.org/multipage/#creating-a-javascript-module-script
@@ -253,7 +257,7 @@ impl ModuleTree {
 
         rooted!(in(*global.get_cx()) let mut module_script = ptr::null_mut::<JSObject>());
 
-        let mut source = get_source_text(module);
+        let mut source = get_source_text(&module);
 
         unsafe {
             if !CompileModule(
@@ -275,6 +279,14 @@ impl ModuleTree {
                     Heap::boxed(exception.get()),
                 )));
             }
+
+            let module_script_data = Box::new(ModuleScript {
+                base_url: url.clone(),
+            });
+            SetModulePrivate(
+                module_script.get(),
+                &PrivateValue(Box::into_raw(module_script_data) as *const _),
+            );
         }
 
         println!("module script of {} compile done", url);
@@ -282,7 +294,7 @@ impl ModuleTree {
         self.resolve_requested_module_specifiers(
             &global,
             module_script.handle().into_handle(),
-            global.api_base_url().clone(),
+            url.clone(),
         )
         .map(|_| ModuleObject(Heap::boxed(*module_script)))
     }
@@ -358,6 +370,7 @@ impl ModuleTree {
         }
     }
 
+    /// Step 5 of <https://html.spec.whatwg.org/multipage/#fetch-the-descendants-of-a-module-script>
     pub fn resolve_requested_modules(
         &self,
         global: &GlobalScope,
@@ -374,7 +387,7 @@ impl ModuleTree {
             let valid_specifier_urls = self.resolve_requested_module_specifiers(
                 &global,
                 raw_record.handle(),
-                global.api_base_url().clone(),
+                self.url.clone(),
             );
 
             return valid_specifier_urls.map(|parsed_urls| {
@@ -472,6 +485,7 @@ impl ModuleTree {
         specifier: RawHandle<*mut JSString>,
     ) -> Result<ServoUrl, UrlParseError> {
         let specifier_str = unsafe { jsstring_to_str(cx, *specifier) };
+        println!("resolving specifier {} with {}", specifier_str, url);
 
         // Step 1.
         if let Ok(specifier_url) = ServoUrl::parse(&specifier_str) {
@@ -812,6 +826,7 @@ impl FetchResponseListener for ModuleContext {
 
             match compiled_module {
                 Err(exception) => {
+                    println!("err for network {}", self.url.clone());
                     module_tree.set_error(Some(exception));
 
                     let promise = module_tree.get_promise().borrow();
@@ -820,6 +835,7 @@ impl FetchResponseListener for ModuleContext {
                     return;
                 },
                 Ok(record) => {
+                    println!("success for network {}", self.url.clone());
                     module_tree.set_record(record);
 
                     let mut visited = HashSet::new();
@@ -887,18 +903,23 @@ pub unsafe fn EnsureModuleHooksInitialized(rt: *mut JSRuntime) {
 /// https://html.spec.whatwg.org/multipage/#hostresolveimportedmodule(referencingscriptormodule%2C-specifier)
 unsafe extern "C" fn HostResolveImportedModule(
     cx: *mut JSContext,
-    _reference_private: RawHandleValue,
+    reference_private: RawHandleValue,
     specifier: RawHandle<*mut JSString>,
 ) -> *mut JSObject {
     let global_scope = GlobalScope::from_context(cx);
 
     // Step 2.
-    let base_url = global_scope.api_base_url();
+    let mut base_url = global_scope.api_base_url();
 
-    // TODO: Step 3.
+    // Step 3.
+    let module_data = (reference_private.to_private() as *const ModuleScript).as_ref();
+    if let Some(data) = module_data {
+        base_url = data.base_url.clone();
+    }
 
     // Step 5.
     let url = ModuleTree::resolve_module_specifier(*global_scope.get_cx(), &base_url, specifier);
+    println!("resolving {}", url.as_ref().unwrap());
 
     // Step 6.
     assert!(url.is_ok());
@@ -1099,6 +1120,7 @@ pub fn fetch_inline_module_script(
 
     match compiled_module {
         Ok(record) => {
+            println!("success for inline {}", url);
             module_tree.set_record(record);
 
             let descendant_results = fetch_module_descendants_and_link(
@@ -1115,6 +1137,7 @@ pub fn fetch_inline_module_script(
             }
         },
         Err(exception) => {
+            println!("exception for inline {}", url);
             module_tree.set_error(Some(exception));
             global.set_inline_module_map(script_id, module_tree);
             promise.reject_native(&());
