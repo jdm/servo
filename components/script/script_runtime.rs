@@ -449,21 +449,20 @@ unsafe fn new_rt_and_cx_with_parent(
         closure: *mut c_void,
         dispatchable: *mut JSRunnable,
     ) -> bool {
-        let networking_task_src: &NetworkingTaskSource = &*(closure as *mut NetworkingTaskSource);
+        let source: &NetworkingTaskSource = &*(closure as *mut NetworkingTaskSource);
         let runnable = Runnable(dispatchable);
         let task = task!(dispatch_to_event_loop_message: move || {
             runnable.run(RustRuntime::get(), Dispatchable_MaybeShuttingDown::NotShuttingDown);
         });
 
-        networking_task_src.queue_unconditionally(task).is_ok()
+        source.queue_unconditionally(task).is_ok()
     }
 
     if let Some(source) = networking_task_source {
-        let networking_task_src = Box::new(source);
         InitDispatchToEventLoop(
             cx,
             Some(dispatch_to_event_loop),
-            Box::into_raw(networking_task_src) as *mut c_void,
+            Box::into_raw(Box::new(source)) as *mut c_void,
         );
     }
 
