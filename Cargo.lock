@@ -3717,9 +3717,8 @@ dependencies = [
 
 [[package]]
 name = "openxr"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd30879fa0a4815c204a199a06f08826c892208e6d93617194bd5a9e0b12e9e0"
+version = "0.10.0"
+source = "git+https://github.com/servo/openxrs?branch=depthkhr#3e91933e4f53b6ce960bde351f951f308759fb68"
 dependencies = [
  "libc",
  "openxr-sys",
@@ -3729,9 +3728,8 @@ dependencies = [
 
 [[package]]
 name = "openxr-sys"
-version = "0.6.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "875181a679f13b1b7c6b37b7f221c11a9cabc67a51399bc8051165d2c03a17a0"
+version = "0.7.0"
+source = "git+https://github.com/servo/openxrs?branch=depthkhr#3e91933e4f53b6ce960bde351f951f308759fb68"
 dependencies = [
  "libc",
  "winapi",
@@ -6384,7 +6382,6 @@ dependencies = [
 [[package]]
 name = "webxr"
 version = "0.0.1"
-source = "git+https://github.com/servo/webxr#e44552df536a6f424d58ccd068aa0301fee5fa1e"
 dependencies = [
  "bindgen",
  "euclid",
@@ -6404,7 +6401,6 @@ dependencies = [
 [[package]]
 name = "webxr-api"
 version = "0.0.1"
-source = "git+https://github.com/servo/webxr#e44552df536a6f424d58ccd068aa0301fee5fa1e"
 dependencies = [
  "euclid",
  "ipc-channel",

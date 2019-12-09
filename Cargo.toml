@@ -31,3 +31,8 @@ mio = { git = "https://github.com/servo/mio.git", branch = "servo" }
 # https://github.com/retep998/winapi-rs/pull/816
 winapi = { git = "https://github.com/servo/winapi-rs", branch = "patch-1" }
 spirv_cross = { git = "https://github.com/kvark/spirv_cross", branch = "wgpu" }
+openxr = { git = "https://github.com/servo/openxrs", branch = "depthkhr" }
+
+[patch."https://github.com/servo/webxr"]
+webxr-api = { path = "../webxr/webxr-api" }
+webxr = { path = "../webxr/webxr" }

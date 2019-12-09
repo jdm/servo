@@ -49,6 +49,7 @@ impl XRViewerPose {
                 views.push(XRView::new(global, session, &left, XREye::Left, &pose));
                 views.push(XRView::new(global, session, &right, XREye::Right, &pose));
             },
+            _ => unimplemented!(),
         });
         let transform = XRRigidTransform::new(global, cast_transform(pose));
         let pose = reflect_dom_object(
