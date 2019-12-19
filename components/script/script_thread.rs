@@ -67,6 +67,7 @@ use crate::dom::windowproxy::WindowProxy;
 use crate::dom::worker::TrustedWorkerAddress;
 use crate::dom::worklet::WorkletThreadPool;
 use crate::dom::workletglobalscope::WorkletGlobalScopeInit;
+use crate::dom::xrsession::XrFrameData;
 use crate::fetch::FetchCanceller;
 use crate::microtask::{Microtask, MicrotaskQueue};
 use crate::script_runtime::{get_reports, new_rt_and_cx, JSContext, Runtime, ScriptPort};
@@ -146,6 +147,7 @@ use script_traits::{TouchEventType, TouchId, UntrustedNodeAddress, WheelDelta};
 use script_traits::{UpdatePipelineIdReason, WebrenderIpcSender, WindowSizeData, WindowSizeType};
 use servo_atoms::Atom;
 use servo_url::{ImmutableOrigin, MutableOrigin, ServoUrl};
+use smallvec::SmallVec;
 use std::borrow::Cow;
 use std::cell::Cell;
 use std::cell::RefCell;
@@ -265,6 +267,7 @@ enum MixedMessage {
     FromScript(MainThreadScriptMsg),
     FromDevtools(DevtoolScriptControlMsg),
     FromImageCache((PipelineId, PendingImageResponse)),
+    FromXr(XrFrameData),
 }
 
 /// Messages used to control the script event loop.
@@ -700,6 +703,12 @@ pub struct ScriptThread {
 
     /// Code is running as a consequence of a user interaction
     is_user_interacting: Cell<bool>,
+
+    ///
+    xr_frame_receiver: Receiver<XrFrameData>,
+
+    ///
+    xr_frame_sender: Sender<XrFrameData>,
 }
 
 /// In the event of thread panic, all data on the stack runs its destructor. However, there
@@ -1279,6 +1288,8 @@ impl ScriptThread {
             Duration::from_millis(5000),
         );
 
+        let (xr_sender, xr_receiver) = unbounded();
+
         ScriptThread {
             documents: DomRefCell::new(Documents::new()),
             window_proxies: DomRefCell::new(HashMap::new()),
@@ -1370,6 +1381,9 @@ impl ScriptThread {
 
             node_ids: Default::default(),
             is_user_interacting: Cell::new(false),
+
+            xr_frame_sender: xr_sender,
+            xr_frame_receiver: xr_receiver,
         }
     }
 
@@ -1392,7 +1406,7 @@ impl ScriptThread {
     /// Handle incoming control messages.
     fn handle_msgs(&self) -> bool {
         use self::MixedMessage::FromScript;
-        use self::MixedMessage::{FromConstellation, FromDevtools, FromImageCache};
+        use self::MixedMessage::{FromConstellation, FromDevtools, FromImageCache, FromXr};
 
         // Handle pending resize events.
         // Gather them first to avoid a double mut borrow on self.
@@ -1410,26 +1424,33 @@ impl ScriptThread {
         }
 
         // Store new resizes, and gather all other events.
-        let mut sequential = vec![];
+        let mut sequential = SmallVec::<[MixedMessage; 2]>::new();
 
         // Notify the background-hang-monitor we are waiting for an event.
         self.background_hang_monitor.notify_wait();
 
         // Receive at least one message so we don't spinloop.
         debug!("Waiting for event.");
-        let mut event = select! {
-            recv(self.task_queue.select()) -> msg => {
-                self.task_queue.take_tasks(msg.unwrap());
-                let event = self
-                    .task_queue
-                    .recv()
-                    .expect("Spurious wake-up of the event-loop, task-queue has no tasks available");
-                FromScript(event)
-            },
-            recv(self.control_port) -> msg => FromConstellation(msg.unwrap()),
-            recv(self.devtools_chan.as_ref().map(|_| &self.devtools_port).unwrap_or(&crossbeam_channel::never())) -> msg
-                => FromDevtools(msg.unwrap()),
-            recv(self.image_cache_port) -> msg => FromImageCache(msg.unwrap()),
+        let mut event = {
+            if let Ok(msg) = self.xr_frame_receiver.try_recv() {
+                FromXr(msg)
+            } else {
+                select! {
+                    recv(self.task_queue.select()) -> msg => {
+                        self.task_queue.take_tasks(msg.unwrap());
+                        let event = self
+                            .task_queue
+                            .recv()
+                            .expect("Spurious wake-up of the event-loop, task-queue has no tasks available");
+                        FromScript(event)
+                    },
+                    recv(self.control_port) -> msg => FromConstellation(msg.unwrap()),
+                    recv(self.devtools_chan.as_ref().map(|_| &self.devtools_port).unwrap_or(&crossbeam_channel::never())) -> msg
+                        => FromDevtools(msg.unwrap()),
+                    recv(self.image_cache_port) -> msg => FromImageCache(msg.unwrap()),
+                    recv(self.xr_frame_receiver) -> msg => FromXr(msg.unwrap())
+                }
+            }
         };
         debug!("Got event.");
 
@@ -1522,18 +1543,21 @@ impl ScriptThread {
             // If any of our input sources has an event pending, we'll perform another iteration
             // and check for more resize events. If there are no events pending, we'll move
             // on and execute the sequential non-resize events we've seen.
-            match self.control_port.try_recv() {
-                Err(_) => match self.task_queue.try_recv() {
-                    Err(_) => match self.devtools_port.try_recv() {
-                        Err(_) => match self.image_cache_port.try_recv() {
-                            Err(_) => break,
-                            Ok(ev) => event = FromImageCache(ev),
+            match self.xr_frame_receiver.try_recv() {
+                Err(_) => match self.control_port.try_recv() {
+                    Err(_) => match self.task_queue.try_recv() {
+                        Err(_) => match self.devtools_port.try_recv() {
+                            Err(_) => match self.image_cache_port.try_recv() {
+                                Err(_) => break,
+                                Ok(ev) => event = FromImageCache(ev),
+                            },
+                            Ok(ev) => event = FromDevtools(ev),
                         },
-                        Ok(ev) => event = FromDevtools(ev),
+                        Ok(ev) => event = FromScript(ev),
                     },
-                    Ok(ev) => event = FromScript(ev),
-                },
-                Ok(ev) => event = FromConstellation(ev),
+                    Ok(ev) => event = FromConstellation(ev),
+                }
+                Ok(ev) => event = FromXr(ev),
             }
         }
 
@@ -1555,6 +1579,7 @@ impl ScriptThread {
                     FromScript(inner_msg) => self.handle_msg_from_script(inner_msg),
                     FromDevtools(inner_msg) => self.handle_msg_from_devtools(inner_msg),
                     FromImageCache(inner_msg) => self.handle_msg_from_image_cache(inner_msg),
+                    FromXr(inner_msg) => self.handle_msg_from_xr(inner_msg),
                 }
 
                 None
@@ -1625,6 +1650,7 @@ impl ScriptThread {
                 },
                 _ => ScriptThreadEventCategory::ScriptEvent,
             },
+            MixedMessage::FromXr(_) => ScriptThreadEventCategory::XrFrame,
         }
     }
 
@@ -1665,6 +1691,7 @@ impl ScriptThread {
                 ScriptHangAnnotation::PerformanceTimelineTask
             },
             ScriptThreadEventCategory::PortMessage => ScriptHangAnnotation::PortMessage,
+            ScriptThreadEventCategory::XrFrame => ScriptHangAnnotation::XrFrame,
         };
         self.background_hang_monitor
             .notify_activity(HangAnnotation::Script(hang_annotation));
@@ -1728,6 +1755,7 @@ impl ScriptThread {
                 MainThreadScriptMsg::WakeUp => None,
             },
             MixedMessage::FromImageCache((pipeline_id, _)) => Some(pipeline_id),
+            MixedMessage::FromXr(ref message) => Some(message.pipeline()),
         }
     }
 
@@ -1783,6 +1811,7 @@ impl ScriptThread {
                 ScriptThreadEventCategory::PerformanceTimelineTask => {
                     ProfilerCategory::ScriptPerformanceEvent
                 },
+                ScriptThreadEventCategory::XrFrame => ProfilerCategory::ScriptXrFrame,
             };
             profile(profiler_cat, None, self.time_profiler_chan.clone(), f)
         } else {
@@ -1805,6 +1834,10 @@ impl ScriptThread {
             doc.record_tti_if_necessary();
         }
         value
+    }
+
+    fn handle_msg_from_xr(&self, msg: XrFrameData) {
+        msg.run_callback();
     }
 
     fn handle_msg_from_constellation(&self, msg: ConstellationControlMsg) {
@@ -3217,6 +3250,7 @@ impl ScriptThread {
             self.user_agent.clone(),
             self.player_context.clone(),
             self.event_loop_waker.as_ref().map(|w| (*w).clone_box()),
+            self.xr_frame_sender.clone(),
         );
 
         // Initialize the browsing context for the window.

@@ -496,6 +496,7 @@ pub enum ScriptHangAnnotation {
     WebVREvent,
     PerformanceTimelineTask,
     PortMessage,
+    XrFrame,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]

@@ -44,15 +44,42 @@ use euclid::{Rect, RigidTransform3D, Transform3D};
 use ipc_channel::ipc::IpcSender;
 use ipc_channel::router::ROUTER;
 use metrics::ToMs;
+use msg::constellation_msg::PipelineId;
 use profile_traits::ipc;
 use std::cell::Cell;
 use std::f64::consts::{FRAC_PI_2, PI};
+use std::fmt;
 use std::mem;
 use std::rc::Rc;
 use webxr_api::{
     self, util, Display, EnvironmentBlendMode, Event as XREvent, Frame, SelectEvent, SelectKind,
     Session, View, Viewer, Visibility,
 };
+
+pub struct XrFrameData {
+    session: Trusted<XRSession>,
+    frame: webxr_api::Frame,
+    pipeline: PipelineId,
+}
+
+impl fmt::Debug for XrFrameData {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        fmt.debug_tuple("XrFrameData")
+            .field(&self.pipeline)
+            .field(&format_args!("..."))
+            .finish()
+    }
+}
+
+impl XrFrameData {
+    pub(crate) fn run_callback(self) {
+        self.session.root().raf_callback(self.frame);
+    }
+
+    pub(crate) fn pipeline(&self) -> PipelineId {
+        self.pipeline
+    }
+}
 
 #[dom_struct]
 pub struct XRSession {
@@ -161,21 +188,19 @@ impl XRSession {
         let this = Trusted::new(self);
         let global = self.global();
         let window = global.as_window();
-        let (task_source, canceller) = window
-            .task_manager()
-            .dom_manipulation_task_source_with_canceller();
+        let pipeline = global.pipeline_id();
+        let xr_sender = window.xr_frame_sender();
         let (sender, receiver) = ipc::channel(global.time_profiler_chan().clone()).unwrap();
         *self.raf_sender.borrow_mut() = Some(sender);
         ROUTER.add_route(
             receiver.to_opaque(),
             Box::new(move |message| {
                 let this = this.clone();
-                let _ = task_source.queue_with_canceller(
-                    task!(xr_raf_callback: move || {
-                        this.root().raf_callback(message.to().unwrap());
-                    }),
-                    &canceller,
-                );
+                let _ = xr_sender.send(XrFrameData {
+                    session: this,
+                    pipeline,
+                    frame: message.to().unwrap(),
+                });
             }),
         );
 

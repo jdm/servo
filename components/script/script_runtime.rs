@@ -153,6 +153,7 @@ pub enum ScriptThreadEventCategory {
     ExitFullscreen,
     WebVREvent,
     PerformanceTimelineTask,
+    XrFrame,
 }
 
 /// An interface for receiving ScriptMsg values in an event loop. Used for synchronous DOM

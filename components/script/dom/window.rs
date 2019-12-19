@@ -53,6 +53,7 @@ use crate::dom::webglrenderingcontext::WebGLCommandSender;
 use crate::dom::windowproxy::WindowProxy;
 use crate::dom::worklet::Worklet;
 use crate::dom::workletglobalscope::WorkletGlobalScopeType;
+use crate::dom::xrsession::XrFrameData;
 use crate::fetch;
 use crate::layout_image::fetch_image_for_layout;
 use crate::microtask::MicrotaskQueue;
@@ -339,9 +340,16 @@ pub struct Window {
     /// A mechanism to force the compositor to process events.
     #[ignore_malloc_size_of = "traits are cumbersome"]
     event_loop_waker: Option<Box<dyn EventLoopWaker>>,
+
+    ///
+    xr_frame_sender: Sender<XrFrameData>,
 }
 
 impl Window {
+    pub fn xr_frame_sender(&self) -> Sender<XrFrameData> {
+        self.xr_frame_sender.clone()
+    }
+
     pub fn task_manager(&self) -> &TaskManager {
         &self.task_manager
     }
@@ -2229,6 +2237,7 @@ impl Window {
         user_agent: Cow<'static, str>,
         player_context: WindowGLContext,
         event_loop_waker: Option<Box<dyn EventLoopWaker>>,
+        xr_frame_sender: Sender<XrFrameData>,
     ) -> DomRoot<Self> {
         let layout_rpc: Box<dyn LayoutRPC + Send> = {
             let (rpc_send, rpc_recv) = unbounded();
@@ -2312,6 +2321,7 @@ impl Window {
             replace_surrogates,
             player_context,
             event_loop_waker,
+            xr_frame_sender,
         });
 
         unsafe { WindowBinding::Wrap(JSContext::from_ptr(runtime.cx()), win) }
