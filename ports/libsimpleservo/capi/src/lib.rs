@@ -15,7 +15,7 @@ use backtrace::Backtrace;
 #[cfg(not(target_os = "windows"))]
 use env_logger;
 use log::LevelFilter;
-use simpleservo::{self, gl_glue, ServoGlue, SERVO};
+use simpleservo::{self, gl_glue, GlFactory, ServoGlue, SERVO};
 use simpleservo::{
     Coordinates, EventLoopWaker, HostTrait, InitOptions, MediaSessionActionType,
     MediaSessionPlaybackState, MouseButton, VRInitOptions,
@@ -27,7 +27,7 @@ use std::os::raw::{c_char, c_void};
 use std::panic::{self, UnwindSafe};
 use std::slice;
 use std::str::FromStr;
-use std::sync::RwLock;
+use std::sync::{Arc, RwLock};
 
 extern "C" fn default_panic_handler(msg: *const c_char) {
     let c_str: &CStr = unsafe { CStr::from_ptr(msg) };
@@ -337,7 +337,7 @@ fn init_logger(_modules: &[*const c_char], _level: LevelFilter) {
 
 unsafe fn init(
     opts: CInitOptions,
-    gl: gl_glue::ServoGl,
+    gl_factory: GlFactory,
     gl_context: Option<*const c_void>,
     display: Option<*const c_void>,
     wakeup: extern "C" fn(),
@@ -401,7 +401,7 @@ unsafe fn init(
     let wakeup = Box::new(WakeupCallback::new(wakeup));
     let callbacks = Box::new(HostCallbacks::new(callbacks));
 
-    simpleservo::init(opts, gl, wakeup, callbacks).unwrap();
+    simpleservo::init(opts, gl_factory, wakeup, callbacks).unwrap();
 }
 
 #[cfg(target_os = "windows")]
@@ -412,11 +412,12 @@ pub extern "C" fn init_with_egl(
     callbacks: CHostCallbacks,
 ) {
     catch_any_panic(|| {
+        let gl_factory = Arc::new(|| gl_glue::egl::init_gl_fns());
         let gl = gl_glue::egl::init().unwrap();
         unsafe {
             init(
                 opts,
-                gl.gl_wrapper,
+                gl_factory,
                 Some(gl.gl_context),
                 Some(gl.display),
                 wakeup,
@@ -434,8 +435,8 @@ pub extern "C" fn init_with_gl(
     callbacks: CHostCallbacks,
 ) {
     catch_any_panic(|| {
-        let gl = gl_glue::gl::init().unwrap();
-        unsafe { init(opts, gl, None, None, wakeup, callbacks) }
+        let gl_factory = Arc::new(|| gl_glue::gl::init().unwrap());
+        unsafe { init(opts, gl_factory, None, None, wakeup, callbacks) }
     });
 }
 

@@ -34,6 +34,7 @@ use std::mem;
 use std::os::raw::c_void;
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::sync::Arc;
 
 thread_local! {
     pub static SERVO: RefCell<Option<ServoGlue>> = RefCell::new(None);
@@ -165,11 +166,13 @@ pub fn is_uri_valid(url: &str) -> bool {
     ServoUrl::parse(url).is_ok()
 }
 
+pub type GlFactory = Arc<dyn Fn() -> Rc<dyn gl::Gl> + Send + Sync>;
+
 /// Initialize Servo. At that point, we need a valid GL context.
 /// In the future, this will be done in multiple steps.
 pub fn init(
     mut init_opts: InitOptions,
-    gl: Rc<dyn gl::Gl>,
+    gl_factory: GlFactory,
     waker: Box<dyn EventLoopWaker>,
     callbacks: Box<dyn HostTrait>,
 ) -> Result<(), &'static str> {
@@ -198,13 +201,14 @@ pub fn init(
         .or(blank_url)
         .unwrap();
 
+    let gl = gl_factory();
     gl.clear_color(1.0, 1.0, 1.0, 1.0);
     gl.clear(gl::COLOR_BUFFER_BIT);
     gl.finish();
 
     let window_callbacks = Rc::new(ServoWindowCallbacks {
         host_callbacks: callbacks,
-        gl: gl.clone(),
+        gl,
         coordinates: RefCell::new(init_opts.coordinates),
         density: init_opts.density,
         gl_context_pointer: init_opts.gl_context_pointer,
@@ -215,7 +219,7 @@ pub fn init(
         vr_init: init_opts.vr_init,
         xr_discovery: init_opts.xr_discovery,
         waker,
-        gl: gl.clone(),
+        gl_factory,
     });
 
     let servo = Servo::new(embedder_callbacks, window_callbacks.clone());
@@ -632,7 +636,7 @@ struct ServoEmbedderCallbacks {
     xr_discovery: Option<webxr::Discovery>,
     vr_init: VRInitOptions,
     #[allow(unused)]
-    gl: Rc<dyn gl::Gl>,
+    gl_factory: GlFactory,
 }
 
 struct ServoWindowCallbacks {
@@ -670,8 +674,8 @@ impl EmbedderMethods for ServoEmbedderCallbacks {
             self.xr_discovery.is_none(),
             "UWP builds should not be initialized with a WebXR Discovery object"
         );
-        let gl = self.gl.clone();
-        let discovery = webxr::openxr::OpenXrDiscovery::new(gl);
+        let gl_factory = self.gl_factory.clone();
+        let discovery = webxr::openxr::OpenXrDiscovery::new(gl_factory());
         registry.register(discovery);
     }
 

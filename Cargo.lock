@@ -3427,7 +3427,6 @@ dependencies = [
 [[package]]
 name = "mozjs_sys"
 version = "0.67.1"
-source = "git+https://github.com/servo/mozjs?rev=59065889ec7726b767d70b8702b43b4e4776cbfe#59065889ec7726b767d70b8702b43b4e4776cbfe"
 dependencies = [
  "bindgen",
  "cc",
@@ -3736,9 +3735,9 @@ dependencies = [
 
 [[package]]
 name = "openxr"
-version = "0.9.1"
+version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd30879fa0a4815c204a199a06f08826c892208e6d93617194bd5a9e0b12e9e0"
+checksum = "37e6e46efc623a06a042076a03591e69f5a9aab45d7dfd520b9bc5f209d1d1a8"
 dependencies = [
  "libc",
  "openxr-sys",
@@ -3748,9 +3747,9 @@ dependencies = [
 
 [[package]]
 name = "openxr-sys"
-version = "0.6.4"
+version = "0.6.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "875181a679f13b1b7c6b37b7f221c11a9cabc67a51399bc8051165d2c03a17a0"
+checksum = "592304f86c329439bfaa1a81254913b01fc50ea6687716536fce50f3d7ec1e79"
 dependencies = [
  "libc",
  "winapi",

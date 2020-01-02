@@ -32,6 +32,17 @@ pub mod egl {
         pub gl_context: EGLContext,
         pub display: EGLNativeDisplayType,
     }
+    
+    pub fn init_gl_fns() -> crate::gl_glue::ServoGl {
+        unsafe {
+            GlesFns::load_with(|addr| {
+                let addr = CString::new(addr.as_bytes()).unwrap();
+                let addr = addr.as_ptr();
+                let egl = Egl;
+                egl.GetProcAddress(addr) as *const c_void
+            })
+        }
+    }
 
     pub fn init() -> Result<EGLInitResult, &'static str> {
         info!("Loading EGL...");
@@ -39,12 +50,7 @@ pub mod egl {
             let egl = Egl;
             let display = egl.GetCurrentDisplay();
             egl.SwapInterval(display, 1);
-            let egl = GlesFns::load_with(|addr| {
-                let addr = CString::new(addr.as_bytes()).unwrap();
-                let addr = addr.as_ptr();
-                let egl = Egl;
-                egl.GetProcAddress(addr) as *const c_void
-            });
+            let egl = init_gl_fns();
             info!("EGL loaded");
             Ok(EGLInitResult {
                 gl_wrapper: egl,

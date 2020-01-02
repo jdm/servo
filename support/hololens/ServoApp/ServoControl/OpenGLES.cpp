@@ -53,6 +53,9 @@ void OpenGLES::Initialize() {
       EGL_EXPERIMENTAL_PRESENT_PATH_ANGLE,
       EGL_EXPERIMENTAL_PRESENT_PATH_FAST_ANGLE,
 
+      /*EGL_PLATFORM_ANGLE_DEBUG_LAYERS_ENABLED_ANGLE,
+      EGL_TRUE,*/
+
       // EGL_PLATFORM_ANGLE_ENABLE_AUTOMATIC_TRIM_ANGLE is an option that
       // enables ANGLE to automatically call
       // the IDXGIDevice3::Trim method on behalf of the application when it gets
@@ -72,6 +75,10 @@ void OpenGLES::Initialize() {
       // default display attributes.
       EGL_PLATFORM_ANGLE_TYPE_ANGLE,
       EGL_PLATFORM_ANGLE_TYPE_D3D11_ANGLE,
+
+      /*EGL_PLATFORM_ANGLE_DEBUG_LAYERS_ENABLED_ANGLE,
+      EGL_TRUE,*/
+
       EGL_PLATFORM_ANGLE_MAX_VERSION_MAJOR_ANGLE,
       9,
       EGL_PLATFORM_ANGLE_MAX_VERSION_MINOR_ANGLE,
@@ -89,6 +96,10 @@ void OpenGLES::Initialize() {
       // attributes and the 9_3 display attributes.
       EGL_PLATFORM_ANGLE_TYPE_ANGLE,
       EGL_PLATFORM_ANGLE_TYPE_D3D11_ANGLE,
+
+      /*EGL_PLATFORM_ANGLE_DEBUG_LAYERS_ENABLED_ANGLE,
+      EGL_TRUE,*/
+
       EGL_PLATFORM_ANGLE_DEVICE_TYPE_ANGLE,
       EGL_PLATFORM_ANGLE_DEVICE_TYPE_D3D_WARP_ANGLE,
       EGL_EXPERIMENTAL_PRESENT_PATH_ANGLE,
@@ -191,7 +202,10 @@ void OpenGLES::Reset() {
 EGLSurface OpenGLES::CreateSurface(SwapChainPanel const &panel, float dpi) {
   EGLSurface surface = EGL_NO_SURFACE;
 
-  const EGLint surfaceAttributes[] = {EGL_NONE};
+  const EGLint surfaceAttributes[] = {
+      //EGL_GL_COLORSPACE, EGL_GL_COLORSPACE_SRGB,
+      EGL_NONE
+  };
 
   PropertySet surfaceCreationProperties;
 
