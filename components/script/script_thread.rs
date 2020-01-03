@@ -2355,7 +2355,6 @@ impl ScriptThread {
                 load_data.url.clone(),
             ),
             layout_is_busy: layout_is_busy.clone(),
-            window_size,
         });
 
         // Pick a layout thread, any layout thread

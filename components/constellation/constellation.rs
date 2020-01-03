@@ -2631,7 +2631,6 @@ where
             new_pipeline_id: new_pipeline_id,
             replace: None,
             new_browsing_context_info: None,
-            window_size,
         });
     }
 
@@ -2780,7 +2779,6 @@ where
                 is_private: is_private,
                 is_visible: is_visible,
             }),
-            window_size,
         });
     }
 
@@ -2952,10 +2950,6 @@ where
         // https://github.com/rust-lang/rust/issues/59159
         let browsing_context_size = browsing_context.size;
         let browsing_context_is_visible = browsing_context.is_visible;
-        debug_assert_eq!(
-            browsing_context_size,
-            load_info.window_size.initial_viewport
-        );
 
         // Create the new pipeline, attached to the parent and push to pending changes
         self.new_pipeline(
@@ -2977,7 +2971,6 @@ where
             replace: replace,
             // Browsing context for iframe already exists.
             new_browsing_context_info: None,
-            window_size: load_info.window_size.initial_viewport,
         });
     }
 
@@ -3036,7 +3029,6 @@ where
                 is_private: is_private,
                 is_visible: is_parent_visible,
             }),
-            window_size: load_info.window_size.initial_viewport,
         });
     }
 
@@ -3125,7 +3117,6 @@ where
                 is_private: is_opener_private,
                 is_visible: is_opener_visible,
             }),
-            window_size: self.window_size.initial_viewport,
         });
     }
 
@@ -3329,7 +3320,6 @@ where
                     replace,
                     // `load_url` is always invoked on an existing browsing context.
                     new_browsing_context_info: None,
-                    window_size,
                 });
                 Some(new_pipeline_id)
             },
@@ -3649,7 +3639,6 @@ where
                     replace: Some(NeedsToReload::Yes(pipeline_id, load_data)),
                     // Browsing context must exist at this point.
                     new_browsing_context_info: None,
-                    window_size,
                 });
                 return;
             },
@@ -4405,7 +4394,7 @@ where
                     change.top_level_browsing_context_id,
                     change.new_pipeline_id,
                     new_context_info.parent_pipeline_id,
-                    change.window_size,
+                    self.window_size.initial_viewport, //XXXjdm is this valid?
                     new_context_info.is_private,
                     new_context_info.is_visible,
                 );

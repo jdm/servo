@@ -193,7 +193,6 @@ impl HTMLIFrameElement {
                     load_data: load_data.clone(),
                     old_pipeline_id: old_pipeline_id,
                     sandbox: sandboxed,
-                    window_size,
                 };
                 global_scope
                     .script_to_constellation_chan()
@@ -220,7 +219,6 @@ impl HTMLIFrameElement {
                     load_data: load_data,
                     old_pipeline_id: old_pipeline_id,
                     sandbox: sandboxed,
-                    window_size,
                 };
                 global_scope
                     .script_to_constellation_chan()

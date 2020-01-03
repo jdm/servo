@@ -12,6 +12,7 @@ use compositing::CompositorProxy;
 use crossbeam_channel::{unbounded, Sender};
 use devtools_traits::{DevtoolsControlMsg, ScriptToDevtoolsControlMsg};
 use embedder_traits::EventLoopWaker;
+use euclid::Scale;
 use gfx::font_cache_thread::FontCacheThread;
 use ipc_channel::ipc::{self, IpcReceiver, IpcSender};
 use ipc_channel::router::ROUTER;
@@ -609,7 +610,8 @@ impl UnprivilegedPipelineContent {
             paint_time_metrics,
             layout_thread_busy_flag.clone(),
             self.opts.load_webfonts_synchronously,
-            self.window_size,
+            (self.window_size.initial_viewport * Scale::new(1.0)).to_u32(),
+            None,
             self.opts.dump_display_list,
             self.opts.dump_display_list_json,
             self.opts.dump_style_tree,
