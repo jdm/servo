@@ -12,6 +12,7 @@ from mozprocess import ProcessHandler
 from tools.serve.serve import make_hosts_file
 
 from .base import (ConnectionlessProtocol,
+                   crashtest_result_converter,
                    RefTestImplementation,
                    testharness_result_converter,
                    reftest_result_converter,
@@ -283,3 +284,14 @@ class ServoDriverProtocol(WebDriverProtocol):
 
 class ServoWdspecExecutor(WdspecExecutor):
     protocol_cls = ServoDriverProtocol
+
+
+class ServoCrashtestExecutor(ProcessTestExecutor):
+    convert_result = crashtest_result_converter
+
+    def __init__(self, browser, server_config, timeout_multiplier=1,
+                 debug_info=None, **kwargs):
+        ProcessTestExecutor.__init__(self, browser, server_config,
+                                     timeout_multiplier=timeout_multiplier,
+                                     debug_info=debug_info)
+        self.protocol = ConnectionlessProtocol(self, browser)
