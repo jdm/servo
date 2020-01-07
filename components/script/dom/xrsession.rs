@@ -354,11 +354,11 @@ impl XRSession {
 
         // If the canvas element is attached to the DOM, it is now dirty,
         // and we need to trigger a reflow.
-        base_layer
+        /*base_layer
             .Context()
             .Canvas()
             .upcast::<Node>()
-            .dirty(NodeDamage::OtherNodeDamage);
+            .dirty(NodeDamage::OtherNodeDamage);*/
     }
 
     fn update_inline_projection_matrix(&self) {
