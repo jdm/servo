@@ -481,6 +481,7 @@ dependencies = [
  "surfman 0.1.3",
  "surfman-chains 0.2.1",
  "surfman-chains-api",
+ "time",
  "webrender",
  "webrender_api",
  "webrender_traits",
@@ -502,6 +503,7 @@ dependencies = [
  "serde_bytes",
  "servo_config",
  "sparkle",
+ "time",
  "webrender_api",
  "webvr_traits",
  "webxr-api",
@@ -5474,8 +5476,6 @@ dependencies = [
 [[package]]
 name = "surfman"
 version = "0.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10248da202c1c8d8798783bbc4ba08e81ff225c6e2a394d64748d2a62acb198c"
 dependencies = [
  "bitflags",
  "cgl 0.3.2",
@@ -6449,7 +6449,6 @@ dependencies = [
 [[package]]
 name = "webxr"
 version = "0.0.1"
-source = "git+https://github.com/servo/webxr#c6abf4c60d165ffc978ad2ebd6bcddc3c21698e1"
 dependencies = [
  "bindgen",
  "euclid",
@@ -6470,13 +6469,13 @@ dependencies = [
 [[package]]
 name = "webxr-api"
 version = "0.0.1"
-source = "git+https://github.com/servo/webxr#c6abf4c60d165ffc978ad2ebd6bcddc3c21698e1"
 dependencies = [
  "euclid",
  "ipc-channel",
  "log",
  "serde",
  "surfman-chains-api",
+ "time",
  "winit",
 ]
 

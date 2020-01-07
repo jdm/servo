@@ -74,6 +74,17 @@ use surfman_chains_api::SwapChainsAPI;
 use webrender_traits::{WebrenderExternalImageRegistry, WebrenderImageHandlerType};
 use webxr_api::SwapChainId as WebXRSwapChainId;
 
+trait Foo {
+    fn to_ms(&self) -> f64;
+}
+
+impl Foo for u64 {
+    fn to_ms(&self) -> f64 {
+        *self as f64 / 1000000.
+    }
+}
+
+
 struct GLContextData {
     ctx: Context,
     gl: Rc<Gl>,
@@ -328,8 +339,8 @@ impl WebGLThread {
             WebGLMsg::CreateWebXRSwapChain(ctx_id, size, sender) => {
                 let _ = sender.send(self.create_webxr_swap_chain(ctx_id, size));
             },
-            WebGLMsg::SwapBuffers(swap_ids, sender) => {
-                self.handle_swap_buffers(swap_ids, sender);
+            WebGLMsg::SwapBuffers(swap_ids, sender, sent_time) => {
+                self.handle_swap_buffers(swap_ids, sender, sent_time);
             },
             WebGLMsg::DOMToTextureCommand(command) => {
                 self.handle_dom_to_texture(command);
@@ -666,8 +677,11 @@ impl WebGLThread {
     fn handle_swap_buffers(
         &mut self,
         swap_ids: Vec<SwapChainId>,
-        completed_sender: WebGLSender<()>,
+        completed_sender: WebGLSender<u64>,
+        sent_time: u64,
     ) {
+        let start_swap = time::precise_time_ns();
+        println!("!!! swap request {}ms", (start_swap - sent_time).to_ms());
         debug!("handle_swap_buffers()");
         for swap_id in swap_ids {
             let context_id = swap_id.context_id();
@@ -731,8 +745,11 @@ impl WebGLThread {
                 framebuffer_object, id
             );
         }
+        
+        let end_swap = time::precise_time_ns();
+        println!("!!! swap buffer {}ms", (end_swap - start_swap).to_ms());
 
-        completed_sender.send(()).unwrap();
+        completed_sender.send(end_swap).unwrap();
     }
 
     /// Creates a new WebXR swap chain

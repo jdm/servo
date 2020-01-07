@@ -82,7 +82,7 @@ pub enum WebGLMsg {
         WebGLSender<Option<WebXRSwapChainId>>,
     ),
     /// Performs a buffer swap.
-    SwapBuffers(Vec<SwapChainId>, WebGLSender<()>),
+    SwapBuffers(Vec<SwapChainId>, WebGLSender<u64>, u64),
     /// Frees all resources and closes the thread.
     Exit,
 }
@@ -196,13 +196,24 @@ impl WebGLMsgSender {
             .unwrap_or_else(|| SwapChainId::Context(self.ctx_id));
         let (sender, receiver) = webgl_channel()?;
         self.sender
-            .send(WebGLMsg::SwapBuffers(vec![swap_id], sender))?;
-        receiver.recv()?;
+            .send(WebGLMsg::SwapBuffers(vec![swap_id], sender, time::precise_time_ns()))?;
+        let sent_time = receiver.recv()?;
+        println!("!!! swap complete {}ms", (time::precise_time_ns() - sent_time).to_ms());
         Ok(())
     }
 
     pub fn send_dom_to_texture(&self, command: DOMToTextureCommand) -> WebGLSendResult {
         self.sender.send(WebGLMsg::DOMToTextureCommand(command))
+    }
+}
+
+trait Foo {
+    fn to_ms(&self) -> f64;
+}
+
+impl Foo for u64 {
+    fn to_ms(&self) -> f64 {
+        *self as f64 / 1000000.
     }
 }
 

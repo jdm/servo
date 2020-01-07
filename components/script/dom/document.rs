@@ -2516,7 +2516,7 @@ impl Document {
         self.window
             .webgl_chan()
             .expect("Where's the WebGL channel?")
-            .send(WebGLMsg::SwapBuffers(dirty_context_ids, sender))
+            .send(WebGLMsg::SwapBuffers(dirty_context_ids, sender, 0))
             .unwrap();
         receiver.recv().unwrap();
     }

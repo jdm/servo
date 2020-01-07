@@ -165,10 +165,15 @@ impl XRSession {
         ROUTER.add_route(
             frame_receiver.to_opaque(),
             Box::new(move |message| {
+                let mut frame: Frame = message.to().unwrap();
+                let received = time::precise_time_ns();
+                println!("!!! raf receive {}ms", (received - frame.sent_time).to_ms());
+                frame.sent_time = received;
+
                 let this = this.clone();
                 let _ = task_source.queue_with_canceller(
                     task!(xr_raf_callback: move || {
-                        this.root().raf_callback(message.to().unwrap());
+                        this.root().raf_callback(frame);
                     }),
                     &canceller,
                 );
@@ -296,6 +301,8 @@ impl XRSession {
     /// https://immersive-web.github.io/webxr/#xr-animation-frame
     fn raf_callback(&self, mut frame: Frame) {
         debug!("WebXR RAF callback");
+        let raf_start = time::precise_time_ns();
+        println!("!!! raf queued {}ms", (raf_start - frame.sent_time).to_ms());
 
         // Step 1
         if let Some(pending) = self.pending_render_state.take() {
@@ -351,6 +358,8 @@ impl XRSession {
         } else {
             self.session.borrow_mut().start_render_loop();
         }
+
+        println!("!!! raf execute {}", (time::precise_time_ns() - raf_start).to_ms());
 
         // If the canvas element is attached to the DOM, it is now dirty,
         // and we need to trigger a reflow.
