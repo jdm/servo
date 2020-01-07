@@ -495,7 +495,7 @@ where
 
         webrender.set_external_image_handler(external_image_handlers);
 
-        let event_loop_waker = None;
+        let event_loop_waker = Some(embedder.create_event_loop_waker());
 
         // The division by 1 represents the page's default zoom of 100%,
         // and gives us the appropriate CSSPixel type for the viewport.

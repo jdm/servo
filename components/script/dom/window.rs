@@ -463,7 +463,7 @@ impl Window {
     pub(crate) fn webgl_chan(&self) -> Option<WebGLCommandSender> {
         self.webgl_chan
             .as_ref()
-            .map(|chan| WebGLCommandSender::new(chan.clone(), self.get_event_loop_waker()))
+            .map(|chan| WebGLCommandSender::new(chan.clone(), /*self.get_event_loop_waker()*/None))
     }
 
     pub fn webgpu_channel(&self) -> Option<WebGPU> {

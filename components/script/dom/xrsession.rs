@@ -40,6 +40,7 @@ use crate::dom::xrspace::XRSpace;
 use crate::dom::xrwebgllayer::XRWebGLLayer;
 use crate::task_source::TaskSource;
 use dom_struct::dom_struct;
+use embedder_traits::EventLoopWaker;
 use euclid::{Rect, RigidTransform3D, Transform3D};
 use ipc_channel::ipc::IpcReceiver;
 use ipc_channel::router::ROUTER;
@@ -82,6 +83,9 @@ pub struct XRSession {
     /// Opaque framebuffers need to know the session is "outside of a requestAnimationFrame"
     /// https://immersive-web.github.io/webxr/#opaque-framebuffer
     outside_raf: Cell<bool>,
+    
+    #[ignore_malloc_size_of = ""]
+    waker: Option<Box<dyn EventLoopWaker>>,
 }
 
 impl XRSession {
@@ -90,6 +94,7 @@ impl XRSession {
         render_state: &XRRenderState,
         input_sources: &XRInputSourceArray,
         mode: XRSessionMode,
+        waker: Option<Box<dyn EventLoopWaker>>,
     ) -> XRSession {
         XRSession {
             eventtarget: EventTarget::new_inherited(),
@@ -110,6 +115,7 @@ impl XRSession {
             end_promises: DomRefCell::new(vec![]),
             ended: Cell::new(false),
             outside_raf: Cell::new(true),
+            waker,
         }
     }
 
@@ -132,6 +138,7 @@ impl XRSession {
                 &render_state,
                 &input_sources,
                 mode,
+                global.as_window().get_event_loop_waker(),
             )),
             global,
             XRSessionBinding::Wrap,
@@ -355,6 +362,9 @@ impl XRSession {
         if self.is_immersive() {
             base_layer.swap_buffers();
             self.session.borrow_mut().render_animation_frame();
+            if let Some(ref waker) = self.waker {
+                waker.wake();
+            }
         } else {
             self.session.borrow_mut().start_render_loop();
         }

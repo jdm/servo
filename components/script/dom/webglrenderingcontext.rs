@@ -191,7 +191,7 @@ impl WebGLRenderingContext {
                 reflector_: Reflector::new(),
                 webgl_sender: WebGLMessageSender::new(
                     ctx_data.sender,
-                    window.get_event_loop_waker(),
+                    /*window.get_event_loop_waker()*/None,
                 ),
                 webrender_image: ctx_data.image_key,
                 webgl_version,
