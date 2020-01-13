@@ -180,6 +180,30 @@ void OpenGLES::Initialize() {
   if (mEglContext == EGL_NO_CONTEXT) {
     throw winrt::hresult_error(E_FAIL, L"Failed to create EGL context");
   }
+
+  // Fetch the EGL device.
+  /*EGLDeviceEXT egl_device = EGL_NO_DEVICE_EXT;
+  int result =
+      eglQueryDisplayAttribEXT(mEglDisplay, EGL_DEVICE_EXT, (EGLAttrib*)&egl_device);
+  if (result == EGL_FALSE) {
+    throw winrt::hresult_error(E_FAIL, L"failed to get egl device");
+  }
+  if (egl_device == EGL_NO_DEVICE_EXT) {
+    throw winrt::hresult_error(E_FAIL, L"no egl device");
+  }
+
+  // Fetch the D3D11 device.
+  winrt::com_ptr<ID3D11Device> d3d11_device;
+  result = eglQueryDeviceAttribEXT(egl_device, EGL_D3D11_DEVICE_ANGLE,
+                                       (EGLAttrib*)d3d11_device.put());
+  if (result == EGL_FALSE) {
+    throw winrt::hresult_error(E_FAIL, L"failed to get d3d device");
+  }
+  if (d3d11_device.get() == NULL) {
+    throw winrt::hresult_error(E_FAIL, L"d3d device is null");
+  }
+  winrt::com_ptr<ID3D11Multithread> multithread{d3d11_device.as<ID3D11Multithread>()};
+  multithread->SetMultithreadProtected(true);*/
 }
 
 void OpenGLES::Cleanup() {
@@ -203,9 +227,8 @@ EGLSurface OpenGLES::CreateSurface(SwapChainPanel const &panel, float dpi) {
   EGLSurface surface = EGL_NO_SURFACE;
 
   const EGLint surfaceAttributes[] = {
-      //EGL_GL_COLORSPACE, EGL_GL_COLORSPACE_SRGB,
-      EGL_NONE
-  };
+      // EGL_GL_COLORSPACE, EGL_GL_COLORSPACE_SRGB,
+      EGL_NONE};
 
   PropertySet surfaceCreationProperties;
 

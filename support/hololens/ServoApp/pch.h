@@ -20,6 +20,8 @@
 #include <wrl/client.h>
 
 #define GL_GLEXT_PROTOTYPES
+#define EGL_EGLEXT_PROTOTYPES
+
 #include <angle_windowsstore.h>
 #include <EGL/egl.h>
 #include <EGL/eglext.h>

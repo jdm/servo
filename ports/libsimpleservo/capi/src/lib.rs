@@ -362,7 +362,7 @@ unsafe fn init(
             LevelFilter::Warn
         }
     } else {
-        LevelFilter::Warn
+        LevelFilter::Trace
     };
 
     let logger_modules = if opts.vslogger_mod_list.is_null() {

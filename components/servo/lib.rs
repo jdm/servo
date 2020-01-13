@@ -172,6 +172,8 @@ mod media_platform {
 
     #[cfg(windows)]
     pub fn init() {
+        servo_allocator::enable_logging();
+
         // UWP apps have the working directory set appropriately. Win32 apps
         // do not and need some assistance finding the DLLs.
         let plugin_dir = if cfg!(feature = "uwp") {

@@ -2994,6 +2994,7 @@ dependencies = [
  "servo-media",
  "servo-media-dummy",
  "servo-media-gstreamer",
+ "servo_allocator",
  "servo_config",
  "servo_geometry",
  "servo_url",
@@ -3078,6 +3079,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c84ec4b527950aa83a329754b01dbe3f58361d1c5efacd1f6d68c494d08a17c6"
 dependencies = [
  "cfg-if",
+]
+
+[[package]]
+name = "logging-allocator"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8a21a927be2b57aa56066e93ed05697c9511b7b8e2c7909d7300a1a0da29c1c0"
+dependencies = [
+ "log",
 ]
 
 [[package]]
@@ -4999,6 +5009,7 @@ name = "servo_allocator"
 version = "0.0.1"
 dependencies = [
  "jemalloc-sys",
+ "logging-allocator",
  "winapi",
 ]
 
@@ -5474,8 +5485,6 @@ dependencies = [
 [[package]]
 name = "surfman"
 version = "0.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10248da202c1c8d8798783bbc4ba08e81ff225c6e2a394d64748d2a62acb198c"
 dependencies = [
  "bitflags",
  "cgl 0.3.2",
@@ -6449,7 +6458,6 @@ dependencies = [
 [[package]]
 name = "webxr"
 version = "0.0.1"
-source = "git+https://github.com/servo/webxr#c6abf4c60d165ffc978ad2ebd6bcddc3c21698e1"
 dependencies = [
  "bindgen",
  "euclid",
@@ -6470,7 +6478,6 @@ dependencies = [
 [[package]]
 name = "webxr-api"
 version = "0.0.1"
-source = "git+https://github.com/servo/webxr#c6abf4c60d165ffc978ad2ebd6bcddc3c21698e1"
 dependencies = [
  "euclid",
  "ipc-channel",

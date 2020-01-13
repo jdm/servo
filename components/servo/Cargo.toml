@@ -40,6 +40,7 @@ media-dummy = ["servo-media-dummy"]
 media-gstreamer = ["servo-media-gstreamer", "gstreamer"]
 
 [dependencies]
+servo_allocator = { path = "../allocator" }
 background_hang_monitor = {path = "../background_hang_monitor"}
 bluetooth_traits = {path = "../bluetooth_traits"}
 bluetooth = {path = "../bluetooth"}

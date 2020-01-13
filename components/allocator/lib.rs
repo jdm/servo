@@ -4,8 +4,10 @@
 
 //! Selecting the default global allocator for Servo
 
+use logging_allocator::LoggingAllocator;
+
 #[global_allocator]
-static ALLOC: Allocator = Allocator;
+static ALLOC: LoggingAllocator<Allocator> = LoggingAllocator::with_allocator(Allocator);
 
 pub use crate::platform::*;
 
@@ -96,12 +98,16 @@ mod platform {
     }
 }
 
+pub fn enable_logging() {
+    ALLOC.enable_logging();
+}
+
 #[cfg(windows)]
 mod platform {
     pub use std::alloc::System as Allocator;
     use std::os::raw::c_void;
     use winapi::um::heapapi::{GetProcessHeap, HeapSize, HeapValidate};
-
+    
     /// Get the size of a heap block.
     pub unsafe extern "C" fn usable_size(mut ptr: *const c_void) -> usize {
         let heap = GetProcessHeap();

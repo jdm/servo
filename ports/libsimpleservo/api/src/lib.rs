@@ -675,7 +675,7 @@ impl EmbedderMethods for ServoEmbedderCallbacks {
             "UWP builds should not be initialized with a WebXR Discovery object"
         );
         let gl_factory = self.gl_factory.clone();
-        let discovery = webxr::openxr::OpenXrDiscovery::new(gl_factory());
+        let discovery = webxr::openxr::OpenXrDiscovery::new(gl_factory);
         registry.register(discovery);
     }
 
