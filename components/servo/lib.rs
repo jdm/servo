@@ -405,6 +405,7 @@ where
                     renderer_kind: renderer_kind,
                     enable_subpixel_aa: opts.enable_subpixel_text_antialiasing,
                     clear_color: None,
+                    surface_origin_is_top_left: true,
                     ..Default::default()
                 },
                 None,
@@ -495,7 +496,8 @@ where
 
         webrender.set_external_image_handler(external_image_handlers);
 
-        let event_loop_waker = Some(embedder.create_event_loop_waker());
+        //let event_loop_waker = Some(embedder.create_event_loop_waker());
+        let event_loop_waker = None;
 
         // The division by 1 represents the page's default zoom of 100%,
         // and gives us the appropriate CSSPixel type for the viewport.

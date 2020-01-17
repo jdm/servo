@@ -946,8 +946,9 @@ impl WindowMethods for Window {
 
     /// <https://html.spec.whatwg.org/multipage/#dom-window-requestanimationframe>
     fn RequestAnimationFrame(&self, callback: Rc<FrameRequestCallback>) -> u32 {
-        self.Document()
-            .request_animation_frame(AnimationFrameCallback::FrameRequestCallback { callback })
+        /*self.Document()
+            .request_animation_frame(AnimationFrameCallback::FrameRequestCallback { callback })*/
+        0
     }
 
     /// <https://html.spec.whatwg.org/multipage/#dom-window-cancelanimationframe>

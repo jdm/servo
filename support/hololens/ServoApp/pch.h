@@ -19,6 +19,7 @@
 #include <WindowsNumerics.h>
 #include <wrl/client.h>
 
+#define EGL_EGLEXT_PROTOTYPES
 #define GL_GLEXT_PROTOTYPES
 #include <angle_windowsstore.h>
 #include <EGL/egl.h>

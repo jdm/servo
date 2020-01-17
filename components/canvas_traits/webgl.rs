@@ -198,7 +198,9 @@ impl WebGLMsgSender {
         self.sender
             .send(WebGLMsg::SwapBuffers(vec![swap_id], sender, time::precise_time_ns()))?;
         let sent_time = receiver.recv()?;
-        println!("!!! swap complete {}ms", (time::precise_time_ns() - sent_time).to_ms());
+        if cfg!(feature = "xr-profile") {
+            println!("!!! swap complete {}ms", (time::precise_time_ns() - sent_time).to_ms());
+        }
         Ok(())
     }
 

@@ -428,10 +428,10 @@ bool ServoControl::OnServoAllowNavigation(hstring uri) {
 }
 
 void ServoControl::OnServoAnimatingChanged(bool animating) {
-  EnterCriticalSection(&mGLLock);
+  /*EnterCriticalSection(&mGLLock);
   mAnimating = animating;
   LeaveCriticalSection(&mGLLock);
-  WakeConditionVariable(&mGLCondVar);
+  WakeConditionVariable(&mGLCondVar);*/
 }
 
 void ServoControl::OnServoIMEStateChanged(bool aShow) {

@@ -2513,6 +2513,11 @@ impl Document {
         }
 
         let (sender, receiver) = webgl::webgl_channel().unwrap();
+        let send_time = if cfg!(feature = "xr-profile") {
+            time::precise_time_ns()
+        } else {
+            0
+        };
         self.window
             .webgl_chan()
             .expect("Where's the WebGL channel?")

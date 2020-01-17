@@ -12,6 +12,7 @@ path = "lib.rs"
 
 [features]
 webgl_backtrace = []
+xr-profile = []
 
 [dependencies]
 cssparser = "0.27"

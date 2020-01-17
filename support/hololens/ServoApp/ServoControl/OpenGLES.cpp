@@ -5,6 +5,7 @@
 #include "pch.h"
 #include "logs.h"
 #include "OpenGLES.h"
+#include "windows.ui.xaml.media.dxinterop.h"
 
 using namespace winrt::Windows::UI::Xaml::Controls;
 using namespace winrt::Windows::Foundation;
@@ -50,11 +51,11 @@ void OpenGLES::Initialize() {
 
       // EGL_EXPERIMENTAL_PRESENT_PATH_ANGLE is an optimization that
       // can have large performance benefits on mobile devices.
-      EGL_EXPERIMENTAL_PRESENT_PATH_ANGLE,
-      EGL_EXPERIMENTAL_PRESENT_PATH_FAST_ANGLE,
+      /*EGL_EXPERIMENTAL_PRESENT_PATH_ANGLE,
+      EGL_EXPERIMENTAL_PRESENT_PATH_FAST_ANGLE,*/
 
-      EGL_PLATFORM_ANGLE_DEBUG_LAYERS_ENABLED_ANGLE,
-      EGL_TRUE,
+      /*EGL_PLATFORM_ANGLE_DEBUG_LAYERS_ENABLED_ANGLE,
+      EGL_TRUE,*/
 
       // EGL_PLATFORM_ANGLE_ENABLE_AUTOMATIC_TRIM_ANGLE is an option that
       // enables ANGLE to automatically call
@@ -76,15 +77,15 @@ void OpenGLES::Initialize() {
       EGL_PLATFORM_ANGLE_TYPE_ANGLE,
       EGL_PLATFORM_ANGLE_TYPE_D3D11_ANGLE,
 
-      EGL_PLATFORM_ANGLE_DEBUG_LAYERS_ENABLED_ANGLE,
-      EGL_TRUE,
+      /*EGL_PLATFORM_ANGLE_DEBUG_LAYERS_ENABLED_ANGLE,
+      EGL_TRUE,*/
 
       EGL_PLATFORM_ANGLE_MAX_VERSION_MAJOR_ANGLE,
       9,
       EGL_PLATFORM_ANGLE_MAX_VERSION_MINOR_ANGLE,
       3,
-      EGL_EXPERIMENTAL_PRESENT_PATH_ANGLE,
-      EGL_EXPERIMENTAL_PRESENT_PATH_FAST_ANGLE,
+      /*EGL_EXPERIMENTAL_PRESENT_PATH_ANGLE,
+      EGL_EXPERIMENTAL_PRESENT_PATH_FAST_ANGLE,*/
       EGL_PLATFORM_ANGLE_ENABLE_AUTOMATIC_TRIM_ANGLE,
       EGL_TRUE,
       EGL_NONE,
@@ -97,13 +98,13 @@ void OpenGLES::Initialize() {
       EGL_PLATFORM_ANGLE_TYPE_ANGLE,
       EGL_PLATFORM_ANGLE_TYPE_D3D11_ANGLE,
 
-      EGL_PLATFORM_ANGLE_DEBUG_LAYERS_ENABLED_ANGLE,
-      EGL_TRUE,
+      /*EGL_PLATFORM_ANGLE_DEBUG_LAYERS_ENABLED_ANGLE,
+      EGL_TRUE,*/
 
       EGL_PLATFORM_ANGLE_DEVICE_TYPE_ANGLE,
       EGL_PLATFORM_ANGLE_DEVICE_TYPE_D3D_WARP_ANGLE,
-      EGL_EXPERIMENTAL_PRESENT_PATH_ANGLE,
-      EGL_EXPERIMENTAL_PRESENT_PATH_FAST_ANGLE,
+      /*EGL_EXPERIMENTAL_PRESENT_PATH_ANGLE,
+      EGL_EXPERIMENTAL_PRESENT_PATH_FAST_ANGLE,*/
       EGL_PLATFORM_ANGLE_ENABLE_AUTOMATIC_TRIM_ANGLE,
       EGL_TRUE,
       EGL_NONE,
@@ -202,7 +203,7 @@ void OpenGLES::Reset() {
 EGLSurface OpenGLES::CreateSurface(SwapChainPanel const &panel, float dpi) {
   EGLSurface surface = EGL_NO_SURFACE;
 
-  const EGLint surfaceAttributes[] = {
+  /*const EGLint surfaceAttributes[] = {
       //EGL_GL_COLORSPACE, EGL_GL_COLORSPACE_SRGB,
       EGL_NONE
   };
@@ -214,12 +215,113 @@ EGLSurface OpenGLES::CreateSurface(SwapChainPanel const &panel, float dpi) {
   // Insert(EGLRenderSurfaceSizeProperty),
   // PropertyValue::CreateSize(*renderSurfaceSize));
   surfaceCreationProperties.Insert(EGLRenderResolutionScaleProperty,
-                                   PropertyValue::CreateSingle(dpi));
+                                   PropertyValue::CreateSingle(dpi));*/
 
-  EGLNativeWindowType win = static_cast<EGLNativeWindowType>(
-      winrt::get_abi(surfaceCreationProperties));
-  surface =
-      eglCreateWindowSurface(mEglDisplay, mEglConfig, win, surfaceAttributes);
+  /*EGLNativeWindowType win = static_cast<EGLNativeWindowType>(
+      winrt::get_abi(surfaceCreationProperties));*/
+  /*surface =
+      eglCreateWindowSurface(mEglDisplay, mEglConfig, win, surfaceAttributes);*/
+
+  HRESULT result = S_OK;
+  //ComPtr<IDependencyObject> swapChainPanelDependencyObject;
+  /*if (SUCCEEDED(result)) {
+    result = mSwapChainPanel.As(&swapChainPanelDependencyObject);
+  }*/
+  /*if (SUCCEEDED(result)) {
+    result = swapChainPanelDependencyObject->get_Dispatcher(
+        mSwapChainPanelDispatcher.GetAddressOf());
+  }*/
+  Size windowSize = panel.RenderSize();
+  RECT clientRect = {0, 0, lround(windowSize.Width * dpi), lround(windowSize.Height * dpi)};
+  /*if (SUCCEEDED(result)) {
+    mClientRect = clientRect(swapChainPanelSize);
+  }*/
+  //TODO: register for panel size change events
+
+    EGLDeviceEXT eglDevice = nullptr;
+    eglQueryDisplayAttribEXT(mEglDisplay, EGL_DEVICE_EXT, (EGLAttrib*)&eglDevice);
+
+    winrt::com_ptr<ID3D11Device> device;
+    eglQueryDeviceAttribEXT(eglDevice, EGL_D3D11_DEVICE_ANGLE, (EGLAttrib*)device.put());
+
+        winrt::com_ptr<IDXGIDevice> dxgiDevice = device.as<IDXGIDevice>();
+        //device->QueryInterface(__uuidof(IDXGIDevice), dxgiDevice.put());
+
+        winrt::com_ptr<IDXGIFactory> dxgiFactory;
+        winrt::com_ptr<IDXGIAdapter> dxgiAdapter;
+        dxgiDevice->GetParent(__uuidof(IDXGIAdapter), (void**)dxgiAdapter.put());
+        //IDXGIAdapter2 *dxgiAdapter2 = d3d11::DynamicCastComObject<IDXGIAdapter2>(mDxgiAdapter);
+        dxgiAdapter->GetParent(__uuidof(IDXGIFactory), (void**)dxgiFactory.put());
+        
+        winrt::com_ptr<IDXGIFactory2> dxgiFactory2 = dxgiFactory.as<IDXGIFactory2>();
+        //dxgiFactory->QueryInterface(_uuidof(IDXGIFactory2), dxgiFactory2.put());
+
+        DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {0};
+    swapChainDesc.Width                 = windowSize.Width;
+    swapChainDesc.Height                = windowSize.Height;
+    swapChainDesc.Format                = DXGI_FORMAT_B8G8R8A8_UNORM;
+    // or maybe DXGI_FORMAT_R8G8B8A8_UNORM? follow code that creates SwapChainD3D
+    swapChainDesc.Stereo                = FALSE;
+    swapChainDesc.SampleDesc.Count      = 1;
+    swapChainDesc.SampleDesc.Quality    = 0;
+    swapChainDesc.BufferUsage =
+        DXGI_USAGE_SHADER_INPUT | DXGI_USAGE_RENDER_TARGET_OUTPUT | DXGI_USAGE_BACK_BUFFER;
+    swapChainDesc.BufferCount = 2;
+    swapChainDesc.SwapEffect  = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
+    swapChainDesc.Scaling     = DXGI_SCALING_STRETCH;
+    swapChainDesc.AlphaMode = DXGI_ALPHA_MODE_IGNORE;
+        //containsAlpha ? DXGI_ALPHA_MODE_PREMULTIPLIED : DXGI_ALPHA_MODE_IGNORE;
+
+    //ComPtr<IDXGISwapChain1> newSwapChain;
+    //Size currentPanelSize = {};
+
+    result = dxgiFactory2->CreateSwapChainForComposition(device.get(), &swapChainDesc, nullptr,
+                                                            mSwapChain.put());
+
+        winrt::com_ptr<ISwapChainPanelNative> swapChainPanelNative =
+        panel.as<ISwapChainPanelNative>();
+    swapChainPanelNative->SetSwapChain(mSwapChain.get());
+    
+    Size renderScale = {windowSize.Width / (float)clientRect.right,
+                        windowSize.Height / (float)clientRect.bottom};
+    // Setup a scale matrix for the swap chain
+    DXGI_MATRIX_3X2_F scaleMatrix = {};
+    scaleMatrix._11               = renderScale.Width;
+    scaleMatrix._22               = renderScale.Height;
+
+    winrt::com_ptr<IDXGISwapChain2> swapChain2 = mSwapChain.as<IDXGISwapChain2>();
+    swapChain2->SetMatrixTransform(&scaleMatrix);
+
+
+    /*if (SUCCEEDED(result))
+    {
+        //result = panel.as(&swapChainPanelNative);
+    }*/
+    
+    // TODO: set swap chain matrix scale transform
+    
+    //winrt::com_ptr<ID3D11Texture2D> backBuffer;
+    ID3D11Texture2D *backBuffer = nullptr;
+    result = mSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)&backBuffer);
+    
+      const EGLint pbuffer_attribs[]{
+      EGL_WIDTH,
+      windowSize.Width,
+      EGL_HEIGHT,
+      windowSize.Height,
+      EGL_FLEXIBLE_SURFACE_COMPATIBILITY_SUPPORTED_ANGLE,
+      EGL_TRUE,
+      EGL_NONE};
+      
+      const auto buffer = reinterpret_cast<EGLClientBuffer>(backBuffer);
+      surface = eglCreatePbufferFromClientBuffer(
+        mEglDisplay, EGL_D3D_TEXTURE_ANGLE, buffer, mEglConfig, pbuffer_attribs
+      );
+      
+      int err = eglGetError();
+      if (err != EGL_SUCCESS) {
+        throw winrt::hresult_error(E_FAIL, L"EGL error creating client buffer");
+      }
 
   if (surface == EGL_NO_SURFACE) {
     throw winrt::hresult_error(E_FAIL, L"Failed to create EGL surface");
@@ -247,5 +349,7 @@ void OpenGLES::MakeCurrent(const EGLSurface surface) {
 }
 
 EGLBoolean OpenGLES::SwapBuffers(const EGLSurface surface) {
-  return (eglSwapBuffers(mEglDisplay, surface));
+    mSwapChain->Present(0, 0);
+    return true;
+  //return (eglSwapBuffers(mEglDisplay, surface));
 }

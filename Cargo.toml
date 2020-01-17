@@ -33,6 +33,7 @@ winapi = { git = "https://github.com/servo/winapi-rs", branch = "patch-1" }
 spirv_cross = { git = "https://github.com/kvark/spirv_cross", branch = "wgpu" }
 backtrace = { git = "https://github.com/MeFisto94/backtrace-rs", branch = "fix-strtab-freeing-crash" }
 surfman = { path = "../rust-offscreen-rendering-context/surfman" }
+ipc-channel = { path = "../ipc-channel" }
 
 [patch."https://github.com/servo/webxr"]
 webxr = { path = "../webxr/webxr" }

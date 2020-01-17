@@ -680,8 +680,11 @@ impl WebGLThread {
         completed_sender: WebGLSender<u64>,
         sent_time: u64,
     ) {
-        let start_swap = time::precise_time_ns();
-        println!("!!! swap request {}ms", (start_swap - sent_time).to_ms());
+        let mut start_swap = 0;
+        if cfg!(feature = "xr-profile") {
+            start_swap = time::precise_time_ns();
+            println!("!!! swap request {}ms", (start_swap - sent_time).to_ms());
+        }
         debug!("handle_swap_buffers()");
         for swap_id in swap_ids {
             let context_id = swap_id.context_id();
@@ -746,8 +749,11 @@ impl WebGLThread {
             );
         }
         
-        let end_swap = time::precise_time_ns();
-        println!("!!! swap buffer {}ms", (end_swap - start_swap).to_ms());
+        let mut end_swap = 0;
+        if cfg!(feature = "xr-profile") {
+            end_swap = time::precise_time_ns();
+            println!("!!! swap buffer {}ms", (end_swap - start_swap).to_ms());
+        }
 
         completed_sender.send(end_swap).unwrap();
     }

@@ -21,6 +21,7 @@ webgl_backtrace = ["backtrace", "canvas_traits/webgl_backtrace"]
 js_backtrace = ["backtrace"]
 uwp = ["js/uwp"]
 vslatestinstalled = ["js/vslatestinstalled"]
+xr-profile = []
 
 [build-dependencies]
 phf_codegen = "0.8"

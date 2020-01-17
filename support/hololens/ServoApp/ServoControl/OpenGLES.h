@@ -28,4 +28,5 @@ private:
   EGLDisplay mEglDisplay = EGL_NO_DISPLAY;
   EGLContext mEglContext = nullptr;
   EGLConfig mEglConfig = nullptr;
+  winrt::com_ptr<IDXGISwapChain1> mSwapChain;
 };

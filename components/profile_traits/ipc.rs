@@ -30,7 +30,7 @@ where
         )
     }
 
-    pub fn try_recv(&self) -> Result<T, bincode::Error> {
+    pub fn try_recv(&self) -> Result<T, ipc::TryRecvError> {
         self.ipc_receiver.try_recv()
     }
 

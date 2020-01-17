@@ -14,6 +14,7 @@ path = "lib.rs"
 canvas2d-azure = ["azure"]
 canvas2d-raqote = ["raqote"]
 webgl_backtrace = ["canvas_traits/webgl_backtrace"]
+xr-profile = []
 no-wgl = ["surfman/sm-no-wgl"]
 
 [dependencies]
