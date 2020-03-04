@@ -2472,6 +2472,10 @@ impl ElementMethods for Element {
 
     /// <https://w3c.github.io/DOM-Parsing/#widl-Element-innerHTML>
     fn SetInnerHTML(&self, value: DOMString) -> ErrorResult {
+        if value.find('<').is_none() {
+            return Ok(self.upcast::<Node>().SetTextContent(Some(value)));
+        }
+
         // Step 1.
         let frag = self.parse_fragment(value)?;
         // Step 2.
