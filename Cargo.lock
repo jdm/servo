@@ -263,6 +263,29 @@ dependencies = [
 
 [[package]]
 name = "bindgen"
+version = "0.51.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ebd71393f1ec0509b553aa012b9b58e81dadbdff7130bd3b8cba576e69b32f75"
+dependencies = [
+ "bitflags",
+ "cexpr",
+ "cfg-if",
+ "clang-sys",
+ "clap",
+ "env_logger 0.6.2",
+ "lazy_static",
+ "log",
+ "peeking_take_while",
+ "proc-macro2 1.0.1",
+ "quote 1.0.2",
+ "regex",
+ "rustc-hash",
+ "shlex",
+ "which",
+]
+
+[[package]]
+name = "bindgen"
 version = "0.53.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "99de13bb6361e01e493b3db7928085dcc474b7ba4f5481818e53a89d76b8393f"
@@ -272,7 +295,7 @@ dependencies = [
  "cfg-if",
  "clang-sys",
  "clap",
- "env_logger",
+ "env_logger 0.7.1",
  "lazy_static",
  "lazycell",
  "log",
@@ -1439,6 +1462,19 @@ dependencies = [
  "proc-macro2 1.0.1",
  "quote 1.0.2",
  "syn",
+]
+
+[[package]]
+name = "env_logger"
+version = "0.6.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aafcde04e90a5226a6443b7aabdb016ba2f8307c847d524724bd9b346dd1a2d3"
+dependencies = [
+ "atty",
+ "humantime",
+ "log",
+ "regex",
+ "termcolor",
 ]
 
 [[package]]
@@ -3164,7 +3200,7 @@ dependencies = [
  "devtools",
  "devtools_traits",
  "embedder_traits",
- "env_logger",
+ "env_logger 0.7.1",
  "euclid",
  "gaol",
  "gfx",
@@ -3610,7 +3646,6 @@ dependencies = [
 [[package]]
 name = "mozjs"
 version = "0.13.0"
-source = "git+https://github.com/servo/rust-mozjs#2598da7110f752d29f2beedf3e47c71f72a354a3"
 dependencies = [
  "cc",
  "lazy_static",
@@ -3623,9 +3658,8 @@ dependencies = [
 [[package]]
 name = "mozjs_sys"
 version = "0.68.1"
-source = "git+https://github.com/servo/mozjs?rev=2392ebc144331184a770bee1f1ac02969946380f#2392ebc144331184a770bee1f1ac02969946380f"
 dependencies = [
- "bindgen",
+ "bindgen 0.53.1",
  "cc",
  "encoding_c",
  "encoding_c_mem",
@@ -4603,7 +4637,7 @@ version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a965d7b934fef625349e5f21774046da180000911140898235576a91dfbbe633"
 dependencies = [
- "bindgen",
+ "bindgen 0.53.1",
  "euclid",
  "gl_generator 0.13.1",
  "gleam 0.9.2",
@@ -5416,7 +5450,7 @@ version = "0.0.1"
 dependencies = [
  "backtrace",
  "cbindgen",
- "env_logger",
+ "env_logger 0.7.1",
  "lazy_static",
  "libc",
  "log",
@@ -5605,7 +5639,7 @@ dependencies = [
  "app_units",
  "arrayvec 0.5.1",
  "atomic_refcell",
- "bindgen",
+ "bindgen 0.53.1",
  "bitflags",
  "byteorder",
  "crossbeam-channel",
@@ -6667,11 +6701,11 @@ name = "webxr"
 version = "0.0.1"
 source = "git+https://github.com/servo/webxr#bf3d92b744a3e48d9addb76f0eef45320ac33960"
 dependencies = [
- "bindgen",
+ "bindgen 0.51.1",
  "crossbeam-channel",
  "euclid",
  "gl_generator 0.13.1",
- "gleam 0.9.2",
+ "gleam 0.6.18",
  "glutin",
  "log",
  "openxr",
