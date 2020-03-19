@@ -100,7 +100,7 @@ Servo::Servo(hstring url, hstring args, GLsizei width, GLsizei height,
       SetEnvironmentVariable(L"IONFLAGS", /*aborts,caches*/L"bailouts,osi,scripts,bl-bails");
 
   capi::CInitOptions o;
-  hstring defaultPrefs = L" --pref dom.webxr.enabled --pref js.ion.enabled=true --devtools";
+  hstring defaultPrefs = L" --pref dom.webxr.enabled --pref js.ion.enabled=true --devtools --vslogger-level debug";
   o.args = *hstring2char(args + defaultPrefs);
   o.url = *hstring2char(url);
   o.width = mWindowWidth;
