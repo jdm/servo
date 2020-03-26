@@ -23,7 +23,7 @@ use crate::dom::bindings::reflector::DomObject;
 use crate::dom::bindings::root::{Dom, DomRoot, MutNullableDom};
 use crate::dom::bindings::str::{DOMString, USVString};
 use crate::dom::bindings::structuredclone;
-use crate::dom::bindings::trace::RootedTraceableBox;
+use crate::dom::bindings::trace::{JSTraceable, RootedTraceableBox};
 use crate::dom::bindings::utils::{GlobalStaticData, WindowProxyHandler};
 use crate::dom::bindings::weakref::DOMTracker;
 use crate::dom::bluetooth::BluetoothExtraPermissionData;
@@ -55,6 +55,7 @@ use crate::dom::worklet::Worklet;
 use crate::dom::workletglobalscope::WorkletGlobalScopeType;
 use crate::fetch;
 use crate::layout_image::fetch_image_for_layout;
+use crate::malloc_size_of::MallocSizeOf;
 use crate::microtask::MicrotaskQueue;
 use crate::realms::InRealm;
 use crate::script_runtime::{
@@ -334,6 +335,9 @@ pub struct Window {
     event_loop_waker: Option<Box<dyn EventLoopWaker>>,
 
     visible: Cell<bool>,
+    
+    #[ignore_malloc_size_of = "Rc is hard"]
+    layout_marker: DomRefCell<Rc<Cell<bool>>>,
 }
 
 impl Window {
@@ -1580,6 +1584,11 @@ impl Window {
             return false;
         }
 
+        // Invalidate any existing cached layout values.
+        self.layout_marker.borrow().set(false);
+        // Create a new layout caching token.
+        *self.layout_marker.borrow_mut() = Rc::new(Cell::new(true));
+
         debug!("script: performing reflow for reason {:?}", reason);
 
         let marker = if self.need_emit_timeline_marker(TimelineMarkerType::Reflow) {
@@ -2348,6 +2357,7 @@ impl Window {
             player_context,
             event_loop_waker,
             visible: Cell::new(true),
+            layout_marker: DomRefCell::new(Rc::new(Cell::new(true))),
         });
 
         unsafe { WindowBinding::Wrap(JSContext::from_ptr(runtime.cx()), win) }
@@ -2355,6 +2365,35 @@ impl Window {
 
     pub fn pipeline_id(&self) -> PipelineId {
         self.upcast::<GlobalScope>().pipeline_id()
+    }
+    
+    pub fn cache_layout_value<T>(&self, value: T) -> LayoutValue<T>
+        where T: Copy + JSTraceable + MallocSizeOf
+    {
+        LayoutValue::new(self.layout_marker.borrow().clone(), value)
+    }
+}
+
+#[derive(JSTraceable, MallocSizeOf)]
+pub struct LayoutValue<T: JSTraceable + MallocSizeOf> {
+    #[ignore_malloc_size_of = "Rc is hard"]
+    is_valid: Rc<Cell<bool>>,
+    value: T,
+}
+
+impl<T: Copy + JSTraceable + MallocSizeOf> LayoutValue<T> {
+    fn new(marker: Rc<Cell<bool>>, value: T) -> Self {
+        LayoutValue {
+            is_valid: marker,
+            value,
+        }
+    }
+    
+    pub fn get(&self) -> Result<T, ()> {
+        if self.is_valid.get() {
+            return Ok(self.value);
+        }
+        Err(())
     }
 }
 
