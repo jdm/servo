@@ -3217,6 +3217,7 @@ impl Element {
         }
         let rect = self.upcast::<Node>().client_rect();
         self.ensure_rare_data().client_rect = Some(window_from_node(self).cache_layout_value(rect));
+        assert!(self.ensure_rare_data().client_rect.as_ref().unwrap().get().is_ok());
         rect
     }
 
