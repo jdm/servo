@@ -588,16 +588,28 @@ impl Document {
         self.needs_paint.get()
     }
 
-    pub fn needs_reflow(&self) -> bool {
+    pub fn needs_reflow(&self) -> Option<ReflowTriggerCondition> {
         // FIXME: This should check the dirty bit on the document,
         // not the document element. Needs some layout changes to make
         // that workable.
-        self.stylesheets.borrow().has_changed() ||
-            self.GetDocumentElement().map_or(false, |root| {
-                root.upcast::<Node>().has_dirty_descendants() ||
-                    !self.pending_restyles.borrow().is_empty() ||
-                    self.needs_paint()
-            })
+        if self.stylesheets.borrow().has_changed() {
+            return Some(ReflowTriggerCondition::StylesheetsChanged);
+        }
+
+        let root = self.GetDocumentElement()?;
+        if root.upcast::<Node>().has_dirty_descendants() {
+            return Some(ReflowTriggerCondition::DirtyDescendants);
+        }
+
+        if !self.pending_restyles.borrow().is_empty() {
+            return Some(ReflowTriggerCondition::PendingRestyles);
+        }
+
+        if self.needs_paint() {
+            return Some(ReflowTriggerCondition::PaintPostponed);
+        }
+
+        None
     }
 
     /// Returns the first `base` element in the DOM that has an `href` attribute.
@@ -1683,7 +1695,7 @@ impl Document {
             // is considered spurious, we need to ensure that the layout
             // and compositor *do* tick the animation.
             self.window
-                .force_reflow(ReflowGoal::Full, ReflowReason::RequestAnimationFrame);
+                .force_reflow(ReflowGoal::Full, ReflowReason::RequestAnimationFrame, None);
         }
 
         // Only send the animation change state message after running any callbacks.
@@ -4952,5 +4964,21 @@ impl PendingScript {
         self.load
             .take()
             .map(|result| (DomRoot::from_ref(&*self.element), result))
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum ReflowTriggerCondition {
+    StylesheetsChanged,
+    DirtyDescendants,
+    PendingRestyles,
+    PaintPostponed,
+}
+
+impl ReflowTriggerCondition {
+    pub fn should_invalidate_layout_cache(&self) -> bool {
+        // If the only reason to perform reflow is that we need to paint, there is
+        // no reason to invalidate any cached layout values which will not change.
+        *self != ReflowTriggerCondition::PaintPostponed
     }
 }

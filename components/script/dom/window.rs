@@ -30,7 +30,7 @@ use crate::dom::bluetooth::BluetoothExtraPermissionData;
 use crate::dom::crypto::Crypto;
 use crate::dom::cssstyledeclaration::{CSSModificationAccess, CSSStyleDeclaration, CSSStyleOwner};
 use crate::dom::customelementregistry::CustomElementRegistry;
-use crate::dom::document::{AnimationFrameCallback, Document};
+use crate::dom::document::{AnimationFrameCallback, Document, ReflowTriggerCondition};
 use crate::dom::element::Element;
 use crate::dom::event::{Event, EventStatus};
 use crate::dom::eventtarget::EventTarget;
@@ -1565,7 +1565,7 @@ impl Window {
     ///
     /// Returns true if layout actually happened, false otherwise.
     #[allow(unsafe_code)]
-    pub fn force_reflow(&self, reflow_goal: ReflowGoal, reason: ReflowReason) -> bool {
+    pub fn force_reflow(&self, reflow_goal: ReflowGoal, reason: ReflowReason, condition: Option<ReflowTriggerCondition>) -> bool {
         self.Document().ensure_safe_to_run_script_or_layout();
         // Check if we need to unsuppress reflow. Note that this needs to be
         // *before* any early bailouts, or reflow might never be unsuppresed!
@@ -1584,10 +1584,15 @@ impl Window {
             return false;
         }
 
-        // Invalidate any existing cached layout values.
-        self.layout_marker.borrow().set(false);
-        // Create a new layout caching token.
-        *self.layout_marker.borrow_mut() = Rc::new(Cell::new(true));
+        if condition != Some(ReflowTriggerCondition::PaintPostponed) {
+            debug!("Invalidating layout cache due to reflow condition {:?}", condition);
+            // Invalidate any existing cached layout values.
+            self.layout_marker.borrow().set(false);
+            // Create a new layout caching token.
+            *self.layout_marker.borrow_mut() = Rc::new(Cell::new(true));
+        } else {
+            debug!("Not invalidating cached layout values for paint-only reflow.");
+        }
 
         debug!("script: performing reflow for reason {:?}", reason);
 
@@ -1723,16 +1728,18 @@ impl Window {
         let for_display = reflow_goal == ReflowGoal::Full;
 
         let mut issued_reflow = false;
-        if !for_display || self.Document().needs_reflow() {
-            issued_reflow = self.force_reflow(reflow_goal, reason);
+        let condition = self.Document().needs_reflow();
+        if !for_display || condition.is_some() {
+            issued_reflow = self.force_reflow(reflow_goal, reason, condition);
 
             // We shouldn't need a reflow immediately after a
             // reflow, except if we're waiting for a deferred paint.
-            assert!(
-                !self.Document().needs_reflow() ||
-                    (!for_display && self.Document().needs_paint()) ||
+            assert!({
+                let condition = self.Document().needs_reflow();
+                condition.is_none() ||
+                    (!for_display && condition == Some(ReflowTriggerCondition::PaintPostponed)) ||
                     self.suppress_reflow.get()
-            );
+            });
         } else {
             debug!(
                 "Document doesn't need reflow - skipping it (reason {:?})",
