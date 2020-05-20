@@ -18,7 +18,10 @@ use crate::dom::bindings::root::{Dom, DomRoot, LayoutDom, MutNullableDom};
 use crate::dom::bindings::str::DOMString;
 use crate::dom::globalscope::GlobalScope;
 use crate::dom::htmlcanvaselement::HTMLCanvasElement;
-use crate::dom::webgl_validations::tex_image_2d::{TexStorageValidator, TexStorageValidatorResult};
+use crate::dom::webgl_validations::tex_image_2d::{
+    TexImage2DValidator, TexImage2DValidatorResult, TexStorageValidator, TexStorageValidatorResult,
+};
+use crate::dom::webgl_validations::types::TexImageTarget;
 use crate::dom::webgl_validations::WebGLValidator;
 use crate::dom::webglactiveinfo::WebGLActiveInfo;
 use crate::dom::webglbuffer::WebGLBuffer;
@@ -27,8 +30,8 @@ use crate::dom::webglprogram::WebGLProgram;
 use crate::dom::webglquery::WebGLQuery;
 use crate::dom::webglrenderbuffer::WebGLRenderbuffer;
 use crate::dom::webglrenderingcontext::{
-    uniform_get, uniform_typed, LayoutCanvasWebGLRenderingContextHelpers, Operation, VertexAttrib,
-    WebGLRenderingContext,
+    uniform_get, uniform_typed, LayoutCanvasWebGLRenderingContextHelpers, Operation, TexPixels,
+    TextureUnpacking, VertexAttrib, WebGLRenderingContext,
 };
 use crate::dom::webglsampler::{WebGLSampler, WebGLSamplerValue};
 use crate::dom::webglshader::WebGLShader;
@@ -43,12 +46,12 @@ use crate::js::conversions::ToJSValConvertible;
 use crate::script_runtime::JSContext;
 use canvas_traits::webgl::WebGLError::*;
 use canvas_traits::webgl::{
-    webgl_channel, GLContextAttributes, InternalFormatParameter, WebGLCommand, WebGLResult,
-    WebGLVersion,
+    webgl_channel, AlphaTreatment, GLContextAttributes, InternalFormatParameter, TexDataType,
+    TexFormat, WebGLCommand, WebGLResult, WebGLVersion, YAxisTreatment,
 };
 use dom_struct::dom_struct;
 use euclid::default::{Point2D, Rect, Size2D};
-use ipc_channel::ipc;
+use ipc_channel::ipc::{self, IpcSharedMemory};
 use js::jsapi::{JSObject, Type};
 use js::jsval::{BooleanValue, DoubleValue, Int32Value, UInt32Value};
 use js::jsval::{JSVal, NullValue, ObjectValue, UndefinedValue};
@@ -888,6 +891,136 @@ impl WebGL2RenderingContext {
             texture.storage(target, levels, internal_format, width, height, depth),
             return
         );
+    }
+
+    // TODO(emilio): Move this logic to a validator.
+    fn validate_tex_image_3d_data(
+        &self,
+        width: u32,
+        height: u32,
+        format: TexFormat,
+        data_type: TexDataType,
+        unpacking_alignment: u32,
+        data: &Option<ArrayBufferView>,
+    ) -> Result<u32, ()> {
+        let element_size = data_type.element_size();
+        let components_per_element = data_type.components_per_element();
+        let components = format.components();
+
+        // If data is non-null, the type of pixels must match the type of the
+        // data to be read.
+        // If it is UNSIGNED_BYTE, a Uint8Array must be supplied;
+        // if it is UNSIGNED_SHORT_5_6_5, UNSIGNED_SHORT_4_4_4_4,
+        // or UNSIGNED_SHORT_5_5_5_1, a Uint16Array must be supplied.
+        // or FLOAT, a Float32Array must be supplied.
+        // If the types do not match, an INVALID_OPERATION error is generated.
+        let received_size = match *data {
+            None => element_size,
+            Some(ref buffer) => match buffer.get_array_type() {
+                Type::Uint8 => 1,
+                Type::Uint16 => 2,
+                Type::Float32 => 4,
+                Type::Int8 => 1,
+                Type::Int16 => 2,
+                Type::Int32 | Type::Uint32 => 4,
+                _ => {
+                    self.base.webgl_error(InvalidOperation);
+                    return Err(());
+                },
+            },
+        };
+
+        if received_size != element_size {
+            self.base.webgl_error(InvalidOperation);
+            return Err(());
+        }
+
+        // NOTE: width and height are positive or zero due to validate()
+        if height == 0 {
+            return Ok(0);
+        } else {
+            // We need to be careful here to not count unpack
+            // alignment at the end of the image, otherwise (for
+            // example) passing a single byte for uploading a 1x1
+            // GL_ALPHA/GL_UNSIGNED_BYTE texture would throw an error.
+            let cpp = element_size * components / components_per_element;
+            let stride = (width * cpp + unpacking_alignment - 1) & !(unpacking_alignment - 1);
+            return Ok(stride * (height - 1) + width * cpp);
+        }
+    }
+
+    fn tex_image_3d(
+        &self,
+        texture: &WebGLTexture,
+        target: TexImageTarget,
+        data_type: TexDataType,
+        internal_format: TexFormat,
+        format: TexFormat,
+        level: u32,
+        depth: u32,
+        _border: u32,
+        unpacking_alignment: u32,
+        pixels: TexPixels,
+    ) {
+        // TexImage2D depth is always equal to 1.
+        handle_potential_webgl_error!(
+            self.base,
+            texture.initialize(
+                target,
+                pixels.size.width,
+                pixels.size.height,
+                depth,
+                format,
+                level,
+                Some(data_type)
+            )
+        );
+
+        let settings = self.base.texture_unpacking_settings.get();
+        let dest_premultiplied = settings.contains(TextureUnpacking::PREMULTIPLY_ALPHA);
+
+        let alpha_treatment = match (pixels.premultiplied, dest_premultiplied) {
+            (true, false) => Some(AlphaTreatment::Unmultiply),
+            (false, true) => Some(AlphaTreatment::Premultiply),
+            _ => None,
+        };
+
+        let y_axis_treatment = if settings.contains(TextureUnpacking::FLIP_Y_AXIS) {
+            YAxisTreatment::Flipped
+        } else {
+            YAxisTreatment::AsIs
+        };
+
+        let internal_format = self
+            .base
+            .extension_manager
+            .get_effective_tex_internal_format(internal_format, data_type.as_gl_constant());
+
+        let effective_data_type = self
+            .base
+            .extension_manager
+            .effective_type(data_type.as_gl_constant());
+
+        // TODO(emilio): convert colorspace if requested.
+        self.base.send_command(WebGLCommand::TexImage3D {
+            target: target.as_gl_constant(),
+            level,
+            internal_format,
+            size: pixels.size,
+            depth,
+            format,
+            data_type,
+            effective_data_type,
+            unpacking_alignment,
+            alpha_treatment,
+            y_axis_treatment,
+            pixel_format: pixels.pixel_format,
+            data: pixels.data.into(),
+        });
+
+        if let Some(fb) = self.base.bound_draw_framebuffer.get() {
+            fb.invalidate_texture(&*texture);
+        }
     }
 }
 
@@ -2246,6 +2379,8 @@ impl WebGL2RenderingContextMethods for WebGL2RenderingContext {
                 constants::BOOL |
                 constants::UNSIGNED_INT |
                 constants::SAMPLER_2D |
+                constants::SAMPLER_2D_ARRAY |
+                constants::SAMPLER_3D |
                 constants::SAMPLER_CUBE => {},
                 _ => return Err(InvalidOperation),
             }
@@ -2872,6 +3007,158 @@ impl WebGL2RenderingContextMethods for WebGL2RenderingContext {
     /// https://www.khronos.org/registry/webgl/specs/latest/1.0/#5.14.4
     fn Viewport(&self, x: i32, y: i32, width: i32, height: i32) {
         self.base.Viewport(x, y, width, height)
+    }
+
+    /// https://www.khronos.org/registry/webgl/specs/latest/2.0/#3.7.6
+    #[allow(unsafe_code)]
+    fn TexImage3D(
+        &self,
+        target: u32,
+        level: i32,
+        internal_format: i32,
+        width: i32,
+        height: i32,
+        depth: i32,
+        border: i32,
+        format: u32,
+        data_type: u32,
+        pixels: CustomAutoRooterGuard<Option<ArrayBufferView>>,
+    ) -> Fallible<()> {
+        if self.bound_pixel_unpack_buffer.get().is_some() {
+            self.base.webgl_error(InvalidOperation);
+            return Ok(());
+        }
+
+        if data_type == constants::FLOAT_32_UNSIGNED_INT_24_8_REV && pixels.is_some() {
+            self.base.webgl_error(InvalidOperation);
+            return Ok(());
+        }
+
+        if level < 0 || width < 0 || height < 0 || depth < 0 {
+            self.base.webgl_error(InvalidValue);
+            return Ok(());
+        }
+
+        if border != 0 {
+            self.base.webgl_error(InvalidValue);
+            return Ok(());
+        }
+
+        //FIXME:
+        /* Textures  with  a  base  internal  format  ofDEPTH_COMPONENTorDEPTH_-STENCILare supported by texture image specification commands only iftargetisTEXTURE_2D,TEXTURE_2D_ARRAY, orTEXTURE_CUBE_MAP. Using these for-mats in conjunction with any othertargetwill result in anINVALID_OPERATIONerror. */
+        match target {
+            constants::TEXTURE_3D | constants::TEXTURE_2D_ARRAY => {},
+            _ => {
+                self.base.webgl_error(InvalidEnum);
+                return Ok(());
+            },
+        }
+
+        /*let texture_slot = handle_potential_webgl_error!(
+            self,
+            self.base.textures.active_texture_slot(target, self.base.webgl_version()),
+            return Ok(()),
+        );
+        if texture_slot.get().is_none() {
+            self.base.webgl_error(InvalidOperation);
+        }*/
+
+        let validator = TexImage2DValidator::new(
+            &self.base,
+            target,
+            level,
+            internal_format as u32,
+            width,
+            height,
+            border,
+            format,
+            data_type,
+        );
+
+        let TexImage2DValidatorResult {
+            texture,
+            target,
+            width,
+            height,
+            level,
+            border,
+            internal_format,
+            format,
+            data_type,
+        } = match validator.validate() {
+            Ok(result) => result,
+            Err(_) => return Ok(()), // NB: The validator sets the correct error for us.
+        };
+
+        if !internal_format.compatible_data_types().contains(&data_type) {
+            return Ok(self.base.webgl_error(InvalidOperation));
+        }
+        if texture.is_immutable() {
+            return Ok(self.base.webgl_error(InvalidOperation));
+        }
+
+        let unpacking_alignment = self.base.texture_unpacking_alignment.get();
+
+        let expected_byte_length = match {
+            self.validate_tex_image_3d_data(
+                width,
+                height,
+                format,
+                data_type,
+                unpacking_alignment,
+                &*pixels,
+            )
+        } {
+            Ok(byte_length) => byte_length,
+            Err(()) => return Ok(()),
+        };
+
+        // If data is null, a buffer of sufficient size
+        // initialized to 0 is passed.
+        let buff = match *pixels {
+            None => IpcSharedMemory::from_bytes(&vec![0u8; expected_byte_length as usize]),
+            Some(ref data) => IpcSharedMemory::from_bytes(unsafe { data.as_slice() }),
+        };
+
+        // From the WebGL spec:
+        //
+        //     "If pixels is non-null but its size is less than what
+        //      is required by the specified width, height, format,
+        //      type, and pixel storage parameters, generates an
+        //      INVALID_OPERATION error."
+        if buff.len() < expected_byte_length as usize {
+            return Ok(self.base.webgl_error(InvalidOperation));
+        }
+
+        let size = Size2D::new(width, height);
+
+        if !self.base.validate_filterable_texture(
+            &texture,
+            target,
+            level,
+            internal_format,
+            size,
+            data_type,
+        ) {
+            // FIXME(nox): What is the spec for this? No error is emitted ever
+            // by validate_filterable_texture.
+            return Ok(());
+        }
+
+        self.tex_image_3d(
+            &texture,
+            target,
+            data_type,
+            internal_format,
+            format,
+            level,
+            depth as u32,
+            border,
+            unpacking_alignment,
+            TexPixels::from_array(buff, Size2D::new(width, height)),
+        );
+
+        Ok(())
     }
 
     /// https://www.khronos.org/registry/webgl/specs/latest/1.0/#5.14.8

@@ -1560,6 +1560,46 @@ impl WebGLImpl {
                 offset,
             ) => gl.vertex_attrib_pointer(attrib_id, size, data_type, normalized, stride, offset),
             WebGLCommand::SetViewport(x, y, width, height) => gl.viewport(x, y, width, height),
+            WebGLCommand::TexImage3D {
+                target,
+                level,
+                internal_format,
+                size,
+                depth,
+                format,
+                data_type,
+                effective_data_type,
+                unpacking_alignment,
+                alpha_treatment,
+                y_axis_treatment,
+                pixel_format,
+                ref data,
+            } => {
+                let pixels = prepare_pixels(
+                    internal_format,
+                    data_type,
+                    size,
+                    unpacking_alignment,
+                    alpha_treatment,
+                    y_axis_treatment,
+                    pixel_format,
+                    Cow::Borrowed(&*data),
+                );
+
+                gl.pixel_store_i(gl::UNPACK_ALIGNMENT, unpacking_alignment as i32);
+                gl.tex_image_3d(
+                    target,
+                    level as i32,
+                    internal_format.as_gl_constant() as i32,
+                    size.width as i32,
+                    size.height as i32,
+                    depth as i32,
+                    0,
+                    format.as_gl_constant(),
+                    effective_data_type,
+                    Some(&pixels),
+                );
+            },
             WebGLCommand::TexImage2D {
                 target,
                 level,

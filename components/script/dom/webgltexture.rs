@@ -16,7 +16,7 @@ use crate::dom::webglobject::WebGLObject;
 use crate::dom::webglrenderingcontext::{Operation, WebGLRenderingContext};
 use canvas_traits::webgl::{
     webgl_channel, TexDataType, TexFormat, TexParameter, TexParameterBool, TexParameterInt,
-    WebGLResult, WebGLTextureId,
+    WebGLResult, WebGLTextureId, WebGLVersion,
 };
 use canvas_traits::webgl::{DOMToTextureCommand, WebGLCommand, WebGLError};
 use dom_struct::dom_struct;
@@ -112,6 +112,9 @@ impl WebGLTexture {
             // This is the first time binding
             let face_count = match target {
                 constants::TEXTURE_2D => 1,
+                constants::TEXTURE_3D => 1,
+                constants::TEXTURE_2D_ARRAY => 1,
+                //XXXjdm TEXTURE_2D_ARRAY
                 constants::TEXTURE_CUBE_MAP => 6,
                 _ => return Err(WebGLError::InvalidEnum),
             };
@@ -260,14 +263,15 @@ impl WebGLTexture {
             TexParameterValue::Bool(_) => unreachable!("no settable tex params should be booleans"),
         };
 
+        let context = self.upcast::<WebGLObject>().context();
+        let is_webgl2 = context.webgl_version() == WebGLVersion::WebGL2;
+
         let update_filter = |filter: &Cell<u32>| {
             if filter.get() == int_value as u32 {
                 return Ok(());
             }
             filter.set(int_value as u32);
-            self.upcast::<WebGLObject>()
-                .context()
-                .send_command(WebGLCommand::TexParameteri(target, param, int_value));
+            context.send_command(WebGLCommand::TexParameteri(target, param, int_value));
             Ok(())
         };
         match param {
@@ -284,14 +288,46 @@ impl WebGLTexture {
                 constants::NEAREST | constants::LINEAR => update_filter(&self.mag_filter),
                 _ => return Err(WebGLError::InvalidEnum),
             },
-            constants::TEXTURE_WRAP_S | constants::TEXTURE_WRAP_T => match int_value as u32 {
-                constants::CLAMP_TO_EDGE | constants::MIRRORED_REPEAT | constants::REPEAT => {
-                    self.upcast::<WebGLObject>()
-                        .context()
-                        .send_command(WebGLCommand::TexParameteri(target, param, int_value));
+            constants::TEXTURE_BASE_LEVEL | constants::TEXTURE_MAX_LEVEL if is_webgl2 => {
+                context.send_command(WebGLCommand::TexParameteri(target, param, int_value));
+                Ok(())
+            },
+            constants::TEXTURE_MAX_LOD | constants::TEXTURE_MIN_LOD if is_webgl2 => {
+                context.send_command(WebGLCommand::TexParameterf(target, param, float_value));
+                Ok(())
+            },
+            constants::TEXTURE_COMPARE_FUNC if is_webgl2 => match int_value as u32 {
+                constants::LEQUAL |
+                constants::GEQUAL |
+                constants::LESS |
+                constants::GREATER |
+                constants::EQUAL |
+                constants::NOTEQUAL |
+                constants::ALWAYS |
+                constants::NEVER => {
+                    context.send_command(WebGLCommand::TexParameteri(target, param, int_value));
                     Ok(())
                 },
                 _ => Err(WebGLError::InvalidEnum),
+            },
+            constants::TEXTURE_COMPARE_MODE if is_webgl2 => match int_value as u32 {
+                constants::NONE | constants::COMPARE_REF_TO_TEXTURE => {
+                    context.send_command(WebGLCommand::TexParameteri(target, param, int_value));
+                    Ok(())
+                },
+                _ => Err(WebGLError::InvalidEnum),
+            },
+            constants::TEXTURE_WRAP_S | constants::TEXTURE_WRAP_T | constants::TEXTURE_WRAP_R => {
+                if param == constants::TEXTURE_WRAP_R && !is_webgl2 {
+                    return Err(WebGLError::InvalidEnum);
+                }
+                match int_value as u32 {
+                    constants::CLAMP_TO_EDGE | constants::MIRRORED_REPEAT | constants::REPEAT => {
+                        context.send_command(WebGLCommand::TexParameteri(target, param, int_value));
+                        Ok(())
+                    },
+                    _ => Err(WebGLError::InvalidEnum),
+                }
             },
             EXTTextureFilterAnisotropicConstants::TEXTURE_MAX_ANISOTROPY_EXT => {
                 // NaN is not less than 1., what a time to be alive.

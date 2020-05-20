@@ -115,6 +115,7 @@ impl<'a> WebGLValidator for CommonTexImage2DValidator<'a> {
         // GL_TEXTURE_CUBE_MAP_POSITIVE_Z, or GL_TEXTURE_CUBE_MAP_NEGATIVE_Z.
         let target = match TexImageTarget::from_gl_constant(self.target) {
             Some(target) if target.dimensions() == 2 => target,
+            Some(target) if target.dimensions() == 3 => target, //XXXjdm
             _ => {
                 self.context.webgl_error(InvalidEnum);
                 return Err(TexImageValidationError::InvalidTextureTarget(self.target));
@@ -244,6 +245,110 @@ impl<'a> CommonTexImage2DValidator<'a> {
         }
     }
 }
+
+pub struct TexImage3DValidator<'a> {
+    context: &'a WebGLRenderingContext,
+    target: u32,
+    level: i32,
+    internal_format: u32,
+    width: i32,
+    height: i32,
+    depth: u32,
+    border: i32,
+    format: u32,
+    data_type: u32,
+}
+
+pub struct TexImage3DValidatorResult {
+    pub texture: DomRoot<WebGLTexture>,
+    pub target: TexImageTarget,
+    pub level: u32,
+    pub internal_format: TexFormat,
+    pub width: u32,
+    pub height: u32,
+    pub depth: u32,
+    pub border: u32,
+}
+
+/*impl<'a> WebGLValidator for TexImage3DValidator<'a> {
+    type Error = TexImageValidationError;
+    type ValidatedOutput = TexImage3DValidatorResult;
+    fn validate(self) -> Result<Self::ValidatedOutput, TexImageValidationError> {
+        let CommonTexImage2DValidatorResult {
+            texture,
+            target,
+            level,
+            internal_format,
+            width,
+            height,
+            border,
+        } = self.common_validator.validate()?;
+
+        // GL_INVALID_ENUM is generated if format or data_type is not an
+        // accepted value.
+        let data_type = match TexDataType::from_gl_constant(self.data_type) {
+            Some(data_type) if data_type.required_webgl_version() <= self.context.webgl_version() => {
+                data_type
+            },
+            _ => {
+                self.context.webgl_error(InvalidEnum);
+                return Err(TexImageValidationError::InvalidDataType);
+            },
+        };
+
+        let format = match TexFormat::from_gl_constant(self.format) {
+            Some(format) if format.required_webgl_version() <= self.context.webgl_version() => format,
+            _ => {
+                self.context.webgl_error(InvalidEnum);
+                return Err(TexImageValidationError::InvalidTextureFormat);
+            },
+        };
+
+        // GL_INVALID_OPERATION is generated if format does not match
+        // internal_format.
+        if format != internal_format.to_unsized() {
+            self.context.webgl_error(InvalidOperation);
+            return Err(TexImageValidationError::TextureFormatMismatch);
+        }
+
+        // NOTE: In WebGL2 data type check should be done based on the internal
+        // format, but in some functions this validator is called with the
+        // regular unsized format as parameter (eg. TexSubImage2D). For now
+        // it's left here to avoid duplication.
+        //
+        // GL_INVALID_OPERATION is generated if type is
+        // GL_UNSIGNED_SHORT_4_4_4_4 or GL_UNSIGNED_SHORT_5_5_5_1 and format is
+        // not GL_RGBA.
+        //
+        // GL_INVALID_OPERATION is generated if type is GL_UNSIGNED_SHORT_5_6_5
+        // and format is not GL_RGB.
+        match data_type {
+            TexDataType::UnsignedShort4444 | TexDataType::UnsignedShort5551
+                if format != TexFormat::RGBA =>
+            {
+                context.webgl_error(InvalidOperation);
+                return Err(TexImageValidationError::InvalidTypeForFormat);
+            }
+            TexDataType::UnsignedShort565 if format != TexFormat::RGB => {
+                context.webgl_error(InvalidOperation);
+                return Err(TexImageValidationError::InvalidTypeForFormat);
+            },
+            _ => {},
+        }
+
+        Ok(TexImage3DValidatorResult {
+            width: width,
+            height: height,
+            level: level,
+            border: border,
+            texture: texture,
+            target: target,
+            internal_format: internal_format,
+            format: format,
+            data_type: data_type,
+        })
+    }
+}*/
 
 pub struct TexImage2DValidator<'a> {
     common_validator: CommonTexImage2DValidator<'a>,

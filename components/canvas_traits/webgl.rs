@@ -398,6 +398,22 @@ pub enum WebGLCommand {
         pixel_format: Option<PixelFormat>,
         data: TruncatedDebug<IpcSharedMemory>,
     },
+    TexImage3D {
+        target: u32,
+        level: u32,
+        internal_format: TexFormat,
+        size: Size2D<u32>,
+        depth: u32,
+        format: TexFormat,
+        data_type: TexDataType,
+        // FIXME(nox): This should be computed on the WebGL thread.
+        effective_data_type: u32,
+        unpacking_alignment: u32,
+        alpha_treatment: Option<AlphaTreatment>,
+        y_axis_treatment: YAxisTreatment,
+        pixel_format: Option<PixelFormat>,
+        data: TruncatedDebug<IpcSharedMemory>,
+    },
     TexSubImage2D {
         target: u32,
         level: u32,

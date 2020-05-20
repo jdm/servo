@@ -142,7 +142,7 @@ where
 bitflags! {
     /// Set of bitflags for texture unpacking (texImage2d, etc...)
     #[derive(JSTraceable, MallocSizeOf)]
-    struct TextureUnpacking: u8 {
+    pub(crate) struct TextureUnpacking: u8 {
         const FLIP_Y_AXIS = 0x01;
         const PREMULTIPLY_ALPHA = 0x02;
         const CONVERT_COLORSPACE = 0x04;
@@ -177,10 +177,10 @@ pub struct WebGLRenderingContext {
     #[ignore_malloc_size_of = "Defined in canvas_traits"]
     last_error: Cell<Option<WebGLError>>,
     texture_packing_alignment: Cell<u8>,
-    texture_unpacking_settings: Cell<TextureUnpacking>,
+    pub(crate) texture_unpacking_settings: Cell<TextureUnpacking>,
     // TODO(nox): Should be Cell<u8>.
-    texture_unpacking_alignment: Cell<u32>,
-    bound_draw_framebuffer: MutNullableDom<WebGLFramebuffer>,
+    pub(crate) texture_unpacking_alignment: Cell<u32>,
+    pub(crate) bound_draw_framebuffer: MutNullableDom<WebGLFramebuffer>,
     // TODO(mmatyas): This was introduced in WebGL2, but listed here because it's used by
     // Textures and Renderbuffers, but such WebGLObjects have access only to the GL1 context.
     bound_read_framebuffer: MutNullableDom<WebGLFramebuffer>,
@@ -193,7 +193,7 @@ pub struct WebGLRenderingContext {
     #[ignore_malloc_size_of = "Because it's small"]
     current_clear_color: Cell<(f32, f32, f32, f32)>,
     size: Cell<Size2D<u32>>,
-    extension_manager: WebGLExtensions,
+    pub(crate) extension_manager: WebGLExtensions,
     capabilities: Capabilities,
     default_vao: DomOnceCell<WebGLVertexArrayObjectOES>,
     current_vao: MutNullableDom<WebGLVertexArrayObjectOES>,
@@ -571,7 +571,7 @@ impl WebGLRenderingContext {
 
     // LINEAR filtering may be forbidden when using WebGL extensions.
     // https://www.khronos.org/registry/webgl/extensions/OES_texture_float_linear/
-    fn validate_filterable_texture(
+    pub(crate) fn validate_filterable_texture(
         &self,
         texture: &WebGLTexture,
         target: TexImageTarget,
@@ -1681,6 +1681,8 @@ impl WebGLRenderingContext {
                 constants::BOOL |
                 constants::INT |
                 constants::SAMPLER_2D |
+                WebGL2RenderingContextConstants::SAMPLER_2D_ARRAY |
+                WebGL2RenderingContextConstants::SAMPLER_3D |
                 constants::SAMPLER_CUBE => {},
                 _ => return Err(InvalidOperation),
             }
@@ -1688,7 +1690,10 @@ impl WebGLRenderingContext {
             let val = self.uniform_vec_section_int(val, src_offset, src_length, 1, location)?;
 
             match location.type_() {
-                constants::SAMPLER_2D | constants::SAMPLER_CUBE => {
+                constants::SAMPLER_2D |
+                WebGL2RenderingContextConstants::SAMPLER_2D_ARRAY |
+                WebGL2RenderingContextConstants::SAMPLER_3D |
+                constants::SAMPLER_CUBE => {
                     for &v in val
                         .iter()
                         .take(cmp::min(location.size().unwrap_or(1) as usize, val.len()))
@@ -3485,7 +3490,8 @@ impl WebGLRenderingContextMethods for WebGLRenderingContext {
     // https://www.khronos.org/registry/webgl/specs/latest/1.0/#5.14.3
     fn Hint(&self, target: u32, mode: u32) {
         if target != constants::GENERATE_MIPMAP_HINT &&
-            !self.extension_manager.is_hint_target_enabled(target)
+            !self.extension_manager.is_hint_target_enabled(target) &&
+            self.webgl_version < WebGLVersion::WebGL2
         {
             return self.webgl_error(InvalidEnum);
         }
@@ -3848,7 +3854,10 @@ impl WebGLRenderingContextMethods for WebGLRenderingContext {
         self.with_location(location, |location| {
             match location.type_() {
                 constants::BOOL | constants::INT => {},
-                constants::SAMPLER_2D | constants::SAMPLER_CUBE => {
+                constants::SAMPLER_2D |
+                constants::SAMPLER_CUBE |
+                WebGL2RenderingContextConstants::SAMPLER_3D |
+                WebGL2RenderingContextConstants::SAMPLER_2D_ARRAY => {
                     if val < 0 || val as u32 >= self.limits.max_combined_texture_image_units {
                         return Err(InvalidValue);
                     }
@@ -4051,9 +4060,11 @@ impl WebGLRenderingContextMethods for WebGLRenderingContext {
                 uniform_get(triple, WebGLCommand::GetUniformBool4).to_jsval(*cx, rval.handle_mut());
                 rval.get()
             },
-            constants::INT | constants::SAMPLER_2D | constants::SAMPLER_CUBE => {
-                Int32Value(uniform_get(triple, WebGLCommand::GetUniformInt))
-            },
+            constants::INT |
+            constants::SAMPLER_2D |
+            WebGL2RenderingContextConstants::SAMPLER_2D_ARRAY |
+            WebGL2RenderingContextConstants::SAMPLER_3D |
+            constants::SAMPLER_CUBE => Int32Value(uniform_get(triple, WebGLCommand::GetUniformInt)),
             constants::INT_VEC2 => unsafe {
                 uniform_typed::<Int32>(*cx, &uniform_get(triple, WebGLCommand::GetUniformInt2))
             },
@@ -4881,11 +4892,11 @@ impl TextureUnit {
     }
 }
 
-struct TexPixels {
-    data: IpcSharedMemory,
-    size: Size2D<u32>,
-    pixel_format: Option<PixelFormat>,
-    premultiplied: bool,
+pub(crate) struct TexPixels {
+    pub(crate) data: IpcSharedMemory,
+    pub(crate) size: Size2D<u32>,
+    pub(crate) pixel_format: Option<PixelFormat>,
+    pub(crate) premultiplied: bool,
 }
 
 impl TexPixels {
@@ -4903,7 +4914,7 @@ impl TexPixels {
         }
     }
 
-    fn from_array(data: IpcSharedMemory, size: Size2D<u32>) -> Self {
+    pub(crate) fn from_array(data: IpcSharedMemory, size: Size2D<u32>) -> Self {
         Self {
             data,
             size,
