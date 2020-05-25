@@ -7,6 +7,7 @@
 
 use crate::document_loader::LoadType;
 use crate::dom::bindings::cell::DomRefCell;
+use crate::dom::bindings::codegen::Bindings::DocumentBinding::DocumentBinding::DocumentMethods;
 use crate::dom::bindings::codegen::Bindings::WindowBinding::WindowBinding::WindowMethods;
 use crate::dom::bindings::conversions::jsstring_to_str;
 use crate::dom::bindings::error::report_pending_exception;
@@ -45,11 +46,11 @@ use js::jsapi::HandleValue as RawHandleValue;
 use js::jsapi::{
     CompileModule, ExceptionStackBehavior, GetModuleResolveHook, JSRuntime, SetModuleResolveHook,
 };
-use js::jsapi::{GetRequestedModules, SetModuleMetadataHook};
+use js::jsapi::{FinishDynamicModuleImport, GetRequestedModules, SetModuleMetadataHook};
 use js::jsapi::{GetWaitForAllPromise, ModuleEvaluate, ModuleInstantiate};
 use js::jsapi::{Heap, JSContext, JS_ClearPendingException, SetModulePrivate};
 use js::jsapi::{JSAutoRealm, JSObject, JSString};
-use js::jsapi::{JS_DefineProperty4, JS_NewStringCopyN, JSPROP_ENUMERATE};
+use js::jsapi::{JS_DefineProperty4, JS_IsExceptionPending, JS_NewStringCopyN, JSPROP_ENUMERATE};
 use js::jsapi::{SetModuleDynamicImportHook, SetScriptPrivateReferenceHooks};
 use js::jsval::{JSVal, PrivateValue, UndefinedValue};
 use js::rust::jsapi_wrapped::{GetRequestedModuleSpecifier, JS_GetPendingException};
@@ -57,13 +58,13 @@ use js::rust::jsapi_wrapped::{JS_GetArrayLength, JS_GetElement};
 use js::rust::transform_u16_to_source_text;
 use js::rust::wrappers::JS_SetPendingException;
 use js::rust::CompileOptionsWrapper;
-use js::rust::IntoHandle;
+use js::rust::{IntoHandle};
 use js::rust::RootedObjectVectorWrapper;
 use js::rust::{Handle, HandleValue};
 use mime::Mime;
 use net_traits::request::{CredentialsMode, Destination, ParserMetadata};
 use net_traits::request::{Referrer, RequestBuilder, RequestMode};
-use net_traits::{FetchMetadata, Metadata};
+use net_traits::{FetchMetadata, Metadata, ReferrerPolicy};
 use net_traits::{FetchResponseListener, NetworkError};
 use net_traits::{ResourceFetchTiming, ResourceTimingType};
 use servo_url::ServoUrl;
@@ -152,6 +153,8 @@ impl Clone for ModuleError {
 
 struct ModuleScript {
     base_url: ServoUrl,
+    options: ScriptFetchOptions,
+    owner: ModuleOwner,
 }
 
 #[derive(JSTraceable)]
@@ -298,7 +301,13 @@ impl ModuleTree {
         &self.visited_urls
     }
 
-    pub fn append_handler(&self, owner: ModuleOwner, module_url: ServoUrl, is_top_level: bool) {
+    fn append_handler(
+        &self,
+        owner: ModuleOwner,
+        module_url: ServoUrl,
+        is_top_level: bool,
+        dynamic_module: Option<RootedTraceableBox<DynamicModule>>
+    ) {
         let promise = self.promise.borrow();
 
         let resolve_this = owner.clone();
@@ -307,16 +316,20 @@ impl ModuleTree {
         let resolved_url = module_url.clone();
         let rejected_url = module_url.clone();
 
+        let module_id = dynamic_module.map(|module| {
+            owner.global().dynamic_module_list().push(module)
+        });
+
         let handler = PromiseNativeHandler::new(
             &owner.global(),
             Some(ModuleHandler::new(Box::new(
                 task!(fetched_resolve: move || {
-                    resolve_this.finish_module_load(Some(resolved_url), is_top_level);
+                    resolve_this.finish_module_load(Some(resolved_url), is_top_level, module_id);
                 }),
             ))),
             Some(ModuleHandler::new(Box::new(
                 task!(failure_reject: move || {
-                    reject_this.finish_module_load(Some(rejected_url), is_top_level);
+                    reject_this.finish_module_load(Some(rejected_url), is_top_level, module_id);
                 }),
             ))),
         );
@@ -348,8 +361,10 @@ impl ModuleTree {
     fn compile_module_script(
         &self,
         global: &GlobalScope,
+        owner: ModuleOwner,
         module_script_text: DOMString,
         url: ServoUrl,
+        options: ScriptFetchOptions,
     ) -> Result<ModuleObject, ModuleError> {
         let module: Vec<u16> = module_script_text.encode_utf16().collect();
 
@@ -384,6 +399,8 @@ impl ModuleTree {
 
             let module_script_data = Box::new(ModuleScript {
                 base_url: url.clone(),
+                options,
+                owner,
             });
 
             SetModulePrivate(
@@ -684,7 +701,7 @@ impl Callback for ModuleHandler {
 /// The owner of the module
 /// It can be `worker` or `script` element
 #[derive(Clone)]
-pub enum ModuleOwner {
+pub(crate) enum ModuleOwner {
     #[allow(dead_code)]
     Worker(TrustedWorkerAddress),
     Window(Trusted<HTMLScriptElement>),
@@ -702,6 +719,7 @@ impl ModuleOwner {
         &self,
         module_url: Option<ServoUrl>,
         is_top_level: bool,
+        dynamic_module: Option<RootedTraceableBox<DynamicModule>>,
     ) -> Rc<Promise> {
         let resolve_this = self.clone();
         let reject_this = self.clone();
@@ -709,16 +727,20 @@ impl ModuleOwner {
         let resolved_url = module_url.clone();
         let rejected_url = module_url.clone();
 
+        let module_id = dynamic_module.map(|module| {
+            self.global().dynamic_module_list().push(module)
+        });
+
         let handler = PromiseNativeHandler::new(
             &self.global(),
             Some(ModuleHandler::new(Box::new(
                 task!(fetched_resolve: move || {
-                    resolve_this.finish_module_load(resolved_url, is_top_level);
+                    resolve_this.finish_module_load(resolved_url, is_top_level, module_id);
                 }),
             ))),
             Some(ModuleHandler::new(Box::new(
                 task!(failure_reject: move || {
-                    reject_this.finish_module_load(rejected_url, is_top_level);
+                    reject_this.finish_module_load(rejected_url, is_top_level, module_id);
                 }),
             ))),
         );
@@ -736,11 +758,18 @@ impl ModuleOwner {
 
     /// https://html.spec.whatwg.org/multipage/#fetch-the-descendants-of-and-link-a-module-script
     /// step 4-7.
-    pub fn finish_module_load(&self, module_url: Option<ServoUrl>, is_top_level: bool) {
+    #[allow(unsafe_code)]
+    pub fn finish_module_load(
+        &self,
+        module_url: Option<ServoUrl>,
+        is_top_level: bool,
+        dynamic_module_id: Option<u32>,
+    ) {
         match &self {
             ModuleOwner::Worker(_) => unimplemented!(),
             ModuleOwner::Window(script) => {
                 let global = self.global();
+                let dynamic_module = dynamic_module_id.map(|id| global.dynamic_module_list().remove(id));
 
                 let document = document_from_node(&*script.root());
 
@@ -836,6 +865,52 @@ impl ModuleOwner {
                     },
                 };
 
+                if let Some(module) = dynamic_module {
+                    let cx = global.get_cx();
+                    let module_err = if module_tree.get_error().borrow().is_none() && is_top_level {
+                        if let Some(ref record) = &*module_tree.get_record().borrow() {
+                            module_tree.execute_module(&global, record.handle()).err()
+                        } else {
+                            warn!("no module record for finished dynamic module import");
+                            None
+                        }
+                    } else {
+                        None
+                    };
+
+                    let tree_err = module_tree.get_error().borrow();
+                    let module_err = module_err.as_ref().or_else(|| tree_err.as_ref());
+
+                    // Ensure any failures related to importing this dynamic module are immediately reported.
+                    if let Some(ref e) = module_err {
+                        match e {
+                            ModuleError::Network(_e) => {
+                                unsafe { 
+                                    let err = gen_type_error(&global, "Dynamic import failed".to_owned());
+                                    JS_SetPendingException(*cx, err.handle(), ExceptionStackBehavior::Capture);
+                                }
+                            }
+                            ModuleError::RawException(e) => {
+                                unsafe {
+                                    JS_SetPendingException(*cx, e.handle(), ExceptionStackBehavior::Capture);
+                                }
+                            }
+                        }
+                    }
+
+                    debug!("Finishing dynamic import for {:?}", module_url);
+                    unsafe {
+                        FinishDynamicModuleImport(
+                            *cx,
+                            module.referencing_private.handle(),
+                            module.specifier.handle(),
+                            module.promise.reflector().get_jsobject().into_handle(),
+                        );
+                        assert!(!JS_IsExceptionPending(*cx));
+                    }
+                    return;
+                }
+
                 if is_top_level {
                     let r#async = script
                         .root()
@@ -867,8 +942,8 @@ struct ModuleContext {
     url: ServoUrl,
     /// Destination of current module context
     destination: Destination,
-    /// Credentials Mode of current module context
-    credentials_mode: CredentialsMode,
+    /// Options for the current script fetch
+    options: ScriptFetchOptions,
     /// Indicates whether the request failed, and why
     status: Result<(), NetworkError>,
     /// Timing object for this resource
@@ -988,8 +1063,10 @@ impl FetchResponseListener for ModuleContext {
 
             let compiled_module = module_tree.compile_module_script(
                 &global,
+                self.owner.clone(),
                 resp_mod_script.text(),
                 self.url.clone(),
+                self.options.clone(),
             );
 
             match compiled_module {
@@ -1013,7 +1090,7 @@ impl FetchResponseListener for ModuleContext {
                         &self.owner,
                         &module_tree,
                         self.destination.clone(),
-                        self.credentials_mode.clone(),
+                        &self.options,
                     );
 
                     // Resolve the request of this module tree promise directly
@@ -1066,8 +1143,147 @@ pub unsafe fn EnsureModuleHooksInitialized(rt: *mut JSRuntime) {
     SetModuleResolveHook(rt, Some(HostResolveImportedModule));
     SetModuleMetadataHook(rt, Some(HostPopulateImportMeta));
     SetScriptPrivateReferenceHooks(rt, None, None);
+    SetModuleDynamicImportHook(rt, Some(host_import_module_dynamically));
+}
 
-    SetModuleDynamicImportHook(rt, None);
+#[allow(unsafe_code)]
+/// <https://html.spec.whatwg.org/multipage/#hostimportmoduledynamically(referencingscriptormodule,-specifier,-promisecapability)>
+pub unsafe extern "C" fn host_import_module_dynamically(
+    cx: *mut JSContext,
+    reference_private: RawHandleValue,
+    specifier: RawHandle<*mut JSString>,
+    promise: RawHandle<*mut JSObject>,
+) -> bool {
+    // Step 1.
+    let cx = SafeJSContext::from_ptr(cx);
+    let in_realm_proof = AlreadyInRealm::assert_for_cx(cx);
+    let global_scope = GlobalScope::from_context(*cx, InRealm::Already(&in_realm_proof));
+
+    // Step 2.
+    let mut base_url = global_scope.api_base_url();
+
+    // Step 3.
+    let mut options = ScriptFetchOptions::default_classic_script();
+    
+    // Step 4.
+    let module_data = module_script_from_reference_private(&reference_private);
+    if let Some(data) = module_data {
+        base_url = data.base_url.clone();
+        options = data.options.descendant_fetch_options();
+    }
+
+    let promise = Promise::new_with_js_promise(Handle::from_raw(promise), cx);
+
+    //Step 5 & 6.
+    match fetch_an_import_module_script_graph(&global_scope, specifier, reference_private, base_url, options, promise) {
+        Ok(()) => {}
+        Err(ModuleError::RawException(e)) => {
+            JS_SetPendingException(*cx, e.handle(), ExceptionStackBehavior::Capture);
+            return false;
+        }
+        Err(ModuleError::Network(_)) => unreachable!(),
+    }
+
+    true
+}
+
+#[derive(Clone)]
+/// <https://html.spec.whatwg.org/multipage/#script-fetch-options>
+pub(crate) struct ScriptFetchOptions {
+    pub referrer: Referrer,
+    pub integrity_metadata: String,
+    pub credentials_mode: CredentialsMode,
+    pub cryptographic_nonce: String,
+    pub parser_metadata: ParserMetadata,
+    pub referrer_policy: Option<ReferrerPolicy>,
+}
+
+impl ScriptFetchOptions {
+    /// <https://html.spec.whatwg.org/multipage/#default-classic-script-fetch-options>
+    fn default_classic_script() -> ScriptFetchOptions {
+        Self {
+            cryptographic_nonce: String::new(),
+            integrity_metadata: String::new(),
+            referrer: Referrer::Client,
+            parser_metadata: ParserMetadata::NotParserInserted,
+            credentials_mode: CredentialsMode::CredentialsSameOrigin,
+            referrer_policy: None,
+        }
+    }
+
+    /// <https://html.spec.whatwg.org/multipage/#descendant-script-fetch-options>
+    fn descendant_fetch_options(&self) -> ScriptFetchOptions {
+        Self {
+            referrer: self.referrer.clone(),
+            integrity_metadata: String::new(),
+            cryptographic_nonce: self.cryptographic_nonce.clone(),
+            credentials_mode: self.credentials_mode,
+            parser_metadata: self.parser_metadata,
+            referrer_policy: self.referrer_policy,
+        }
+    }
+}
+
+#[allow(unsafe_code)]
+unsafe fn module_script_from_reference_private<'a>(reference_private: &RawHandle<JSVal>) -> Option<&ModuleScript> {
+    if reference_private.get().is_undefined() {
+        return None;
+    }
+    (reference_private.get().to_private() as *const ModuleScript).as_ref()
+}
+
+/// <https://html.spec.whatwg.org/multipage/#fetch-an-import()-module-script-graph>
+#[allow(unsafe_code)]
+fn fetch_an_import_module_script_graph(
+    global: &GlobalScope,
+    specifier: RawHandle<*mut JSString>,
+    reference_private: RawHandleValue,
+    base_url: ServoUrl,
+    options: ScriptFetchOptions,
+    promise: Rc<Promise>
+) -> Result<(), ModuleError> {
+    // Step 1.
+    let url = ModuleTree::resolve_module_specifier(
+        *global.get_cx(),
+        &base_url,
+        specifier,
+    );
+
+    // Step 2.
+    if url.is_err() {
+        let specifier_error = unsafe { gen_type_error(&global, "Wrong module specifier".to_owned()) };
+        return Err(specifier_error);
+    }
+
+    // Step 3.
+    let owner = match unsafe { module_script_from_reference_private(&reference_private) } {
+        Some(module_data) => module_data.owner.clone(),
+        None => {
+            let script_element = global.as_window().Document().GetCurrentScript().expect("no current script?");
+            ModuleOwner::Window(Trusted::new(&*script_element))
+        }
+    };
+
+    let dynamic_module = RootedTraceableBox::new(DynamicModule {
+        promise,
+        specifier: Heap::default(),
+        referencing_private: Heap::default(),
+        id: 0,
+    });
+    dynamic_module.specifier.set(specifier.get());
+    dynamic_module.referencing_private.set(reference_private.get());
+
+    fetch_single_module_script(
+        owner,
+        url.unwrap(),
+        Destination::Script,
+        options,
+        None,
+        //parent_url, XXXjdm
+        true,
+        Some(dynamic_module),
+    );
+    Ok(())
 }
 
 #[allow(unsafe_code, non_snake_case)]
@@ -1085,7 +1301,7 @@ unsafe extern "C" fn HostResolveImportedModule(
     let mut base_url = global_scope.api_base_url();
 
     // Step 3.
-    let module_data = (reference_private.to_private() as *const ModuleScript).as_ref();
+    let module_data = module_script_from_reference_private(&reference_private);
     if let Some(data) = module_data {
         base_url = data.base_url.clone();
     }
@@ -1131,7 +1347,7 @@ unsafe extern "C" fn HostPopulateImportMeta(
     let global_scope = GlobalScope::from_context(cx, InRealm::Already(&in_realm_proof));
 
     // Step 2.
-    let base_url = match (reference_private.to_private() as *const ModuleScript).as_ref() {
+    let base_url = match module_script_from_reference_private(&reference_private) {
         Some(module_data) => module_data.base_url.clone(),
         None => global_scope.api_base_url(),
     };
@@ -1153,38 +1369,74 @@ unsafe extern "C" fn HostPopulateImportMeta(
 }
 
 /// https://html.spec.whatwg.org/multipage/#fetch-a-module-script-tree
-pub fn fetch_external_module_script(
+pub(crate) fn fetch_external_module_script(
     owner: ModuleOwner,
     url: ServoUrl,
     destination: Destination,
-    integrity_metadata: String,
-    credentials_mode: CredentialsMode,
+    options: ScriptFetchOptions,
 ) -> Rc<Promise> {
     // Step 1.
     fetch_single_module_script(
         owner,
         url,
         destination,
-        Referrer::Client,
-        ParserMetadata::NotParserInserted,
-        integrity_metadata,
-        credentials_mode,
+        options,
         None,
         true,
+        None,
     )
 }
 
+#[derive(JSTraceable, MallocSizeOf)]
+#[unrooted_must_root_lint::must_root]
+pub(crate) struct DynamicModuleList {
+    requests: Vec<RootedTraceableBox<DynamicModule>>,
+    next_id: u32,
+}
+
+impl DynamicModuleList {
+    pub fn new() -> Self {
+        Self {
+            requests: vec![],
+            next_id: 0,
+        }
+    }
+
+    fn push(&mut self, mut module: RootedTraceableBox<DynamicModule>) -> u32 {
+        let id = self.next_id;
+        self.next_id += 1;
+        module.id = id;
+        self.requests.push(module);
+        id
+    }
+
+    fn remove(&mut self, id: u32) -> RootedTraceableBox<DynamicModule> {
+        let index = self.requests.iter().position(|module| module.id == id).expect("missing dynamic module");
+        self.requests.remove(index)
+    }
+}
+
+#[unrooted_must_root_lint::must_root]
+#[derive(JSTraceable, MallocSizeOf)]
+struct DynamicModule {
+    #[ignore_malloc_size_of = "Rc is hard"]
+    promise: Rc<Promise>,
+    #[ignore_malloc_size_of = "GC types are hard"]
+    specifier: Heap<*mut JSString>,
+    #[ignore_malloc_size_of = "GC types are hard"]
+    referencing_private: Heap<JSVal>,
+    id: u32,
+}
+
 /// https://html.spec.whatwg.org/multipage/#fetch-a-single-module-script
-pub fn fetch_single_module_script(
+fn fetch_single_module_script(
     owner: ModuleOwner,
     url: ServoUrl,
     destination: Destination,
-    referrer: Referrer,
-    parser_metadata: ParserMetadata,
-    integrity_metadata: String,
-    credentials_mode: CredentialsMode,
+    options: ScriptFetchOptions,
     parent_url: Option<ServoUrl>,
     top_level_module_fetch: bool,
+    dynamic_module: Option<RootedTraceableBox<DynamicModule>>,
 ) -> Rc<Promise> {
     {
         // Step 1.
@@ -1202,7 +1454,7 @@ pub fn fetch_single_module_script(
 
             assert!(promise.is_some());
 
-            module_tree.append_handler(owner.clone(), url.clone(), top_level_module_fetch);
+            module_tree.append_handler(owner.clone(), url.clone(), top_level_module_fetch, dynamic_module);
 
             let promise = promise.as_ref().unwrap();
 
@@ -1232,7 +1484,7 @@ pub fn fetch_single_module_script(
     let module_tree = ModuleTree::new(url.clone());
     module_tree.set_status(ModuleStatus::Fetching);
 
-    let promise = owner.gen_promise_with_final_handler(Some(url.clone()), top_level_module_fetch);
+    let promise = owner.gen_promise_with_final_handler(Some(url.clone()), top_level_module_fetch, dynamic_module);
 
     module_tree.set_promise(promise.clone());
     if let Some(parent_url) = parent_url {
@@ -1259,10 +1511,10 @@ pub fn fetch_single_module_script(
     let request = RequestBuilder::new(url.clone())
         .destination(destination.clone())
         .origin(global.origin().immutable().clone())
-        .referrer(Some(referrer))
-        .parser_metadata(parser_metadata)
-        .integrity_metadata(integrity_metadata.clone())
-        .credentials_mode(credentials_mode)
+        .referrer(Some(options.referrer.clone()))
+        .parser_metadata(options.parser_metadata)
+        .integrity_metadata(options.integrity_metadata.clone())
+        .credentials_mode(options.credentials_mode)
         .mode(mode);
 
     let context = Arc::new(Mutex::new(ModuleContext {
@@ -1271,7 +1523,7 @@ pub fn fetch_single_module_script(
         metadata: None,
         url: url.clone(),
         destination: destination.clone(),
-        credentials_mode: credentials_mode.clone(),
+        options,
         status: Ok(()),
         resource_timing: ResourceFetchTiming::new(ResourceTimingType::Resource),
     }));
@@ -1300,23 +1552,23 @@ pub fn fetch_single_module_script(
 
 #[allow(unsafe_code)]
 /// https://html.spec.whatwg.org/multipage/#fetch-an-inline-module-script-graph
-pub fn fetch_inline_module_script(
+pub(crate) fn fetch_inline_module_script(
     owner: ModuleOwner,
     module_script_text: DOMString,
     url: ServoUrl,
     script_id: ScriptId,
-    credentials_mode: CredentialsMode,
+    options: ScriptFetchOptions,
 ) {
     let global = owner.global();
 
     let module_tree = ModuleTree::new(url.clone());
 
-    let promise = owner.gen_promise_with_final_handler(None, true);
+    let promise = owner.gen_promise_with_final_handler(None, true, None);
 
     module_tree.set_promise(promise.clone());
 
     let compiled_module =
-        module_tree.compile_module_script(&global, module_script_text, url.clone());
+        module_tree.compile_module_script(&global, owner.clone(), module_script_text, url.clone(), options.clone());
 
     match compiled_module {
         Ok(record) => {
@@ -1326,7 +1578,7 @@ pub fn fetch_inline_module_script(
                 &owner,
                 &module_tree,
                 Destination::Script,
-                credentials_mode,
+                &options,
             );
 
             global.set_inline_module_map(script_id, module_tree);
@@ -1351,10 +1603,10 @@ fn fetch_module_descendants_and_link(
     owner: &ModuleOwner,
     module_tree: &ModuleTree,
     destination: Destination,
-    credentials_mode: CredentialsMode,
+    options: &ScriptFetchOptions,
 ) -> Option<Rc<Promise>> {
     let descendant_results =
-        fetch_module_descendants(owner, module_tree, destination, credentials_mode);
+        fetch_module_descendants(owner, module_tree, destination, options);
 
     match descendant_results {
         Ok(descendants) => {
@@ -1422,7 +1674,7 @@ fn fetch_module_descendants(
     owner: &ModuleOwner,
     module_tree: &ModuleTree,
     destination: Destination,
-    credentials_mode: CredentialsMode,
+    options: &ScriptFetchOptions,
 ) -> Result<Vec<Rc<Promise>>, ModuleError> {
     debug!("Start to load dependencies of {}", module_tree.url.clone());
 
@@ -1451,17 +1703,17 @@ fn fetch_module_descendants(
                         assert!(visited.get(&requested_url).is_some());
                     }
 
+                    let options = options.descendant_fetch_options();
+
                     // Step 2.
                     fetch_single_module_script(
                         owner.clone(),
                         requested_url.clone(),
                         destination.clone(),
-                        Referrer::Client,
-                        ParserMetadata::NotParserInserted,
-                        "".to_owned(),
-                        credentials_mode.clone(),
+                        options,
                         Some(module_tree.url.clone()),
                         false,
+                        None,
                     )
                 })
                 .collect()

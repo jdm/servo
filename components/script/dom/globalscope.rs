@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-use crate::dom::bindings::cell::DomRefCell;
+use crate::dom::bindings::cell::{DomRefCell, RefMut};
 use crate::dom::bindings::codegen::Bindings::BroadcastChannelBinding::BroadcastChannelMethods;
 use crate::dom::bindings::codegen::Bindings::EventSourceBinding::EventSourceBinding::EventSourceMethods;
 use crate::dom::bindings::codegen::Bindings::ImageBitmapBinding::{
@@ -48,7 +48,7 @@ use crate::dom::workerglobalscope::WorkerGlobalScope;
 use crate::dom::workletglobalscope::WorkletGlobalScope;
 use crate::microtask::{Microtask, MicrotaskQueue, UserMicrotask};
 use crate::realms::{enter_realm, AlreadyInRealm, InRealm};
-use crate::script_module::ModuleTree;
+use crate::script_module::{DynamicModuleList, ModuleTree};
 use crate::script_runtime::{CommonScriptMsg, JSContext as SafeJSContext, ScriptChan, ScriptPort};
 use crate::script_thread::{MainThreadScriptChan, ScriptThread};
 use crate::task::TaskCanceller;
@@ -252,6 +252,9 @@ pub struct GlobalScope {
 
     /// currect https state (from previous request)
     https_state: Cell<HttpsState>,
+
+    /// List of ongoing dynamic module imports.
+    dynamic_modules: DomRefCell<DynamicModuleList>,
 }
 
 /// A wrapper for glue-code between the ipc router and the event-loop.
@@ -605,6 +608,7 @@ impl GlobalScope {
             gpu_id_hub,
             frozen_supported_performance_entry_types: DomRefCell::new(Default::default()),
             https_state: Cell::new(HttpsState::None),
+            dynamic_modules: DomRefCell::new(DynamicModuleList::new()),
         }
     }
 
@@ -2605,6 +2609,10 @@ impl GlobalScope {
 
     pub fn wgpu_id_hub(&self) -> Arc<Mutex<Identities>> {
         self.gpu_id_hub.clone()
+    }
+
+    pub(crate) fn dynamic_module_list(&self) -> RefMut<DynamicModuleList> {
+        self.dynamic_modules.borrow_mut()
     }
 }
 
