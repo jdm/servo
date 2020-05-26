@@ -773,10 +773,10 @@ impl ModuleOwner {
 
                 let document = document_from_node(&*script.root());
 
-                let module_map = global.get_module_map().borrow();
+                let module_map = global.get_module_map();
 
                 let (module_tree, mut load) = if let Some(script_src) = module_url.clone() {
-                    let module_tree = module_map.get(&script_src.clone()).unwrap().clone();
+                    let module_tree = module_map.borrow().get(&script_src.clone()).unwrap().clone();
 
                     let load = Ok(ScriptOrigin::external(
                         module_tree.get_text().borrow().clone(),
@@ -814,29 +814,34 @@ impl ModuleOwner {
 
                 module_tree.set_status(ModuleStatus::Finished);
 
-                if !module_tree.has_all_ready_descendants(&module_map) {
+                if !module_tree.has_all_ready_descendants(&module_map.borrow()) {
                     return;
                 }
 
-                let parent_urls = module_tree.get_parent_urls().borrow();
-                let parent_all_ready = parent_urls
-                    .iter()
-                    .filter_map(|parent_url| module_map.get(&parent_url.clone()))
-                    .all(|parent_tree| parent_tree.has_all_ready_descendants(&module_map));
+                {
+                    let module_map = module_map.borrow();
+                    let parent_urls = module_tree.get_parent_urls();
+                    let parent_all_ready = parent_urls
+                        .borrow()
+                        .iter()
+                        .filter_map(|parent_url| module_map.get(&parent_url.clone()))
+                        .all(|parent_tree| parent_tree.has_all_ready_descendants(&module_map));
 
-                if !parent_all_ready {
-                    return;
+                    if !parent_all_ready {
+                        return;
+                    }
+
+                    parent_urls
+                        .borrow()
+                        .iter()
+                        .filter_map(|parent_url| module_map.get(&parent_url.clone()))
+                        .for_each(|parent_tree| {
+                            let parent_promise = parent_tree.get_promise().borrow();
+                            if let Some(promise) = parent_promise.as_ref() {
+                                promise.resolve_native(&());
+                            }
+                        });
                 }
-
-                parent_urls
-                    .iter()
-                    .filter_map(|parent_url| module_map.get(&parent_url.clone()))
-                    .for_each(|parent_tree| {
-                        let parent_promise = parent_tree.get_promise().borrow();
-                        if let Some(promise) = parent_promise.as_ref() {
-                            promise.resolve_native(&());
-                        }
-                    });
 
                 let mut discovered_urls: HashSet<ServoUrl> = HashSet::new();
                 let module_error =
