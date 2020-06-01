@@ -4650,20 +4650,25 @@ class CGUnionConversionStruct(CGThing):
             # "object" is not distinguishable from other types
             assert not object or not (interfaceObject or arrayObject or callbackObject or mozMapObject)
             templateBody = CGList([], "\n")
-            if object:
-                templateBody.append(object)
+            if arrayObject or callbackObject:
+                # An object can be both an sequence object and a callback or
+                # dictionary, but we shouldn't have both in the union's members
+                # because they are not distinguishable.
+                assert not (arrayObject and callbackObject)
+                templateBody.append(arrayObject if arrayObject else callbackObject)
             if interfaceObject:
+                assert not object
                 templateBody.append(interfaceObject)
-            if arrayObject:
-                templateBody.append(arrayObject)
-            if callbackObject:
-                templateBody.append(callbackObject)
+            elif object:
+                templateBody.append(object)
+
             if mozMapObject:
                 templateBody.append(mozMapObject)
+
             conversions.append(CGIfWrapper("value.get().is_object()", templateBody))
 
         if dictionaryObject:
-            assert not hasObjectTypes
+            assert not object
             conversions.append(dictionaryObject)
 
         stringTypes = [t for t in memberTypes if t.isString() or t.isEnum()]
