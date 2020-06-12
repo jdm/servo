@@ -23,4 +23,8 @@ interface HTMLCanvasElement : HTMLElement {
   //OffscreenCanvas transferControlToOffscreen();
 };
 
+partial interface HTMLCanvasElement {
+    MediaStream captureStream (optional double frameRequestRate);
+};
+
 //callback BlobCallback = void (Blob? blob);
