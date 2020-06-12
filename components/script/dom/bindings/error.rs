@@ -108,6 +108,7 @@ pub type Fallible<T> = Result<T, Error>;
 pub type ErrorResult = Fallible<()>;
 
 /// Set a pending exception for the given `result` on `cx`.
+#[allow(unsafe_code)]
 pub fn throw_dom_exception(cx: SafeJSContext, global: &GlobalScope, result: Error) {
     #[cfg(feature = "js_backtrace")]
     unsafe {

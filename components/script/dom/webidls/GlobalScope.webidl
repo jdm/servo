@@ -7,4 +7,5 @@
 
 [Exposed=(Window,Worker,Worklet,DissimilarOriginWindow),
  Inline]
-interface GlobalScope : EventTarget {};
+interface GlobalScope : EventTarget {
+};
