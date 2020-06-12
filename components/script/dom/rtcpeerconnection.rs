@@ -10,10 +10,11 @@ use crate::dom::bindings::codegen::Bindings::RTCPeerConnectionBinding::{
     RTCAnswerOptions, RTCBundlePolicy, RTCConfiguration, RTCIceConnectionState,
     RTCIceGatheringState, RTCOfferOptions, RTCSignalingState,
 };
+//use crate::dom::bindings::codegen::Bindings::RTCRtpTransceiverBinding::RTCRtpTransceiverInit;
 use crate::dom::bindings::codegen::Bindings::RTCSessionDescriptionBinding::{
     RTCSdpType, RTCSessionDescriptionInit,
 };
-use crate::dom::bindings::codegen::UnionTypes::StringOrStringSequence;
+use crate::dom::bindings::codegen::UnionTypes::{/*MediaStreamTrackOrString,*/ StringOrStringSequence};
 use crate::dom::bindings::error::Error;
 use crate::dom::bindings::error::Fallible;
 use crate::dom::bindings::inheritance::Castable;
@@ -34,6 +35,7 @@ use crate::dom::rtcicecandidate::RTCIceCandidate;
 use crate::dom::rtcpeerconnectioniceevent::RTCPeerConnectionIceEvent;
 use crate::dom::rtcsessiondescription::RTCSessionDescription;
 use crate::dom::rtctrackevent::RTCTrackEvent;
+//use crate::dom::rtcrtptransceiver::RTCRtpTransceiver;
 use crate::dom::window::Window;
 use crate::realms::{enter_realm, InRealm};
 use crate::task::TaskCanceller;
@@ -74,6 +76,7 @@ pub struct RTCPeerConnection {
     signaling_state: Cell<RTCSignalingState>,
     #[ignore_malloc_size_of = "defined in servo-media"]
     data_channels: DomRefCell<HashMap<DataChannelId, Dom<RTCDataChannel>>>,
+    //transceivers: DomRefCell<Vec<Dom<RTCRtpTransceiver>>>,
 }
 
 struct RTCSignaller {
@@ -744,6 +747,10 @@ impl RTCPeerConnectionMethods for RTCPeerConnection {
     ) -> DomRoot<RTCDataChannel> {
         RTCDataChannel::new(&self.global(), &self, label, init, None)
     }
+
+    /*fn AddTransceiver(&self, _track_or_kind: &MediaStreamTrackOrDOMString, init: &RTCRtpTransceiverInit) -> DomRoot<RTCRtpTransceiver> {
+        RTCRtpTransceiver::new(self.global(), init.direction)
+    }*/
 }
 
 impl From<SessionDescription> for RTCSessionDescriptionInit {
