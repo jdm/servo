@@ -138,8 +138,8 @@ partial interface RTCPeerConnection {
     // RTCRtpSender                addTrack(MediaStreamTrack track,
     //                                      MediaStream... streams);
     // void                        removeTrack(RTCRtpSender sender);
-    //RTCRtpTransceiver           addTransceiver((MediaStreamTrack or DOMString) trackOrKind,
-    //                                           optional RTCRtpTransceiverInit init = {});
+    RTCRtpTransceiver           addTransceiver((MediaStreamTrack or DOMString) trackOrKind,
+                                               optional RTCRtpTransceiverInit init = {});
     attribute EventHandler ontrack;
 };
 

@@ -3,9 +3,12 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 use crate::dom::bindings::codegen::Bindings::RTCRtpSenderBinding::RTCRtpSenderMethods;
-use crate::dom::bindings::codegen::Bindings::RTCRtpSenderBinding::RTCRtpSendParameters;
+use crate::dom::bindings::codegen::Bindings::RTCRtpSenderBinding::{
+    RTCRtpCodecParameters, RTCRtpParameters,RTCRtcpParameters,  RTCRtpSendParameters
+};
 use crate::dom::bindings::reflector::{reflect_dom_object, Reflector};
-use crate::dom::bindings::root::DomRoot;
+use crate::dom::bindings::root::{Dom, DomRoot};
+use crate::dom::bindings::str::DOMString;
 use crate::dom::globalscope::GlobalScope;
 use dom_struct::dom_struct;
 
@@ -28,6 +31,20 @@ impl RTCRtpSender {
 
 impl RTCRtpSenderMethods for RTCRtpSender {
     fn GetParameters(&self) -> RTCRtpSendParameters {
-        unimplemented!()
+        RTCRtpSendParameters {
+            parent: RTCRtpParameters {
+                headerExtensions: vec![],
+                rtcp: RTCRtcpParameters {
+                    payloadType: 0,
+                    mimeType: DOMString::new(),
+                    clockRate: 0,
+                    channels: 0,
+                    sdpFmtpLine: DOMString::new(),
+                },
+                codecs: vec![],
+            },
+            transactionId: DOMString::new(),
+            encodings: vec![],
+        }
     }
 }
