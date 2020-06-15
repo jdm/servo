@@ -1088,7 +1088,7 @@ impl WindowMethods for Window {
             capture_stack!(in(*self.get_cx()) let stack);
             let js_stack = stack.and_then(|s| s.as_string(None, StackFormat::SpiderMonkey));
             let rust_stack = Backtrace::new();
-            println!("Current JS stack:\n{:?}\nCurrent Rust stack:\n{:?}", js_stack, rust_stack);
+            println!("Current JS stack:\n{}\nCurrent Rust stack:\n{:?}", js_stack.unwrap_or(String::new()), rust_stack);
         }
     }
 
