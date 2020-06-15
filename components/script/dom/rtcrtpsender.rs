@@ -4,13 +4,15 @@
 
 use crate::dom::bindings::codegen::Bindings::RTCRtpSenderBinding::RTCRtpSenderMethods;
 use crate::dom::bindings::codegen::Bindings::RTCRtpSenderBinding::{
-    RTCRtpCodecParameters, RTCRtpParameters,RTCRtcpParameters,  RTCRtpSendParameters
+    RTCRtpParameters, RTCRtcpParameters,  RTCRtpSendParameters
 };
-use crate::dom::bindings::reflector::{reflect_dom_object, Reflector};
-use crate::dom::bindings::root::{Dom, DomRoot};
+use crate::dom::bindings::reflector::{reflect_dom_object, DomObject, Reflector};
+use crate::dom::bindings::root::DomRoot;
 use crate::dom::bindings::str::DOMString;
 use crate::dom::globalscope::GlobalScope;
+use crate::dom::promise::Promise;
 use dom_struct::dom_struct;
+use std::rc::Rc;
 
 #[dom_struct]
 pub struct RTCRtpSender {
@@ -35,16 +37,19 @@ impl RTCRtpSenderMethods for RTCRtpSender {
             parent: RTCRtpParameters {
                 headerExtensions: vec![],
                 rtcp: RTCRtcpParameters {
-                    payloadType: 0,
-                    mimeType: DOMString::new(),
-                    clockRate: 0,
-                    channels: 0,
-                    sdpFmtpLine: DOMString::new(),
+                    cname: None,
+                    reducedSize: None,
                 },
                 codecs: vec![],
             },
             transactionId: DOMString::new(),
             encodings: vec![],
         }
+    }
+
+    fn SetParameters(&self, _parameters: &RTCRtpSendParameters) -> Rc<Promise> {
+        let promise = Promise::new(&self.global());
+        promise.resolve_native(&());
+        promise
     }
 }

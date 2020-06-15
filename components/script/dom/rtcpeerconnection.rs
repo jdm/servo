@@ -748,7 +748,7 @@ impl RTCPeerConnectionMethods for RTCPeerConnection {
         RTCDataChannel::new(&self.global(), &self, label, init, None)
     }
 
-    fn AddTransceiver(&self, _track_or_kind: &MediaStreamTrackOrString, init: &RTCRtpTransceiverInit) -> DomRoot<RTCRtpTransceiver> {
+    fn AddTransceiver(&self, _track_or_kind: MediaStreamTrackOrString, init: &RTCRtpTransceiverInit) -> DomRoot<RTCRtpTransceiver> {
         RTCRtpTransceiver::new(&self.global(), init.direction)
     }
 }
