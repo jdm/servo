@@ -5,8 +5,8 @@
 use crate::dom::bindings::cell::DomRefCell;
 use crate::dom::bindings::codegen::Bindings::CryptoBinding::CryptoMethods;
 use crate::dom::bindings::error::{Error, Fallible};
-use crate::dom::bindings::reflector::{reflect_dom_object, Reflector};
-use crate::dom::bindings::root::DomRoot;
+use crate::dom::bindings::reflector::{reflect_dom_object, DomObject, Reflector};
+use crate::dom::bindings::root::{DomRoot, MutNullableDom};
 use crate::dom::globalscope::GlobalScope;
 use crate::dom::subtlecrypto::SubtleCrypto;
 use crate::script_runtime::JSContext;
@@ -34,6 +34,7 @@ impl Crypto {
         Crypto {
             reflector_: Reflector::new(),
             rng: DomRefCell::new(ServoRng::new()),
+            subtle: MutNullableDom::default(),
         }
     }
 

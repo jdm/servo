@@ -3,18 +3,22 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 use crate::dom::bindings::codegen::Bindings::CryptoKeyBinding::{CryptoKeyMethods, KeyType, KeyUsage};
-use crate::dom::bindings::codegen::Bindings::SubtleCryptoBindings::KeyAlgorithm;
+use crate::dom::bindings::codegen::Bindings::SubtleCryptoBinding::KeyAlgorithm;
 use crate::dom::bindings::reflector::{reflect_dom_object, Reflector};
+use crate::dom::bindings::root::DomRoot;
+use crate::dom::globalscope::GlobalScope;
 use crate::script_runtime::JSContext;
 use dom_struct::dom_struct;
-use js::jsapi::JSValue;
-use js::rust::IntoHandle;
+use js::conversions::ToJSValConvertible;
+use js::jsapi::{JSObject, Value};
+use std::ptr::NonNull;
 
 #[dom_struct]
-struct CryptoKey {
+pub struct CryptoKey {
     reflector_: Reflector,
     key_type: KeyType,
     extractable: bool,
+    #[ignore_malloc_size_of = ""]
     algorithm: KeyAlgorithm,
     usages: Vec<KeyUsage>,
     
@@ -24,6 +28,10 @@ impl CryptoKey {
     fn new_inherited(key_type: KeyType, extractable: bool, algorithm: KeyAlgorithm, usages: Vec<KeyUsage>) -> CryptoKey {
         CryptoKey {
             reflector_: Reflector::new(),
+            key_type,
+            extractable,
+            algorithm,
+            usages,
         }
     }
 
@@ -43,22 +51,23 @@ impl CryptoKeyMethods for CryptoKey {
         self.extractable
     }
 
+    #[allow(unsafe_code)]
     // https://w3c.github.io/webcrypto/#cryptokey-interface-members
-    fn Algorithm(&self, cx: JSContext) -> JSValue {
-        rooted!(in(*cx) let mut algorithm: JSValue);
+    fn Algorithm(&self, cx: JSContext) -> NonNull<JSObject> {
         unsafe {
-            self.algorithm.to_jsval(*cx, algorithm.handle_mut().into_handle());
+            rooted!(in(*cx) let mut algorithm: Value);
+            self.algorithm.to_jsval(*cx, algorithm.handle_mut());
+            NonNull::new(algorithm.to_object()).unwrap()
         }
-        algorithm
     }
 
     #[allow(unsafe_code)]
     // https://w3c.github.io/webcrypto/#cryptokey-interface-members
-    fn Usages(&self, cx: JSContext) -> JSValue {
-        rooted!(in(*cx) let mut usages: JSValue);
+    fn Usages(&self, cx: JSContext) -> NonNull<JSObject> {
         unsafe {
+            rooted!(in(*cx) let mut usages: Value);
             self.usages.to_jsval(*cx, usages.handle_mut());
+            NonNull::new(usages.to_object()).unwrap()
         }
-        usages.get()
     }
 }
