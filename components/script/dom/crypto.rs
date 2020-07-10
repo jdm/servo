@@ -8,6 +8,7 @@ use crate::dom::bindings::error::{Error, Fallible};
 use crate::dom::bindings::reflector::{reflect_dom_object, Reflector};
 use crate::dom::bindings::root::DomRoot;
 use crate::dom::globalscope::GlobalScope;
+use crate::dom::subtlecrypto::SubtleCrypto;
 use crate::script_runtime::JSContext;
 use dom_struct::dom_struct;
 use js::jsapi::JSObject;
@@ -25,6 +26,7 @@ pub struct Crypto {
     reflector_: Reflector,
     #[ignore_malloc_size_of = "Defined in rand"]
     rng: DomRefCell<ServoRng>,
+    subtle: MutNullableDom<SubtleCrypto>,
 }
 
 impl Crypto {
@@ -41,6 +43,10 @@ impl Crypto {
 }
 
 impl CryptoMethods for Crypto {
+    fn Subtle(&self) -> DomRoot<SubtleCrypto> {
+        self.subtle.or_init(|| SubtleCrypto::new(&self.global()))
+    }
+
     #[allow(unsafe_code)]
     // https://dvcs.w3.org/hg/webcrypto-api/raw-file/tip/spec/Overview.html#Crypto-method-getRandomValues
     fn GetRandomValues(
