@@ -311,6 +311,7 @@ impl WebGLFramebuffer {
         let attachments = [&*z, &*s, &*zs];
         let webgl1_attachment_constraints = &[
             &[
+                constants::DEPTH_COMPONENT,
                 constants::DEPTH_COMPONENT16,
                 constants::DEPTH_COMPONENT24,
                 constants::DEPTH_COMPONENT32F,
@@ -569,6 +570,7 @@ impl WebGLFramebuffer {
         &self,
         attachment: u32,
     ) -> Option<&DomRefCell<Option<WebGLFramebufferAttachment>>> {
+        let extension_manager = self.upcast::<WebGLObject>().context().extension_manager();
         match attachment {
             constants::COLOR_ATTACHMENT0..=constants::COLOR_ATTACHMENT15 => {
                 let idx = attachment - constants::COLOR_ATTACHMENT0;
@@ -576,7 +578,7 @@ impl WebGLFramebuffer {
             },
             constants::DEPTH_ATTACHMENT => Some(&self.depth),
             constants::STENCIL_ATTACHMENT => Some(&self.stencil),
-            constants::DEPTH_STENCIL_ATTACHMENT => Some(&self.depthstencil),
+            constants::DEPTH_STENCIL_ATTACHMENT if extension_manager.is_framebuffer_attachment_enabled(attachment) => Some(&self.depthstencil),
             _ => None,
         }
     }

@@ -21,3 +21,4 @@ pub mod oesvertexarrayobject;
 pub mod webglcolorbufferfloat;
 pub mod webglcompressedtextureetc1;
 pub mod webglcompressedtextures3tc;
+pub mod webgl_depth_texture;

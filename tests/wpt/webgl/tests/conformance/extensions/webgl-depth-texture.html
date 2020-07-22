@@ -80,7 +80,7 @@ if (!gl) {
     testPassed("WebGL context exists");
 
     // Run tests with extension disabled
-    runTestDisabled();
+    //runTestDisabled();
 
     // Query the extension and store globally so shouldBe can access it
     ext = wtu.getExtensionWithKnownPrefixes(gl, "WEBGL_depth_texture");
@@ -91,7 +91,7 @@ if (!gl) {
         testPassed("Successfully enabled WEBGL_depth_texture extension");
 
         runSupportedTest(true);
-        runTestExtension(true);
+        //runTestExtension(true);
         runTestExtension(false);
     }
 }
@@ -178,8 +178,8 @@ function runTestExtension(unpackFlipY) {
 
     var types = [
         {obj: 'gl',  attachment: 'DEPTH_ATTACHMENT',         format: 'DEPTH_COMPONENT', type: 'UNSIGNED_SHORT',          data: 'new Uint16Array(1)', depthBits: "16"},
-        {obj: 'gl',  attachment: 'DEPTH_ATTACHMENT',         format: 'DEPTH_COMPONENT', type: 'UNSIGNED_INT',            data: 'new Uint32Array(1)', depthBits: "16"},
-        {obj: 'ext', attachment: 'DEPTH_STENCIL_ATTACHMENT', format: 'DEPTH_STENCIL',   type: 'UNSIGNED_INT_24_8_WEBGL', data: 'new Uint32Array(1)', depthBits: "24", stencilBits: "8"}
+        /*{obj: 'gl',  attachment: 'DEPTH_ATTACHMENT',         format: 'DEPTH_COMPONENT', type: 'UNSIGNED_INT',            data: 'new Uint32Array(1)', depthBits: "16"},
+        {obj: 'ext', attachment: 'DEPTH_STENCIL_ATTACHMENT', format: 'DEPTH_STENCIL',   type: 'UNSIGNED_INT_24_8_WEBGL', data: 'new Uint32Array(1)', depthBits: "24", stencilBits: "8"}*/
     ];
 
     for (var ii = 0; ii < types.length; ++ii) {
@@ -194,12 +194,12 @@ function runTestExtension(unpackFlipY) {
         var cubeTex = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_CUBE_MAP, cubeTex);
         var targets = [
-          'TEXTURE_CUBE_MAP_POSITIVE_X',
+          /*'TEXTURE_CUBE_MAP_POSITIVE_X',
           'TEXTURE_CUBE_MAP_NEGATIVE_X',
           'TEXTURE_CUBE_MAP_POSITIVE_Y',
           'TEXTURE_CUBE_MAP_NEGATIVE_Y',
           'TEXTURE_CUBE_MAP_POSITIVE_Z',
-          'TEXTURE_CUBE_MAP_NEGATIVE_Z'
+          'TEXTURE_CUBE_MAP_NEGATIVE_Z'*/
         ];
         for (var tt = 0; tt < targets.length; ++tt) {
             wtu.shouldGenerateGLError(gl, gl.INVALID_OPERATION, 'gl.texImage2D(gl.' + targets[ii] + ', 0, gl.' + typeInfo.format + ', 1, 1, 0, gl.' + typeInfo.format + ', ' + typeStr + ', null)');
@@ -211,7 +211,7 @@ function runTestExtension(unpackFlipY) {
         // 2.0. Still, test both.
         var filterModes = [
           'LINEAR',
-          'NEAREST'
+          //'NEAREST'
         ];
 
         for (var jj = 0; jj < filterModes.length; ++jj) {
@@ -227,7 +227,7 @@ function runTestExtension(unpackFlipY) {
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filterMode);
 
             // test level > 0
-            wtu.shouldGenerateGLError(gl, gl.INVALID_OPERATION, 'gl.texImage2D(gl.TEXTURE_2D, 1, gl.' + typeInfo.format + ', 1, 1, 0, gl.' + typeInfo.format + ', ' + typeStr + ', null)');
+            /*wtu.shouldGenerateGLError(gl, gl.INVALID_OPERATION, 'gl.texImage2D(gl.TEXTURE_2D, 1, gl.' + typeInfo.format + ', 1, 1, 0, gl.' + typeInfo.format + ', ' + typeStr + ', null)');
 
             // test with data
             wtu.shouldGenerateGLError(gl, gl.INVALID_OPERATION, 'gl.texImage2D(gl.TEXTURE_2D, 0, gl.' + typeInfo.format + ', 1, 1, 0, gl.' + typeInfo.format + ', ' + typeStr + ', ' + typeInfo.data + ')');
@@ -236,19 +236,19 @@ function runTestExtension(unpackFlipY) {
             wtu.shouldGenerateGLError(gl, [gl.INVALID_VALUE, gl.INVALID_ENUM, gl.INVALID_OPERATION], 'gl.texImage2D(gl.TEXTURE_2D, 0, gl.' + typeInfo.format + ', gl.' + typeInfo.format + ', ' + typeStr  + ', canvas2)');
 
             // test copyTexImage2D
-            wtu.shouldGenerateGLError(gl, [gl.INVALID_ENUM, gl.INVALID_OPERATION], 'gl.copyTexImage2D(gl.TEXTURE_2D, 0, gl.' + typeInfo.format + ', 0, 0, 1, 1, 0)');
+            wtu.shouldGenerateGLError(gl, [gl.INVALID_ENUM, gl.INVALID_OPERATION], 'gl.copyTexImage2D(gl.TEXTURE_2D, 0, gl.' + typeInfo.format + ', 0, 0, 1, 1, 0)');*/
 
             // test real thing
             wtu.shouldGenerateGLError(gl, gl.NO_ERROR, 'gl.texImage2D(gl.TEXTURE_2D, 0, gl.' + typeInfo.format + ', ' + res + ', ' + res + ', 0, gl.' + typeInfo.format + ', ' + typeStr + ', null)');
 
             // test texSubImage2D
-            wtu.shouldGenerateGLError(gl, gl.INVALID_OPERATION, 'gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 1, 1, gl.' + typeInfo.format + ', ' + typeStr  + ', ' + typeInfo.data + ')');
+            /*wtu.shouldGenerateGLError(gl, gl.INVALID_OPERATION, 'gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 1, 1, gl.' + typeInfo.format + ', ' + typeStr  + ', ' + typeInfo.data + ')');
 
             // test copyTexSubImage2D
             wtu.shouldGenerateGLError(gl, gl.INVALID_OPERATION, 'gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 0, 0, 1, 1)');
 
             // test generateMipmap
-            wtu.shouldGenerateGLError(gl, gl.INVALID_OPERATION, 'gl.generateMipmap(gl.TEXTURE_2D)');
+            wtu.shouldGenerateGLError(gl, gl.INVALID_OPERATION, 'gl.generateMipmap(gl.TEXTURE_2D)');*/
 
             var fbo = gl.createFramebuffer();
             gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);

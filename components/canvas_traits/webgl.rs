@@ -1260,11 +1260,13 @@ impl TexFormat {
             TexFormat::RGBA16i => &[TexDataType::Short][..],
             TexFormat::RGBA32i => &[TexDataType::Int][..],
             TexFormat::RGBA32ui => &[TexDataType::UnsignedInt][..],
+            TexFormat::DepthComponent |
             TexFormat::DepthComponent16 => {
                 &[TexDataType::UnsignedShort, TexDataType::UnsignedInt][..]
             },
             TexFormat::DepthComponent24 => &[TexDataType::UnsignedInt][..],
             TexFormat::DepthComponent32f => &[TexDataType::Float][..],
+            TexFormat::DepthStencil |
             TexFormat::Depth24Stencil8 => &[TexDataType::UnsignedInt248][..],
             TexFormat::Depth32fStencil8 => &[TexDataType::Float32UnsignedInt248Rev][..],
             TexFormat::CompressedRgbS3tcDxt1 |
@@ -1278,6 +1280,7 @@ impl TexFormat {
     pub fn required_webgl_version(self) -> WebGLVersion {
         match self {
             TexFormat::DepthComponent |
+            TexFormat::DepthStencil |
             TexFormat::Alpha |
             TexFormat::RGB |
             TexFormat::RGBA |
@@ -1380,8 +1383,11 @@ impl TexDataType {
             TexDataType::UnsignedShort4444 |
             TexDataType::UnsignedShort5551 |
             TexDataType::UnsignedShort565 |
+            TexDataType::UnsignedShort |
+            TexDataType::UnsignedInt |
             TexDataType::Float |
-            TexDataType::HalfFloat => WebGLVersion::WebGL1,
+            TexDataType::HalfFloat |
+            TexDataType::UnsignedInt248 => WebGLVersion::WebGL1,
             _ => WebGLVersion::WebGL2,
         }
     }

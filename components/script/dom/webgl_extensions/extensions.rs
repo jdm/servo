@@ -10,6 +10,7 @@ use crate::dom::bindings::codegen::Bindings::EXTTextureFilterAnisotropicBinding:
 use crate::dom::bindings::codegen::Bindings::OESStandardDerivativesBinding::OESStandardDerivativesConstants;
 use crate::dom::bindings::codegen::Bindings::OESTextureHalfFloatBinding::OESTextureHalfFloatConstants;
 use crate::dom::bindings::codegen::Bindings::OESVertexArrayObjectBinding::OESVertexArrayObjectConstants;
+use crate::dom::bindings::codegen::Bindings::WEBGL_depth_textureBinding::WEBGL_depth_textureConstants;
 use crate::dom::bindings::codegen::Bindings::WebGLRenderingContextBinding::WebGLRenderingContextConstants as constants;
 use crate::dom::bindings::trace::JSTraceable;
 use crate::dom::extcolorbufferhalffloat::EXTColorBufferHalfFloat;
@@ -30,9 +31,10 @@ use std::ptr::NonNull;
 // Data types that are implemented for texImage2D and texSubImage2D in a WebGL 1.0 context
 // but must trigger a InvalidValue error until the related WebGL Extensions are enabled.
 // Example: https://www.khronos.org/registry/webgl/extensions/OES_texture_float/
-const DEFAULT_DISABLED_TEX_TYPES_WEBGL1: [GLenum; 2] = [
+const DEFAULT_DISABLED_TEX_TYPES_WEBGL1: [GLenum; 3] = [
     constants::FLOAT,
     OESTextureHalfFloatConstants::HALF_FLOAT_OES,
+    WEBGL_depth_textureConstants::UNSIGNED_INT_24_8_WEBGL,
 ];
 
 // Data types that are implemented for textures in WebGLRenderingContext
@@ -76,11 +78,18 @@ const DEFAULT_DISABLED_GET_TEX_PARAMETER_NAMES_WEBGL2: [GLenum; 1] =
 const DEFAULT_DISABLED_GET_VERTEX_ATTRIB_NAMES_WEBGL1: [GLenum; 1] =
     [ANGLEInstancedArraysConstants::VERTEX_ATTRIB_ARRAY_DIVISOR_ANGLE];
 
+const DEFAULT_ENABLED_FRAMEBUFFER_ATTACHMENTS_WEBGL1: [GLenum; 0] = [];
+const DEFAULT_ENABLED_FRAMEBUFFER_ATTACHMENTS_WEBGL2: [GLenum; 2] = [
+    constants::DEPTH_ATTACHMENT,
+    constants::DEPTH_STENCIL_ATTACHMENT
+];
+
 /// WebGL features that are enabled/disabled by WebGL Extensions.
 #[derive(JSTraceable, MallocSizeOf)]
 struct WebGLExtensionFeatures {
     gl_extensions: FnvHashSet<String>,
     disabled_tex_types: FnvHashSet<GLenum>,
+    enabled_framebuffer_attachments: FnvHashSet<GLenum>,
     not_filterable_tex_types: FnvHashSet<GLenum>,
     effective_tex_internal_formats: FnvHashMap<TexFormatType, TexFormat>,
     /// WebGL Hint() targets enabled by extensions.
@@ -106,6 +115,7 @@ impl WebGLExtensionFeatures {
             disabled_get_parameter_names,
             disabled_get_tex_parameter_names,
             disabled_get_vertex_attrib_names,
+            enabled_framebuffer_attachments,
             not_filterable_tex_types,
             element_index_uint_enabled,
             blend_minmax_enabled,
@@ -124,6 +134,10 @@ impl WebGLExtensionFeatures {
                     .iter()
                     .cloned()
                     .collect(),
+                DEFAULT_ENABLED_FRAMEBUFFER_ATTACHMENTS_WEBGL1
+                    .iter()
+                    .cloned()
+                    .collect(),
                 DEFAULT_NOT_FILTERABLE_TEX_TYPES.iter().cloned().collect(),
                 false,
                 false,
@@ -139,6 +153,10 @@ impl WebGLExtensionFeatures {
                     .cloned()
                     .collect(),
                 Default::default(),
+                DEFAULT_ENABLED_FRAMEBUFFER_ATTACHMENTS_WEBGL2
+                    .iter()
+                    .cloned()
+                    .collect(),
                 Default::default(),
                 true,
                 true,
@@ -156,6 +174,7 @@ impl WebGLExtensionFeatures {
             element_index_uint_enabled,
             blend_minmax_enabled,
             tex_compression_formats: Default::default(),
+            enabled_framebuffer_attachments,
         }
     }
 }
@@ -263,6 +282,14 @@ impl WebGLExtensions {
         names
             .iter()
             .all(|name| features.gl_extensions.contains(*name))
+    }
+
+    pub fn is_framebuffer_attachment_enabled(&self, attachment: GLenum) -> bool {
+        self.features.borrow().enabled_framebuffer_attachments.get(&attachment).is_some()
+    }
+
+    pub fn enable_framebuffer_attachment(&self, attachment: GLenum) {
+        self.features.borrow_mut().enabled_framebuffer_attachments.insert(attachment);
     }
 
     pub fn enable_tex_type(&self, data_type: GLenum) {
@@ -421,6 +448,7 @@ impl WebGLExtensions {
         self.register::<ext::webglcolorbufferfloat::WEBGLColorBufferFloat>();
         self.register::<ext::webglcompressedtextureetc1::WEBGLCompressedTextureETC1>();
         self.register::<ext::webglcompressedtextures3tc::WEBGLCompressedTextureS3TC>();
+        self.register::<ext::webgl_depth_texture::WEBGL_depth_texture>();
     }
 
     pub fn enable_element_index_uint(&self) {
