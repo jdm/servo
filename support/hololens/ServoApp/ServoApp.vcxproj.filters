@@ -855,6 +855,23 @@
     <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\swresample-3.dll">
       <Filter>ReleaseServoDLLs</Filter>
     </None>
+    <None Include="$(OpenXRLoaderBinaryRoot)\bin\openxr_loader.dll" />
+    <None Include="..\..\..\target\aarch64-uwp-windows-msvc\debug\gstaudiobuffersplit.dll" />
+    <None Include="..\..\..\target\aarch64-uwp-windows-msvc\debug\gstgio.dll" />
+    <None Include="..\..\..\target\aarch64-uwp-windows-msvc\debug\gstid3tag.dll" />
+    <None Include="..\..\..\target\aarch64-uwp-windows-msvc\debug\gstid3demux.dll" />
+    <None Include="..\..\..\target\aarch64-uwp-windows-msvc\release\gstaudiobuffersplit.dll" />
+    <None Include="..\..\..\target\aarch64-uwp-windows-msvc\release\gstgio.dll" />
+    <None Include="..\..\..\target\aarch64-uwp-windows-msvc\release\gstid3tag.dll" />
+    <None Include="..\..\..\target\aarch64-uwp-windows-msvc\release\gstid3demux.dll" />
+    <None Include="..\..\..\target\x86_64-uwp-windows-msvc\debug\gstaudiobuffersplit.dll" />
+    <None Include="..\..\..\target\x86_64-uwp-windows-msvc\debug\gstgio.dll" />
+    <None Include="..\..\..\target\x86_64-uwp-windows-msvc\debug\gstid3tag.dll" />
+    <None Include="..\..\..\target\x86_64-uwp-windows-msvc\debug\gstid3demux.dll" />
+    <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\gstaudiobuffersplit.dll" />
+    <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\gstgio.dll" />
+    <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\gstid3tag.dll" />
+    <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\gstid3demux.dll" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Assets">

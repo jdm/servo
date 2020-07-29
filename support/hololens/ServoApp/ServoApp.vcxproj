@@ -66,9 +66,14 @@
     <AppxAutoIncrementPackageRevision>False</AppxAutoIncrementPackageRevision>
     <AppxBundle>Always</AppxBundle>
     <AppxBundlePlatforms>x64</AppxBundlePlatforms>
-    <AppInstallerUpdateFrequency>1</AppInstallerUpdateFrequency>
+    <AppInstallerUpdateFrequency>0</AppInstallerUpdateFrequency>
     <AppInstallerCheckForUpdateFrequency>OnApplicationRun</AppInstallerCheckForUpdateFrequency>
     <AppxSymbolPackageEnabled>False</AppxSymbolPackageEnabled>
+    <GenerateTestArtifacts>True</GenerateTestArtifacts>
+    <HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
+    <AppxPackageSigningEnabled>True</AppxPackageSigningEnabled>
+    <PackageCertificateKeyFile>ServoApp_TemporaryKey.pfx</PackageCertificateKeyFile>
+    <AppxPackageSigningTimestampDigestAlgorithm>SHA256</AppxPackageSigningTimestampDigestAlgorithm>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
@@ -191,6 +196,9 @@
     <None Include="..\..\..\target\aarch64-uwp-windows-msvc\debug\gstaudio-1.0-0.dll">
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">true</DeploymentContent>
     </None>
+    <None Include="..\..\..\target\aarch64-uwp-windows-msvc\debug\gstaudiobuffersplit.dll">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">true</DeploymentContent>
+    </None>
     <None Include="..\..\..\target\aarch64-uwp-windows-msvc\debug\gstaudioconvert.dll">
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">true</DeploymentContent>
     </None>
@@ -224,10 +232,19 @@
     <None Include="..\..\..\target\aarch64-uwp-windows-msvc\debug\gstfft-1.0-0.dll">
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">true</DeploymentContent>
     </None>
+    <None Include="..\..\..\target\aarch64-uwp-windows-msvc\debug\gstgio.dll">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">true</DeploymentContent>
+    </None>
     <None Include="..\..\..\target\aarch64-uwp-windows-msvc\debug\gstgl-1.0-0.dll">
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">true</DeploymentContent>
     </None>
     <None Include="..\..\..\target\aarch64-uwp-windows-msvc\debug\gstinterleave.dll">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">true</DeploymentContent>
+    </None>
+    <None Include="..\..\..\target\aarch64-uwp-windows-msvc\debug\gstid3tag.dll">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">true</DeploymentContent>
+    </None>
+    <None Include="..\..\..\target\aarch64-uwp-windows-msvc\debug\gstid3demux.dll">
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">true</DeploymentContent>
     </None>
     <None Include="..\..\..\target\aarch64-uwp-windows-msvc\debug\gstisomp4.dll">
@@ -365,6 +382,9 @@
     <None Include="..\..\..\target\aarch64-uwp-windows-msvc\release\gstaudio-1.0-0.dll">
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">true</DeploymentContent>
     </None>
+    <None Include="..\..\..\target\aarch64-uwp-windows-msvc\release\gstaudiobuffersplit.dll">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">true</DeploymentContent>
+    </None>
     <None Include="..\..\..\target\aarch64-uwp-windows-msvc\release\gstaudioconvert.dll">
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">true</DeploymentContent>
     </None>
@@ -398,10 +418,19 @@
     <None Include="..\..\..\target\aarch64-uwp-windows-msvc\release\gstfft-1.0-0.dll">
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">true</DeploymentContent>
     </None>
+    <None Include="..\..\..\target\aarch64-uwp-windows-msvc\release\gstgio.dll">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">true</DeploymentContent>
+    </None>
     <None Include="..\..\..\target\aarch64-uwp-windows-msvc\release\gstgl-1.0-0.dll">
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">true</DeploymentContent>
     </None>
     <None Include="..\..\..\target\aarch64-uwp-windows-msvc\release\gstinterleave.dll">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">true</DeploymentContent>
+    </None>
+    <None Include="..\..\..\target\aarch64-uwp-windows-msvc\release\gstid3tag.dll">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">true</DeploymentContent>
+    </None>
+    <None Include="..\..\..\target\aarch64-uwp-windows-msvc\release\gstid3demux.dll">
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">true</DeploymentContent>
     </None>
     <None Include="..\..\..\target\aarch64-uwp-windows-msvc\release\gstisomp4.dll">
@@ -539,6 +568,9 @@
     <None Include="..\..\..\target\x86_64-uwp-windows-msvc\debug\gstaudio-1.0-0.dll">
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</DeploymentContent>
     </None>
+    <None Include="..\..\..\target\x86_64-uwp-windows-msvc\debug\gstaudiobuffersplit.dll">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</DeploymentContent>
+    </None>
     <None Include="..\..\..\target\x86_64-uwp-windows-msvc\debug\gstaudioconvert.dll">
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</DeploymentContent>
     </None>
@@ -572,10 +604,19 @@
     <None Include="..\..\..\target\x86_64-uwp-windows-msvc\debug\gstfft-1.0-0.dll">
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</DeploymentContent>
     </None>
+    <None Include="..\..\..\target\x86_64-uwp-windows-msvc\debug\gstgio.dll">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</DeploymentContent>
+    </None>
     <None Include="..\..\..\target\x86_64-uwp-windows-msvc\debug\gstgl-1.0-0.dll">
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</DeploymentContent>
     </None>
     <None Include="..\..\..\target\x86_64-uwp-windows-msvc\debug\gstinterleave.dll">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</DeploymentContent>
+    </None>
+    <None Include="..\..\..\target\x86_64-uwp-windows-msvc\debug\gstid3tag.dll">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</DeploymentContent>
+    </None>
+    <None Include="..\..\..\target\x86_64-uwp-windows-msvc\debug\gstid3demux.dll">
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</DeploymentContent>
     </None>
     <None Include="..\..\..\target\x86_64-uwp-windows-msvc\debug\gstisomp4.dll">
@@ -725,6 +766,9 @@
     <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\gstaudio-1.0-0.dll">
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
     </None>
+    <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\gstaudiobuffersplit.dll">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
+    </None>
     <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\gstaudioconvert.dll">
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
     </None>
@@ -758,7 +802,16 @@
     <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\gstfft-1.0-0.dll">
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
     </None>
+    <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\gstgio.dll">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
+    </None>
     <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\gstgl-1.0-0.dll">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
+    </None>
+    <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\gstid3tag.dll">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
+    </None>
+    <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\gstid3demux.dll">
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
     </None>
     <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\gstinterleave.dll">
@@ -947,8 +1000,8 @@
   <ImportGroup Label="ExtensionTargets">
     <Import Project="..\packages\Microsoft.Windows.CppWinRT.2.0.200316.3\build\native\Microsoft.Windows.CppWinRT.targets" Condition="Exists('..\packages\Microsoft.Windows.CppWinRT.2.0.200316.3\build\native\Microsoft.Windows.CppWinRT.targets')" />
     <Import Project="..\packages\OpenXR.Loader.1.0.6.2\build\native\OpenXR.Loader.targets" Condition="Exists('..\packages\OpenXR.Loader.1.0.6.2\build\native\OpenXR.Loader.targets')" />
-    <Import Project="..\packages\ANGLE.WindowsStore.Servo.2.1.19\build\native\ANGLE.WindowsStore.Servo.targets" Condition="Exists('..\packages\ANGLE.WindowsStore.Servo.2.1.19\build\native\ANGLE.WindowsStore.Servo.targets')" />
     <Import Project="..\packages\Microsoft.UI.Xaml.2.4.2\build\native\Microsoft.UI.Xaml.targets" Condition="Exists('..\packages\Microsoft.UI.Xaml.2.4.2\build\native\Microsoft.UI.Xaml.targets')" />
+    <Import Project="..\packages\ANGLE.WindowsStore.Servo.2.1.20\build\native\ANGLE.WindowsStore.Servo.targets" Condition="Exists('..\packages\ANGLE.WindowsStore.Servo.2.1.20\build\native\ANGLE.WindowsStore.Servo.targets')" />
   </ImportGroup>
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
@@ -958,7 +1011,7 @@
     <Error Condition="!Exists('..\packages\Microsoft.Windows.CppWinRT.2.0.200316.3\build\native\Microsoft.Windows.CppWinRT.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.Windows.CppWinRT.2.0.200316.3\build\native\Microsoft.Windows.CppWinRT.targets'))" />
     <Error Condition="!Exists('..\packages\OpenXR.Loader.1.0.6.2\build\native\OpenXR.Loader.props')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\OpenXR.Loader.1.0.6.2\build\native\OpenXR.Loader.props'))" />
     <Error Condition="!Exists('..\packages\OpenXR.Loader.1.0.6.2\build\native\OpenXR.Loader.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\OpenXR.Loader.1.0.6.2\build\native\OpenXR.Loader.targets'))" />
-    <Error Condition="!Exists('..\packages\ANGLE.WindowsStore.Servo.2.1.19\build\native\ANGLE.WindowsStore.Servo.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\ANGLE.WindowsStore.Servo.2.1.19\build\native\ANGLE.WindowsStore.Servo.targets'))" />
     <Error Condition="!Exists('..\packages\Microsoft.UI.Xaml.2.4.2\build\native\Microsoft.UI.Xaml.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.UI.Xaml.2.4.2\build\native\Microsoft.UI.Xaml.targets'))" />
+    <Error Condition="!Exists('..\packages\ANGLE.WindowsStore.Servo.2.1.20\build\native\ANGLE.WindowsStore.Servo.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\ANGLE.WindowsStore.Servo.2.1.20\build\native\ANGLE.WindowsStore.Servo.targets'))" />
   </Target>
 </Project>
