@@ -188,8 +188,9 @@ mod media_platform {
         ) {
             Ok(b) => b,
             Err(e) => {
-                eprintln!("Error initializing GStreamer: {:?}", e);
-                std::process::exit(1);
+                //eprintln!("Error initializing GStreamer: {:?}", e);
+                //std::process::exit(1);
+                panic!("Error initializing GStreamer: {:?}", e)
             },
         };
         ServoMedia::init_with_backend(backend);

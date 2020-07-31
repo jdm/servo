@@ -778,6 +778,9 @@
     <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\gstaudioparsers.dll">
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
     </None>
+    <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\gstaudiorate.dll">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
+    </None>
     <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\gstaudioresample.dll">
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
     </None>
@@ -797,6 +800,12 @@
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
     </None>
     <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\gstdeinterlace.dll">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
+    </None>
+    <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\gstdtls.dll">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
+    </None>
+    <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\gstfft-1.0-0.dll">
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
     </None>
     <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\gstfft-1.0-0.dll">
@@ -823,6 +832,21 @@
     <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\gstlibav.dll">
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
     </None>
+    <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\gstmediafoundation.dll">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
+    </None>
+    <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\gstnet-1.0-0.dll">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
+    </None>
+    <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\gstnice.dll">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
+    </None>
+    <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\gstopenh264.dll">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
+    </None>
+    <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\gstopus.dll">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
+    </None>
     <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\gstpbutils-1.0-0.dll">
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
     </None>
@@ -844,7 +868,16 @@
     <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\gstrtp-1.0-0.dll">
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
     </None>
+    <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\gstrtp.dll">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
+    </None>
+    <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\gstrtpmanager.dll">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
+    </None>
     <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\gstrtsp-1.0-0.dll">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
+    </None>
+    <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\gstsctp-1.0-0.dll">
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
     </None>
     <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\gstsdp-1.0-0.dll">
@@ -868,16 +901,25 @@
     <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\gstvideoparsersbad.dll">
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
     </None>
+    <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\gstvideorate.dll">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
+    </None>
     <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\gstvideoscale.dll">
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
     </None>
     <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\gstvolume.dll">
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
     </None>
-    <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\gstwasapi.dll">
+    <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\gstvpx.dll">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
+    </None>
+    <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\gstwasapi2.dll">
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
     </None>
     <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\gstwebrtc-1.0-0.dll">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
+    </None>
+    <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\gstwebrtc.dll">
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
     </None>
     <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\intl-8.dll">
@@ -886,7 +928,13 @@
     <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\libcrypto.dll">
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
     </None>
+    <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\libcrypto-1_1-x64.dll">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
+    </None>
     <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\libssl.dll">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
+    </None>
+    <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\libssl-1_1-x64.dll">
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
     </None>
     <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\msvcp140.dll">
@@ -894,7 +942,16 @@
       </DeploymentContent>
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</DeploymentContent>
     </None>
+    <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\nice-10.dll">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
+    </None>
     <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\orc-0.4-0.dll">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
+    </None>
+    <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\openh264-6.dll">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
+    </None>
+    <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\opus-0.dll">
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
     </None>
     <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\postproc-55.dll">
@@ -908,10 +965,16 @@
       </ExcludedFromBuild>
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">false</DeploymentContent>
     </None>
+    <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\srtp2-1.dll">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
+    </None>
     <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\swresample-3.dll">
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
     </None>
     <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\swscale-5.dll">
+      <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
+    </None>
+    <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\usrsctp-1.dll">
       <DeploymentContent Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</DeploymentContent>
     </None>
     <None Include="..\..\..\target\x86_64-uwp-windows-msvc\release\vcruntime140.dll">

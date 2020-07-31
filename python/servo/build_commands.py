@@ -287,7 +287,7 @@ class MachCommands(CommandBase):
                 "x86_64": {
                     "angle": "x64",
                     "gst": "X86_64",
-                    "gst_root": "x64",
+                    "gst_root": "x86_64",
                 },
             }
             arch = arches.get(target_triple.split('-')[0])
@@ -304,14 +304,13 @@ class MachCommands(CommandBase):
                 print("Found existing GStreamer library path in LIB. Please remove it.")
                 sys.exit(1)
 
+            gst_root_dir = env.get(
+                "OVERRIDE_GSTREAMER_ROOT_1_0_" + arch['gst'],
+                path.join(self.msvc_package_dir("gstreamer-uwp"), arch['gst_root'])
+            )
             # Override any existing GStreamer installation with the vendored libraries.
-            env["GSTREAMER_1_0_ROOT_" + arch['gst']] = path.join(
-                self.msvc_package_dir("gstreamer-uwp"), arch['gst_root']
-            )
-            env["PKG_CONFIG_PATH"] = path.join(
-                self.msvc_package_dir("gstreamer-uwp"), arch['gst_root'],
-                "lib", "pkgconfig"
-            )
+            env["GSTREAMER_1_0_ROOT_" + arch['gst']] = gst_root_dir
+            env["PKG_CONFIG_PATH"] = path.join(gst_root_dir, "lib", "pkgconfig")
 
         if 'windows' in host:
             process = subprocess.Popen('("%s" %s > nul) && "python" -c "import os; print(repr(os.environ))"' %
@@ -888,6 +887,9 @@ def package_gstreamer_dlls(env, servo_exe_dir, target, uwp):
         "gmodule-2.0-0.dll",
         "gobject-2.0-0.dll",
         "intl-8.dll",
+        "libcrypto-1_1-x64.dll",
+        "libssl-1_1-x64.dll",
+        "nice-10.dll",
         "orc-0.4-0.dll",
         "swresample-3.dll",
         "z-1.dll",
@@ -900,8 +902,12 @@ def package_gstreamer_dlls(env, servo_exe_dir, target, uwp):
         # aren't present in the official GStreamer 1.16 release.
         gst_dlls += [
             "avresample-4.dll",
+            "openh264-6.dll",
+            "opus-0.dll",
             "postproc-55.dll",
+            "srtp2-1.dll",
             "swscale-5.dll",
+            "usrsctp-1.dll",
             "x264-157.dll",
         ]
     else:
@@ -909,7 +915,6 @@ def package_gstreamer_dlls(env, servo_exe_dir, target, uwp):
         # with UWP's restrictions.
         gst_dlls += [
             "graphene-1.0-0.dll",
-            "libcrypto-1_1-x64.dll",
             "libgmp-10.dll",
             "libgnutls-30.dll",
             "libhogweed-4.dll",
@@ -918,7 +923,6 @@ def package_gstreamer_dlls(env, servo_exe_dir, target, uwp):
             "libogg-0.dll",
             "libopus-0.dll",
             "libpng16-16.dll",
-            "libssl-1_1-x64.dll",
             "libtasn1-6.dll",
             "libtheora-0.dll",
             "libtheoradec-1.dll",
@@ -927,7 +931,6 @@ def package_gstreamer_dlls(env, servo_exe_dir, target, uwp):
             "libvorbis-0.dll",
             "libvorbisenc-2.dll",
             "libwinpthread-1.dll",
-            "nice-10.dll",
         ]
 
     missing = []

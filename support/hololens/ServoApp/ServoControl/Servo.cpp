@@ -134,6 +134,21 @@ const char *prompt_input(const char *message, const char *default,
   }
 }
 
+void enable_pref(const char* prefName, std::vector<capi::CPref>& cprefs) {
+  static bool enabled = true;
+  capi::CPref cpref;
+  cpref.key = prefName;
+  cpref.pref_type = capi::CPrefType::Bool;
+  cpref.value = &enabled;
+  cprefs.push_back(cpref);
+}
+
+/*static std::string ToStdString(Platform::String ^ input)
+{
+  std::wstring w_str(input->Begin());
+  return std::string(w_str.begin(), w_str.end());
+}*/
+
 Servo::Servo(std::optional<hstring> initUrl, hstring args, GLsizei width,
              GLsizei height, EGLNativeWindowType eglNativeWindow, float dpi,
              ServoDelegate &aDelegate, bool transient)
@@ -191,14 +206,24 @@ Servo::Servo(std::optional<hstring> initUrl, hstring args, GLsizei width,
     setNonPersistentHomepage(OVERRIDE_DEFAULT_URL, cprefs);
 #endif
   }
+  
+  SetEnvironmentVariableA("GST_DEBUG", "6");
+  auto current = ApplicationData::Current();
+  auto logPath = std::wstring(current.LocalFolder().Path()) + L"\\gst.log";
+  OutputDebugStringA("gst log is ");
+  OutputDebugStringW(logPath.c_str());
+  OutputDebugStringA("\n");
+  SetEnvironmentVariable(L"GST_DEBUG_FILE", logPath.c_str());
 
   if (transient) {
-    capi::CPref cpref;
-    cpref.key = "dom.webxr.sessionavailable";
-    cpref.pref_type = capi::CPrefType::Bool;
-    cpref.value = &transient;
-    cprefs.push_back(cpref);
+    enable_pref("dom.webxr.sessionavailable", cprefs);
   }
+
+  enable_pref("dom.webrtc.enabled", cprefs);
+  enable_pref("dom.webrtc.transceiver.enabled", cprefs);
+  enable_pref("dom.gamepad.enabled", cprefs);
+  enable_pref("dom.svg.enabled", cprefs);
+  enable_pref("dom.canvas_capture.enabled", cprefs);
 
   capi::CPrefList prefsList = {cprefs.size(), cprefs.data()};
 
@@ -231,7 +256,7 @@ Servo::Servo(std::optional<hstring> initUrl, hstring args, GLsizei width,
 
   sServo = this; // FIXME;
 
-  auto current = ApplicationData::Current();
+  //auto current = ApplicationData::Current();
   auto filePath = std::wstring(current.LocalFolder().Path()) + L"\\stdout.txt";
   sLogHandle =
       CreateFile2(filePath.c_str(), GENERIC_WRITE, 0, CREATE_ALWAYS, nullptr);

@@ -33,8 +33,8 @@ GSTREAMER_DYLIBS = [
 ]
 
 NON_UWP_DYLIBS = [
-    "gstnet",
-    "gstsctp",
+    #"gstnet",
+    #"gstsctp",
 ]
 
 GSTREAMER_PLUGINS = [
@@ -43,6 +43,7 @@ GSTREAMER_PLUGINS = [
     ("gstaudioconvert", "gst-plugins-base"),
     ("gstaudiofx", "gst-plugins-good"),
     ("gstaudioparsers", "gst-plugins-good"),
+    ("gstaudiorate", "gst-plugins-base"),
     ("gstaudioresample", "gst-plugins-base"),
     ("gstautodetect", "gst-plugins-good"),
     ("gstcoreelements", "gstreamer"),
@@ -53,10 +54,11 @@ GSTREAMER_PLUGINS = [
     ("gstid3demux", "gst-plugins-good"),
     ("gstinterleave", "gst-plugins-good"),
     ("gstisomp4", "gst-plugins-good"),
-    ("gstlibav", "gst-libav"),
+    #("gstlibav", "gst-libav"),
     ("gstmatroska", "gst-plugins-good"),
     ("gstogg", "gst-plugins-base"),
     ("gstopengl", "gst-plugins-base"),
+    ("gstopenh264", "gst-plugins-bad"),
     ("gstopus", "gst-plugins-base"),
     ("gstplayback", "gst-plugins-base"),
     ("gstproxy", "gst-plugins-bad"),
@@ -67,6 +69,7 @@ GSTREAMER_PLUGINS = [
     ("gstvideoconvert", "gst-plugins-base"),
     ("gstvideofilter", "gst-plugins-good"),
     ("gstvideoparsersbad", "gst-plugins-bad"),
+    ("gstvideorate", "gst-plugins-base"),
     ("gstvideoscale", "gst-plugins-base"),
     ("gstvorbis", "gst-plugins-base"),
     ("gstvolume", "gst-plugins-base"),
@@ -75,8 +78,9 @@ GSTREAMER_PLUGINS = [
 ]
 
 WINDOWS_PLUGINS = [
+    "gstmediafoundation",
     "gstnice",
-    "gstwasapi",
+    "gstwasapi2",
 ]
 
 MACOS_PLUGINS = [
@@ -86,18 +90,18 @@ MACOS_PLUGINS = [
 ]
 
 NON_UWP_PLUGINS = [
-    "gstdtls",
+    #"gstdtls",
     "gstmatroska",
-    "gstnice",
+    #"gstnice",
     "gstogg",
     "gstopengl",
-    "gstopus",
-    "gstrtp",
-    "gstrtpmanager",
+    #"gstopus",
+    #"gstrtp",
+    #"gstrtpmanager",
     "gsttheora",
     "gstvorbis",
-    "gstvpx",
-    "gstwebrtc",
+    #"gstvpx",
+    #"gstwebrtc",
 ]
 
 
