@@ -5,4 +5,4 @@
 // For development purpose.
 // Will override shell.homepage preference:
 // #define OVERRIDE_DEFAULT_URL L"data:text/html,<input>"
-#define OVERRIDE_DEFAULT_URL L"https://webrtc.github.io/samples/"
+#define OVERRIDE_DEFAULT_URL L"https://hubs.mozilla.com/mB8Wn7L/talkative-simplistic-sphere"

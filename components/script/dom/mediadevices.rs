@@ -70,6 +70,9 @@ impl MediaDevicesMethods for MediaDevices {
         let global = self.global();
         let in_realm_proof = AlreadyInRealm::assert(&global);
         let p = Promise::new_in_current_realm(&global, InRealm::Already(&in_realm_proof));
+        
+        p.resolve_native(&Vec::<DomRoot<MediaDeviceInfo>>::new());
+        return p;
 
         // Step 2.
         // XXX These steps should be run in parallel.

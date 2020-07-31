@@ -54,7 +54,7 @@ GSTREAMER_PLUGINS = [
     ("gstid3demux", "gst-plugins-good"),
     ("gstinterleave", "gst-plugins-good"),
     ("gstisomp4", "gst-plugins-good"),
-    #("gstlibav", "gst-libav"),
+    ("gstlibav", "gst-libav"),
     ("gstmatroska", "gst-plugins-good"),
     ("gstogg", "gst-plugins-base"),
     ("gstopengl", "gst-plugins-base"),
@@ -78,7 +78,7 @@ GSTREAMER_PLUGINS = [
 ]
 
 WINDOWS_PLUGINS = [
-    "gstmediafoundation",
+    #"gstmediafoundation",
     "gstnice",
     "gstwasapi2",
 ]
