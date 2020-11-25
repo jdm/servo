@@ -1073,6 +1073,7 @@ where
         sandbox: IFrameSandboxState,
         is_private: bool,
         is_visible: bool,
+        name: String,
     ) {
         if self.shutting_down {
             return;
@@ -1178,6 +1179,7 @@ where
             player_context: self.player_context.clone(),
             event_loop_waker: self.event_loop_waker.as_ref().map(|w| (*w).clone_box()),
             user_agent: self.user_agent.clone(),
+            name,
         });
 
         let pipeline = match result {
@@ -1250,6 +1252,7 @@ where
         size: Size2D<f32, CSSPixel>,
         is_private: bool,
         is_visible: bool,
+        name: String,
     ) {
         debug!("Creating new browsing context {}", browsing_context_id);
         let bc_group_id = match self
@@ -1284,6 +1287,7 @@ where
             size,
             is_private,
             is_visible,
+            name,
         );
         self.browsing_contexts
             .insert(browsing_context_id, browsing_context);
@@ -1743,8 +1747,8 @@ where
             FromScriptMsg::ScriptLoadedURLInIFrame(load_info) => {
                 self.handle_script_loaded_url_in_iframe_msg(load_info);
             },
-            FromScriptMsg::ScriptNewIFrame(load_info, layout_sender) => {
-                self.handle_script_new_iframe(load_info, layout_sender);
+            FromScriptMsg::ScriptNewIFrame(load_info, name, layout_sender) => {
+                self.handle_script_new_iframe(load_info, name, layout_sender);
             },
             FromScriptMsg::ScriptNewAuxiliary(load_info, layout_sender) => {
                 self.handle_script_new_auxiliary(load_info, layout_sender);
@@ -1851,7 +1855,7 @@ where
                     .pipelines
                     .get(&pipeline_id)
                     .and_then(|pipeline| self.browsing_contexts.get(&pipeline.browsing_context_id))
-                    .map(|ctx| (ctx.id, ctx.parent_pipeline_id));
+                    .map(|ctx| (ctx.id, ctx.parent_pipeline_id, ctx.name.clone()));
                 if let Err(e) = sender.send(result) {
                     warn!(
                         "Sending reply to get browsing context info failed ({:?}).",
@@ -2925,6 +2929,7 @@ where
             sandbox,
             is_private,
             is_visible,
+            String::new(),
         );
         self.add_pending_change(SessionHistoryChange {
             top_level_browsing_context_id: top_level_browsing_context_id,
@@ -3062,6 +3067,7 @@ where
             sandbox,
             is_private,
             is_visible,
+            String::new(),
         );
         self.add_pending_change(SessionHistoryChange {
             top_level_browsing_context_id: top_level_browsing_context_id,
@@ -3072,6 +3078,7 @@ where
                 parent_pipeline_id: None,
                 is_private: is_private,
                 is_visible: is_visible,
+                name: String::new(),
             }),
             window_size,
         });
@@ -3251,6 +3258,7 @@ where
         );
 
         // Create the new pipeline, attached to the parent and push to pending changes
+        let name = browsing_context.name.clone();
         self.new_pipeline(
             new_pipeline_id,
             browsing_context_id,
@@ -3262,6 +3270,7 @@ where
             load_info.sandbox,
             is_private,
             browsing_context_is_visible,
+            name,
         );
         self.add_pending_change(SessionHistoryChange {
             top_level_browsing_context_id: top_level_browsing_context_id,
@@ -3277,6 +3286,7 @@ where
     fn handle_script_new_iframe(
         &mut self,
         load_info: IFrameLoadInfoWithData,
+        name: String,
         layout_sender: IpcSender<LayoutControlMsg>,
     ) {
         let IFrameLoadInfo {
@@ -3328,6 +3338,7 @@ where
                 parent_pipeline_id: Some(parent_pipeline_id),
                 is_private: is_private,
                 is_visible: is_parent_visible,
+                name,
             }),
             window_size: load_info.window_size.initial_viewport,
         });
@@ -3417,6 +3428,7 @@ where
                 parent_pipeline_id: None,
                 is_private: is_opener_private,
                 is_visible: is_opener_visible,
+                name: String::new(),
             }),
             window_size: self.window_size.initial_viewport,
         });
@@ -3518,7 +3530,7 @@ where
                 return None;
             },
         };
-        let (window_size, pipeline_id, parent_pipeline_id, is_private, is_visible) =
+        let (window_size, pipeline_id, parent_pipeline_id, is_private, is_visible, name) =
             match self.browsing_contexts.get(&browsing_context_id) {
                 Some(ctx) => (
                     ctx.size,
@@ -3526,6 +3538,7 @@ where
                     ctx.parent_pipeline_id,
                     ctx.is_private,
                     ctx.is_visible,
+                    ctx.name.clone(),
                 ),
                 None => {
                     // This should technically never happen (since `load_url` is
@@ -3605,6 +3618,7 @@ where
                     sandbox,
                     is_private,
                     is_visible,
+                    name,
                 );
                 self.add_pending_change(SessionHistoryChange {
                     top_level_browsing_context_id: top_level_browsing_context_id,
@@ -3882,6 +3896,7 @@ where
                     window_size,
                     is_private,
                     is_visible,
+                    name,
                 ) = match self.browsing_contexts.get(&browsing_context_id) {
                     Some(ctx) => (
                         ctx.top_level_id,
@@ -3890,6 +3905,7 @@ where
                         ctx.size,
                         ctx.is_private,
                         ctx.is_visible,
+                        ctx.name.clone(),
                     ),
                     None => return warn!("No browsing context to traverse!"),
                 };
@@ -3909,6 +3925,7 @@ where
                     sandbox,
                     is_private,
                     is_visible,
+                    name,
                 );
                 self.add_pending_change(SessionHistoryChange {
                     top_level_browsing_context_id: top_level_id,
@@ -4748,6 +4765,7 @@ where
                     change.window_size,
                     new_context_info.is_private,
                     new_context_info.is_visible,
+                    new_context_info.name.clone(),
                 );
                 self.update_activity(change.new_pipeline_id);
             },

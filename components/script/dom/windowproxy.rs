@@ -128,10 +128,8 @@ impl WindowProxy {
         parent: Option<&WindowProxy>,
         opener: Option<BrowsingContextId>,
         creator: CreatorBrowsingContextInfo,
+        name: DOMString,
     ) -> WindowProxy {
-        let name = frame_element.map_or(DOMString::new(), |e| {
-            e.get_string_attribute(&local_name!("name"))
-        });
         WindowProxy {
             reflector: Reflector::new(),
             browsing_context_id: browsing_context_id,
@@ -160,6 +158,7 @@ impl WindowProxy {
         parent: Option<&WindowProxy>,
         opener: Option<BrowsingContextId>,
         creator: CreatorBrowsingContextInfo,
+        name: DOMString,
     ) -> DomRoot<WindowProxy> {
         unsafe {
             let WindowProxyHandler(handler) = window.windowproxy_handler();
@@ -188,6 +187,7 @@ impl WindowProxy {
                 parent,
                 opener,
                 creator,
+                name,
             ));
 
             // The window proxy owns the browsing context.
@@ -220,6 +220,7 @@ impl WindowProxy {
         parent: Option<&WindowProxy>,
         opener: Option<BrowsingContextId>,
         creator: CreatorBrowsingContextInfo,
+        name: DOMString,
     ) -> DomRoot<WindowProxy> {
         unsafe {
             let handler = CreateWrapperProxyHandler(&XORIGIN_PROXY_HANDLER);
@@ -236,6 +237,7 @@ impl WindowProxy {
                 parent,
                 opener,
                 creator,
+                name,
             ));
 
             // Create a new dissimilar-origin window.
@@ -326,6 +328,7 @@ impl WindowProxy {
                 load_data: load_data,
                 pipeline_port: pipeline_receiver,
                 window_size: window.window_size(),
+                name: String::new(),
             };
             let constellation_msg = ScriptMsg::ScriptNewAuxiliary(load_info, pipeline_sender);
             window.send_to_constellation(constellation_msg);
@@ -443,6 +446,7 @@ impl WindowProxy {
                             None,
                             None,
                             creator,
+                            DOMString::new(), //XXXjdm
                         )
                     },
                     None => return NullValue(),

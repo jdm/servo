@@ -206,6 +206,9 @@ pub struct InitialPipelineState {
 
     /// User agent string to report in network requests.
     pub user_agent: Cow<'static, str>,
+
+    ///
+    pub name: String,
 }
 
 pub struct NewPipeline {
@@ -236,6 +239,7 @@ impl Pipeline {
                     load_data: state.load_data.clone(),
                     window_size: state.window_size,
                     pipeline_port: pipeline_port,
+                    name: state.name,
                 };
 
                 if let Err(e) =
@@ -309,6 +313,7 @@ impl Pipeline {
                     webxr_registry: state.webxr_registry,
                     player_context: state.player_context,
                     user_agent: state.user_agent,
+                    name: state.name,
                 };
 
                 // Spawn the child process.
@@ -518,6 +523,7 @@ pub struct UnprivilegedPipelineContent {
     webxr_registry: webxr_api::Registry,
     player_context: WindowGLContext,
     user_agent: Cow<'static, str>,
+    name: String,
 }
 
 impl UnprivilegedPipelineContent {
@@ -573,6 +579,7 @@ impl UnprivilegedPipelineContent {
                 layout_is_busy: layout_thread_busy_flag.clone(),
                 player_context: self.player_context.clone(),
                 event_loop_waker,
+                name: self.name.clone(),
             },
             self.load_data.clone(),
             self.opts.profile_script_events,

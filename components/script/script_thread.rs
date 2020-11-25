@@ -216,6 +216,7 @@ struct InProgressLoad {
     canceller: FetchCanceller,
     /// Flag for sharing with the layout thread that is not yet created.
     layout_is_busy: Arc<AtomicBool>,
+    name: DOMString,
 }
 
 impl InProgressLoad {
@@ -231,6 +232,7 @@ impl InProgressLoad {
         url: ServoUrl,
         origin: MutableOrigin,
         layout_is_busy: Arc<AtomicBool>,
+        name: DOMString,
     ) -> InProgressLoad {
         let current_time = get_time();
         let navigation_start_precise = precise_time_ns();
@@ -253,6 +255,7 @@ impl InProgressLoad {
             navigation_start_precise: navigation_start_precise,
             canceller: Default::default(),
             layout_is_busy: layout_is_busy,
+            name,
         }
     }
 }
@@ -782,6 +785,7 @@ impl ScriptThreadFactory for ScriptThread {
                 let window_size = state.window_size;
                 let layout_is_busy = state.layout_is_busy.clone();
 
+                let name = DOMString::from(state.name.clone());
                 let script_thread = ScriptThread::new(
                     state,
                     script_port,
@@ -816,6 +820,7 @@ impl ScriptThreadFactory for ScriptThread {
                     load_data.url.clone(),
                     origin,
                     layout_is_busy,
+                    name,
                 );
                 script_thread.pre_page_load(new_load, load_data);
 
@@ -2463,6 +2468,7 @@ impl ScriptThread {
             load_data,
             window_size,
             pipeline_port,
+            name,
         } = new_layout_info;
 
         let layout_pair = unbounded();
@@ -2523,6 +2529,7 @@ impl ScriptThread {
             load_data.url.clone(),
             origin,
             layout_is_busy.clone(),
+            DOMString::from(name),
         );
         if load_data.url.as_str() == "about:blank" {
             self.start_page_load_about_blank(new_load, load_data.js_eval_result);
@@ -2706,6 +2713,7 @@ impl ScriptThread {
                 // is no need to pass along existing opener information that
                 // will be discarded.
                 None,
+                DOMString::new(), //XXXjdm
             );
         }
     }
@@ -3067,7 +3075,7 @@ impl ScriptThread {
     fn ask_constellation_for_browsing_context_info(
         &self,
         pipeline_id: PipelineId,
-    ) -> Option<(BrowsingContextId, Option<PipelineId>)> {
+    ) -> Option<(BrowsingContextId, Option<PipelineId>, String)> {
         let (result_sender, result_receiver) = ipc::channel().unwrap();
         let msg = ScriptMsg::GetBrowsingContextInfo(pipeline_id, result_sender);
         self.script_sender
@@ -3106,7 +3114,7 @@ impl ScriptThread {
         pipeline_id: PipelineId,
         opener: Option<BrowsingContextId>,
     ) -> Option<DomRoot<WindowProxy>> {
-        let (browsing_context_id, parent_pipeline_id) =
+        let (browsing_context_id, parent_pipeline_id, name) =
             self.ask_constellation_for_browsing_context_info(pipeline_id)?;
         if let Some(window_proxy) = self.window_proxies.borrow().get(&browsing_context_id) {
             return Some(DomRoot::from_ref(window_proxy));
@@ -3135,6 +3143,7 @@ impl ScriptThread {
             parent_browsing_context.as_deref(),
             opener,
             creator,
+            DOMString::from(name),
         );
         self.window_proxies
             .borrow_mut()
@@ -3155,6 +3164,7 @@ impl ScriptThread {
         top_level_browsing_context_id: TopLevelBrowsingContextId,
         parent_info: Option<PipelineId>,
         opener: Option<BrowsingContextId>,
+        name: DOMString,
     ) -> DomRoot<WindowProxy> {
         if let Some(window_proxy) = self.window_proxies.borrow().get(&browsing_context_id) {
             // Note: we do not set the window to be the currently-active one,
@@ -3192,6 +3202,7 @@ impl ScriptThread {
             parent_browsing_context.as_deref(),
             opener,
             creator,
+            DOMString::from(name),
         );
         self.window_proxies
             .borrow_mut()
@@ -3299,6 +3310,7 @@ impl ScriptThread {
             incomplete.top_level_browsing_context_id,
             incomplete.parent_info,
             incomplete.opener,
+            incomplete.name,
         );
         if window_proxy.parent().is_some() {
             // https://html.spec.whatwg.org/multipage/#navigating-across-documents:delaying-load-events-mode-2

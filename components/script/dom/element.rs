@@ -2905,6 +2905,7 @@ impl VirtualMethods for Element {
                 // Keep the name in rare data for fast access
                 self.ensure_rare_data().name_attribute =
                     mutation.new_value(attr).and_then(|value| {
+                        println!("name: {}", value.to_string());
                         let value = value.as_atom();
                         if value != &atom!("") {
                             Some(value.clone())

@@ -27,6 +27,9 @@ pub struct NewBrowsingContextInfo {
     /// Whether this browsing context should be treated as visible for the
     /// purposes of scheduling and resource management.
     pub is_visible: bool,
+
+    ///
+    pub name: String,
 }
 
 /// The constellation's view of a browsing context.
@@ -65,6 +68,9 @@ pub struct BrowsingContext {
     /// All the pipelines that have been presented or will be presented in
     /// this browsing context.
     pub pipelines: HashSet<PipelineId>,
+
+    ///
+    pub name: String,
 }
 
 impl BrowsingContext {
@@ -79,6 +85,7 @@ impl BrowsingContext {
         size: Size2D<f32, CSSPixel>,
         is_private: bool,
         is_visible: bool,
+        name: String,
     ) -> BrowsingContext {
         let mut pipelines = HashSet::new();
         pipelines.insert(pipeline_id);
@@ -92,6 +99,7 @@ impl BrowsingContext {
             pipeline_id,
             parent_pipeline_id,
             pipelines,
+            name,
         }
     }
 

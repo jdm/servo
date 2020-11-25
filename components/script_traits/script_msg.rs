@@ -190,7 +190,7 @@ pub enum ScriptMsg {
     /// embedded and the parent pipeline id of that browsing context.
     GetBrowsingContextInfo(
         PipelineId,
-        IpcSender<Option<(BrowsingContextId, Option<PipelineId>)>>,
+        IpcSender<Option<(BrowsingContextId, Option<PipelineId>, String)>>,
     ),
     /// Get the nth child browsing context ID for a given browsing context, sorted in tree order.
     GetChildBrowsingContextId(
@@ -238,7 +238,7 @@ pub enum ScriptMsg {
     /// A load has been requested in an IFrame.
     ScriptLoadedURLInIFrame(IFrameLoadInfoWithData),
     /// A load of the initial `about:blank` has been completed in an IFrame.
-    ScriptNewIFrame(IFrameLoadInfoWithData, IpcSender<LayoutControlMsg>),
+    ScriptNewIFrame(IFrameLoadInfoWithData, String, IpcSender<LayoutControlMsg>),
     /// Script has opened a new auxiliary browsing context.
     ScriptNewAuxiliary(
         AuxiliaryBrowsingContextLoadInfo,

@@ -238,6 +238,8 @@ pub struct NewLayoutInfo {
     pub window_size: WindowSizeData,
     /// A port on which layout can receive messages from the pipeline.
     pub pipeline_port: IpcReceiver<LayoutControlMsg>,
+    ///
+    pub name: String,
 }
 
 /// When a pipeline is closed, should its browsing context be discarded too?
@@ -683,6 +685,8 @@ pub struct InitialScriptState {
     pub player_context: WindowGLContext,
     /// Mechanism to force the compositor to process events.
     pub event_loop_waker: Option<Box<dyn EventLoopWaker>>,
+    ///
+    pub name: String,
 }
 
 /// This trait allows creating a `ScriptThread` without depending on the `script`

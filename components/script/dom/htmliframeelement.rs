@@ -193,9 +193,17 @@ impl HTMLIFrameElement {
                     sandbox: sandboxed,
                     window_size,
                 };
+                //let name = self.GetContentWindow().map(|w| w.get_name().to_string()).unwrap_or_default();
+                let name = String::from(self.upcast::<Element>()
+                    .get_name()
+                    .map_or(DOMString::from(""), |n| DOMString::from(&*n)));
                 global_scope
                     .script_to_constellation_chan()
-                    .send(ScriptMsg::ScriptNewIFrame(load_info, pipeline_sender))
+                    .send(ScriptMsg::ScriptNewIFrame(
+                        load_info,
+                        name.clone(),
+                        pipeline_sender,
+                    ))
                     .unwrap();
 
                 let new_layout_info = NewLayoutInfo {
@@ -207,6 +215,7 @@ impl HTMLIFrameElement {
                     load_data: load_data,
                     pipeline_port: pipeline_receiver,
                     window_size,
+                    name,
                 };
 
                 self.pipeline_id.set(Some(new_pipeline_id));
@@ -261,7 +270,7 @@ impl HTMLIFrameElement {
         // Note: the spec says to set the name 'when the nested browsing context is created'.
         // The current implementation sets the name on the window,
         // when the iframe attributes are first processed.
-        if mode == ProcessingMode::FirstTime {
+        /*if mode == ProcessingMode::FirstTime {
             if let Some(window) = self.GetContentWindow() {
                 window.set_name(
                     self.upcast::<Element>()
@@ -269,7 +278,7 @@ impl HTMLIFrameElement {
                         .map_or(DOMString::from(""), |n| DOMString::from(&*n)),
                 );
             }
-        }
+        }*/
 
         // https://github.com/whatwg/html/issues/490
         if mode == ProcessingMode::FirstTime &&
