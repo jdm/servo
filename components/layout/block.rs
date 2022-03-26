@@ -858,7 +858,7 @@ impl BlockFlow {
         // is not correct behavior according to CSS 2.1 § 10.5. Instead I think we should treat the
         // root element as having `overflow: scroll` and use the layers-based scrolling
         // infrastructure to make it scrollable.
-        let viewport_size = LogicalSize::from_physical(
+        /*let viewport_size = LogicalSize::from_physical(
             self.fragment.style.writing_mode,
             shared_context.viewport_size(),
         );
@@ -868,7 +868,7 @@ impl BlockFlow {
         );
 
         self.base.position.size.block = block_size;
-        self.fragment.border_box.size.block = block_size;
+        self.fragment.border_box.size.block = block_size;*/
     }
 
     // FIXME: Record enough info to deal with fragmented decorations.
@@ -1179,13 +1179,13 @@ impl BlockFlow {
                 // but this is not correct behavior according to CSS 2.1 § 10.5. Instead I think we
                 // should treat the root element as having `overflow: scroll` and use the layers-
                 // based scrolling infrastructure to make it scrollable.
-                if is_root {
+                /*if is_root {
                     let viewport_size = LogicalSize::from_physical(
                         self.fragment.style.writing_mode,
                         layout_context.shared_context().viewport_size(),
                     );
                     block_size = max(viewport_size.block, block_size)
-                }
+                }*/
 
                 // Store the content block-size for use in calculating the absolute flow's
                 // dimensions later.
@@ -1194,17 +1194,9 @@ impl BlockFlow {
                 self.fragment.border_box.size.block = block_size;
             }
 
-            if self
-                .base
-                .flags
-                .contains(FlowFlags::IS_ABSOLUTELY_POSITIONED)
-            {
-                self.propagate_early_absolute_position_info_to_children();
-                return None;
-            }
-
             // Compute any explicitly-specified block size.
             // Can't use `for` because we assign to `candidate_block_size_iterator.candidate_value`.
+            debug!("container block size: {:?}", self.base.block_container_explicit_block_size);
             let mut candidate_block_size_iterator = CandidateBSizeIterator::new(
                 &self.fragment,
                 self.base.block_container_explicit_block_size,
@@ -1243,6 +1235,15 @@ impl BlockFlow {
             ));
             self.base.floats = floats;
             self.adjust_fragments_for_collapsed_margins_if_root(layout_context.shared_context());
+
+            if self
+                .base
+                .flags
+                .contains(FlowFlags::IS_ABSOLUTELY_POSITIONED)
+            {
+                //self.propagate_early_absolute_position_info_to_children();
+                return None;
+            }
         } else {
             // We don't need to reflow, but we still need to perform in-order traversals if
             // necessary.
@@ -1440,6 +1441,7 @@ impl BlockFlow {
     }
 
     fn calculate_absolute_block_size_and_margins(&mut self, shared_context: &SharedStyleContext) {
+        debug!("calculate_absolute_block_size_and_margins for flow {:x}", self.base.debug_id());
         let opaque_self = OpaqueFlow::from_flow(self);
         let containing_block_block_size = self
             .containing_block_size(&shared_context.viewport_size(), opaque_self)
@@ -1470,6 +1472,7 @@ impl BlockFlow {
                     MaybeAuto::from_style(position.block_start, containing_block_block_size);
                 block_end = MaybeAuto::from_style(position.block_end, containing_block_block_size);
             }
+            debug!("block_start: {:?}, block_end: {:?}", block_start, block_end);
 
             let available_block_size =
                 containing_block_block_size - self.fragment.border_padding.block_start_end();
@@ -1528,7 +1531,8 @@ impl BlockFlow {
             .flags
             .contains(FlowFlags::BLOCK_POSITION_IS_STATIC)
         {
-            self.base.position.start.b = solution.block_start + self.fragment.margin.block_start
+            self.base.position.start.b = solution.block_start + self.fragment.margin.block_start;
+            debug!("setting position block start to {:?}", self.base.position.start.b);
         }
 
         let block_size = solution.block_size + self.fragment.border_padding.block_start_end();
@@ -1608,6 +1612,7 @@ impl BlockFlow {
 
         let mut iterator = self.base.child_iter_mut().enumerate().peekable();
         while let Some((i, kid)) = iterator.next() {
+            debug!("{:x}: setting container block size to {:?}", kid.base().debug_id(), explicit_content_size);
             kid.mut_base().block_container_explicit_block_size = explicit_content_size;
 
             // The inline-start margin edge of the child flow is at our inline-start content edge,
@@ -2305,7 +2310,7 @@ impl Flow for BlockFlow {
         {
             // Root element margins should never be collapsed according to CSS § 8.3.1.
             debug!(
-                "assign_block_size: assigning block_size for root flow {:?}",
+                "assign_block_size: assigning block_size for root flow {:x}",
                 self.base().debug_id()
             );
             self.assign_block_size_block_base(
@@ -2315,7 +2320,7 @@ impl Flow for BlockFlow {
             )
         } else {
             debug!(
-                "assign_block_size: assigning block_size for block {:?}",
+                "assign_block_size: assigning block_size for block {:x}",
                 self.base().debug_id()
             );
             self.assign_block_size_block_base(

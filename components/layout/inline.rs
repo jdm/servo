@@ -1191,7 +1191,9 @@ impl InlineFlow {
         line: &Line,
         minimum_line_metrics: &LineMetrics,
         layout_context: &LayoutContext,
+        debug_id: usize,
     ) {
+        debug!("set_block_fragment_positions for {:x}", debug_id);
         for fragment_index in line.range.each_index() {
             let fragment = fragments.get_mut(fragment_index.to_usize());
             let line_metrics = LineMetrics::for_line_and_fragment(line, fragment, layout_context);
@@ -1669,6 +1671,7 @@ impl Flow for InlineFlow {
                 line,
                 &self.minimum_line_metrics,
                 layout_context,
+                self.base.debug_id(),
             );
 
             // This is used to set the block-start position of the next line in
