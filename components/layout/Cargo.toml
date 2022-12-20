@@ -3,7 +3,7 @@ name = "layout_2013"
 version = "0.0.1"
 authors = ["The Servo Project Developers"]
 license = "MPL-2.0"
-edition = "2018"
+edition = "2021"
 publish = false
 
 [lib]
@@ -31,7 +31,7 @@ malloc_size_of = { path = "../malloc_size_of" }
 msg = { path = "../msg" }
 net_traits = { path = "../net_traits" }
 num-traits = "0.2"
-parking_lot = "0.11"
+parking_lot = "0.12.1"
 profile_traits = { path = "../profile_traits" }
 range = { path = "../range" }
 rayon = "1"
@@ -50,7 +50,7 @@ style_traits = { path = "../style_traits" }
 unicode-bidi = { version = "0.3", features = ["with_serde"] }
 unicode-script = "0.5"
 webrender_api = { git = "https://github.com/servo/webrender" }
-xi-unicode = "0.1.0"
+xi-unicode = "0.3.0"
 
 [dev-dependencies]
 size_of_test = { path = "../size_of_test" }

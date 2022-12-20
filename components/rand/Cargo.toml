@@ -3,7 +3,7 @@ name = "servo_rand"
 version = "0.0.1"
 authors = ["The Servo Project Developers"]
 license = "MPL-2.0"
-edition = "2018"
+edition = "2021"
 publish = false
 
 [lib]
@@ -13,7 +13,7 @@ path = "lib.rs"
 [dependencies]
 lazy_static = "1"
 log = "0.4"
-rand = "0.7"
-rand_core = "0.5"
-rand_isaac = "0.2"
+rand = "0.8.5"
+rand_core = "0.6.4"
+rand_isaac = "0.3.0"
 uuid = "0.8"

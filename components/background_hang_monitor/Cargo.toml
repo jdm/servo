@@ -4,7 +4,7 @@ version = "0.0.1"
 authors = ["The Servo Project Developers"]
 license = "MPL-2.0"
 publish = false
-edition = "2018"
+edition = "2021"
 
 [lib]
 name = "background_hang_monitor"
@@ -28,5 +28,5 @@ lazy_static = "1.0"
 mach = "0.3"
 
 [target.'cfg(all(target_os = "linux", not(any(target_arch = "arm", target_arch = "aarch64"))))'.dependencies]
-nix = "0.14"
+nix = "0.26.1"
 unwind-sys = "0.1.1"

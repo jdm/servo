@@ -3,7 +3,7 @@ name = "canvas"
 version = "0.0.1"
 authors = ["The Servo Project Developers"]
 license = "MPL-2.0"
-edition = "2018"
+edition = "2021"
 publish = false
 
 [lib]
@@ -26,7 +26,7 @@ font-kit = "0.11"
 fnv = "1.0"
 gfx = { path = "../gfx" }
 gleam = "0.12"
-half = "1"
+half = "2.1.0"
 ipc-channel = "0.14"
 log = "0.4"
 lyon_geom = "0.14"
