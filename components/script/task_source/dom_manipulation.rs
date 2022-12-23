@@ -59,10 +59,10 @@ impl DOMManipulationTaskSource {
     ) {
         let target = Trusted::new(target);
         let task = EventTask {
-            target,
-            name,
-            bubbles,
-            cancelable,
+            target: target,
+            name: name,
+            bubbles: bubbles,
+            cancelable: cancelable,
         };
         let _ = self.queue(task, window.upcast());
     }

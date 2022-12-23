@@ -3,14 +3,14 @@ name = "servo_allocator"
 version = "0.0.1"
 authors = ["The Servo Project Developers"]
 license = "MPL-2.0"
-edition = "2021"
+edition = "2018"
 publish = false
 
 [lib]
 path = "lib.rs"
 
 [target.'cfg(not(windows))'.dependencies]
-jemalloc-sys = { version = "0.5.2+5.3.0-patched" }
+jemalloc-sys = { version = "0.3.2" }
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = ["heapapi"] }

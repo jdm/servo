@@ -118,10 +118,10 @@ impl Window {
         let height = win_size.to_untyped().height;
 
         let mut window_builder = winit::window::WindowBuilder::new()
-            .with_title("Servo")
+            .with_title("Servo".to_string())
             .with_decorations(!no_native_titlebar)
             .with_transparent(no_native_titlebar)
-            .with_inner_size(PhysicalSize::new(width, height))
+            .with_inner_size(PhysicalSize::new(width as f64, height as f64))
             .with_visible(visible);
 
         window_builder = builder_with_platform_options(window_builder);
