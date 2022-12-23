@@ -463,12 +463,13 @@ where
                 },
                 EmbedderMsg::Panic(_reason, _backtrace) => {},
                 EmbedderMsg::GetSelectedBluetoothDevice(devices, sender) => {
-                    let selected = platform_get_selected_devices(devices);
+                  /*  let selected = platform_get_selected_devices(devices);
                     if let Err(e) = sender.send(selected) {
                         let reason =
                             format!("Failed to send GetSelectedBluetoothDevice response: {}", e);
                         self.event_queue.push(WindowEvent::SendError(None, reason));
                     };
+                   */
                 },
                 EmbedderMsg::SelectFiles(patterns, multiple_files, sender) => {
                     let res = match (
@@ -553,8 +554,9 @@ fn prompt_user(_prompt: PermissionPrompt) -> PermissionRequest {
 }
 
 #[cfg(target_os = "linux")]
-fn platform_get_selected_devices(devices: Vec<String>) -> Option<String> {
-    thread::Builder::new()
+// tinyfiledialogs::list_dialog is gone :c
+fn platform_get_selected_devices(devices: Vec<String>)  {
+  /*  thread::Builder::new()
         .name("DevicePicker".to_owned())
         .spawn(move || {
             let dialog_rows: Vec<&str> = devices.iter().map(|s| s.as_ref()).collect();
@@ -571,6 +573,8 @@ fn platform_get_selected_devices(devices: Vec<String>) -> Option<String> {
         .unwrap()
         .join()
         .expect("Thread spawning failed")
+
+   */
 }
 
 #[cfg(not(target_os = "linux"))]

@@ -26,7 +26,7 @@ core-foundation = "0.6"
 winapi = "0.3.2"
 
 [target.'cfg(any(target_os = "linux", target_os = "dragonfly", target_os = "freebsd", target_os = "openbsd"))'.dependencies]
-libloading = "0.5"
+libloading = "0.7.4"
 
 [build-dependencies]
 gl_generator = "0.14"
