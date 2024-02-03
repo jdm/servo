@@ -213,6 +213,18 @@ impl webrender_api::RenderNotifier for RenderNotifier {
     }
 }
 
+struct SurfmanGLData(rendering_context::RenderingContext);
+
+impl webxr_api::MainThreadGLData<webxr::SurfmanGL> for SurfmanGLData {
+    fn device(&self) -> std::cell::Ref<<webxr::SurfmanGL as webxr_api::GLTypes>::Device> {
+        self.0.device()
+    }
+
+    fn context(&self) -> std::cell::Ref<<webxr::SurfmanGL as webxr_api::GLTypes>::Context> {
+        self.0.context()
+    }
+}
+
 pub struct InitializedServo<Window: WindowMethods + 'static + ?Sized> {
     pub servo: Servo<Window>,
     pub browser_id: TopLevelBrowsingContextId,
@@ -380,9 +392,15 @@ where
         // Set webrender external image handler for WebGL textures
         external_image_handlers.set_handler(image_handler, WebrenderImageHandlerType::WebGL);
 
+        let main_thread_gl = SurfmanGLData(rendering_context.clone());
+
         // Create the WebXR main thread
         let mut webxr_main_thread =
-            webxr::MainThreadRegistry::new(event_loop_waker, webxr_layer_grand_manager)
+            webxr::MainThreadRegistry::new(
+                event_loop_waker,
+                webxr_layer_grand_manager,
+                Box::new(main_thread_gl),
+            )
                 .expect("Failed to create WebXR device registry");
         if pref!(dom.webxr.enabled) {
             embedder.register_webxr(&mut webxr_main_thread, embedder_proxy.clone());

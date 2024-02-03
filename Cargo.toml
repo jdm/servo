@@ -141,3 +141,7 @@ debug-assertions = false
 #
 #     [patch."https://github.com/servo/<repository>"]
 #     <crate> = { path = "/path/to/local/checkout" }
+
+[patch."https://github.com/servo/webxr"]
+webxr-api = { git = "https://github.com/jdm/webxr", branch = "openxr-main-thread" }
+webxr  = { git = "https://github.com/jdm/webxr", branch = "openxr-main-thread" }

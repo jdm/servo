@@ -167,6 +167,10 @@ impl RenderingContext {
         self.0.device.borrow()
     }
 
+    pub fn context(&self) -> std::cell::Ref<Context> {
+        self.0.context.borrow()
+    }
+
     pub fn connection(&self) -> Connection {
         let ref device = self.0.device.borrow();
         device.connection()

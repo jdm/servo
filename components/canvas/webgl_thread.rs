@@ -3022,9 +3022,14 @@ impl FramebufferRebindingInfo {
     }
 }
 
+pub enum LayerManagerFactoryOrLayerManager {
+    Factory(WebXRLayerManagerFactory<WebXRSurfman>),
+    LayerManager(Box<dyn WebXRLayerManagerAPI<WebXRSurfman> + Send>),
+}
+
 /// Bridge between WebGL and WebXR
 pub(crate) struct WebXRBridge {
-    factory_receiver: crossbeam_channel::Receiver<WebXRLayerManagerFactory<WebXRSurfman>>,
+    factory_receiver: crossbeam_channel::Receiver<LayerManagerFactoryOrLayerManager>,
     managers: HashMap<WebXRLayerManagerId, Box<dyn WebXRLayerManagerAPI<WebXRSurfman>>>,
     next_manager_id: u32,
 }
@@ -3051,11 +3056,15 @@ impl WebXRBridge {
         device: &mut Device,
         contexts: &mut dyn WebXRContexts<WebXRSurfman>,
     ) -> Result<WebXRLayerManagerId, WebXRError> {
-        let factory = self
+        use self::LayerManagerFactoryOrLayerManager::*;
+        let factory_or_manager = self
             .factory_receiver
             .recv()
             .map_err(|_| WebXRError::CommunicationError)?;
-        let manager = factory.build(device, contexts)?;
+        let manager = match factory_or_manager {
+            Factory(factory) => factory.build(device, contexts)?,
+            LayerManager(manager) => manager,
+        };
         let manager_id = unsafe { WebXRLayerManagerId::new(self.next_manager_id) };
         self.next_manager_id = self.next_manager_id + 1;
         self.managers.insert(manager_id, manager);
@@ -3140,8 +3149,8 @@ impl WebXRBridge {
 
 pub(crate) struct WebXRBridgeInit {
     sender: WebGLSender<WebGLMsg>,
-    factory_receiver: crossbeam_channel::Receiver<WebXRLayerManagerFactory<WebXRSurfman>>,
-    factory_sender: crossbeam_channel::Sender<WebXRLayerManagerFactory<WebXRSurfman>>,
+    factory_receiver: crossbeam_channel::Receiver<LayerManagerFactoryOrLayerManager>,
+    factory_sender: crossbeam_channel::Sender<LayerManagerFactoryOrLayerManager>,
 }
 
 impl WebXRBridgeInit {
@@ -3170,7 +3179,7 @@ struct WebXRBridgeGrandManager {
     // Fortunately, the webgl thread runs in the same process as
     // the webxr threads, so we can use a crossbeam channel to send
     // factories.
-    factory_sender: crossbeam_channel::Sender<WebXRLayerManagerFactory<WebXRSurfman>>,
+    factory_sender: crossbeam_channel::Sender<LayerManagerFactoryOrLayerManager>,
 }
 
 impl WebXRLayerGrandManagerAPI<WebXRSurfman> for WebXRBridgeGrandManager {
@@ -3178,8 +3187,34 @@ impl WebXRLayerGrandManagerAPI<WebXRSurfman> for WebXRBridgeGrandManager {
         &self,
         factory: WebXRLayerManagerFactory<WebXRSurfman>,
     ) -> Result<WebXRLayerManager, WebXRError> {
+        self.wait_for_new_manager(move || {
+            let _ = self.factory_sender.send(LayerManagerFactoryOrLayerManager::Factory(factory));
+        })
+    }
+
+    fn create_layer_manager_from(
+        &self,
+        manager: Box<dyn WebXRLayerManagerAPI<WebXRSurfman> + Send>,
+    ) -> Result<WebXRLayerManager, WebXRError> {
+        self.wait_for_new_manager(move || {
+            let _ = self.factory_sender.send(LayerManagerFactoryOrLayerManager::LayerManager(manager));
+        })
+    }
+
+    fn clone_layer_grand_manager(&self) -> WebXRLayerGrandManager<WebXRSurfman> {
+        WebXRLayerGrandManager::new(WebXRBridgeGrandManager {
+            sender: self.sender.clone(),
+            factory_sender: self.factory_sender.clone(),
+        })
+    }
+}
+
+impl WebXRBridgeGrandManager {
+    fn wait_for_new_manager<F>(&self, setup: F) -> Result<WebXRLayerManager, WebXRError>
+        where F: FnOnce()
+    {
         let (sender, receiver) = webgl_channel().map_err(|_| WebXRError::CommunicationError)?;
-        let _ = self.factory_sender.send(factory);
+        setup();
         let _ = self
             .sender
             .send(WebGLMsg::WebXRCommand(WebXRCommand::CreateLayerManager(
@@ -3195,13 +3230,6 @@ impl WebXRLayerGrandManagerAPI<WebXRSurfman> for WebXRBridgeGrandManager {
             sender,
             layers,
         }))
-    }
-
-    fn clone_layer_grand_manager(&self) -> WebXRLayerGrandManager<WebXRSurfman> {
-        WebXRLayerGrandManager::new(WebXRBridgeGrandManager {
-            sender: self.sender.clone(),
-            factory_sender: self.factory_sender.clone(),
-        })
     }
 }
 
