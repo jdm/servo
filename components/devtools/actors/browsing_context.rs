@@ -100,6 +100,23 @@ struct PageErrorResource {
 }
 
 #[derive(Serialize)]
+struct NetworkUpdateMsg {
+    from: String,
+    #[serde(rename = "type")]
+    type_: String,
+    array: Vec<NetworkUpdateResource>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct NetworkUpdateResource {
+    actor: String,
+    stacktrace_resource_id: String,
+    cause: Option<String>,
+    resource_type: String,
+}
+
+#[derive(Serialize)]
 struct TabNavigated {
     from: String,
     #[serde(rename = "type")]
@@ -414,6 +431,23 @@ impl BrowsingContextActor {
             resources: vec![PageErrorResource {
                 page_error,
                 resource_type: "error-message".into(),
+            }],
+        };
+
+        for stream in self.streams.borrow_mut().values_mut() {
+            let _ = stream.write_json_packet(&msg);
+        }
+    }
+
+    pub(crate) fn network_event(&self, actor: String) {
+        let msg = NetworkUpdateMsg {
+            from: self.name(),
+            type_: "resources-available-array".into(),
+            resources: vec![NetworkUpdateResource {
+                actor,
+                stacktrace_resource_id: "".to_string(),
+                cause: None,
+                resource_type: "network-event".into(),
             }],
         };
 

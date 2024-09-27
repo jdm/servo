@@ -73,7 +73,7 @@ impl SessionContext {
                 ("local-storage", false),
                 ("session-storage", false),
                 ("platform-message", false),
-                ("network-event", false),
+                ("network-event", true),
                 ("network-event-stacktrace", false),
                 ("reflow", false),
                 ("stylesheet", false),
@@ -219,7 +219,7 @@ impl Actor for WatcherActor {
                         "document-event" => {
                             target.document_event(stream);
                         },
-                        "console-message" | "error-message" => {},
+                        "console-message" | "error-message" | "network-event" => {},
                         _ => warn!("resource {} not handled yet", resource),
                     }
 

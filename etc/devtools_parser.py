@@ -99,6 +99,9 @@ def read_data(file):
 
 # Transform the raw output of wireshark into a more manageable one
 def process_data(out, port):
+    print(out)
+    print()
+    print()
     out = [line.split("\t") for line in out.split("\n")]
 
     # Process fields
@@ -119,6 +122,9 @@ def process_data(out, port):
         try:
             dec = bytearray.fromhex(curr_data).decode()
         except UnicodeError:
+            continue
+        except ValueError:
+            print(f"Warning: Invalid hex data found: {curr_data}")
             continue
 
         indices = [m.span() for m in re.finditer(pattern, dec)]
@@ -144,6 +150,9 @@ def parse_message(msg):
 
     try:
         content = json.loads(data)
+        if not isinstance(content, dict):
+            print(f"Warning: ignoring packet with data {content}")
+            return
         if from_servo and "from" in content:
             print(colored(f"Actor: {content['from']}", 'yellow'))
         print(json.dumps(content, sort_keys=True, indent=4))

@@ -263,7 +263,7 @@ impl RootActor {
                 sources: false,
                 highlightable: true,
                 custom_highlighters: true,
-                network_monitor: false,
+                network_monitor: true,
             },
         }
     }

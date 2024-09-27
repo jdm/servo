@@ -336,7 +336,7 @@ impl Actor for ConsoleActor {
                 for str_type in str_types {
                     match str_type {
                         "PageError" => message_types.insert(CachedConsoleMessageTypes::PAGE_ERROR),
-                        "ConsoleAPI" => {
+                        "ConsoleAPI" | "LogMessage" => {
                             message_types.insert(CachedConsoleMessageTypes::CONSOLE_API)
                         },
                         s => debug!("unrecognized message type requested: \"{}\"", s),

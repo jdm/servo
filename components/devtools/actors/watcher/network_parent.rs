@@ -42,6 +42,11 @@ impl Actor for NetworkParentActor {
                 let _ = stream.write_json_packet(&msg);
                 ActorMessageStatus::Processed
             },
+            "setPersist" => {
+                let msg = EmptyReplyMsg { from: self.name() };
+                let _ = stream.write_json_packet(&msg);
+                ActorMessageStatus::Processed
+            }
             _ => ActorMessageStatus::Ignored,
         })
     }

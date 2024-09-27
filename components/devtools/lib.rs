@@ -459,6 +459,11 @@ fn run_server(
         let netevent_actor_name =
             find_network_event_actor(actors.clone(), actor_requests, request_id);
         let mut actors = actors.lock().unwrap();
+
+        let id = pipelines.get(&pipeline_id).unwrap();
+        let actor_name = browsing_contexts.get(id).unwrap();
+        actors.find::<BrowsingContextActor>(actor_name).network_event(netevent_actor_name.clone());
+
         let actor = actors.find_mut::<NetworkEventActor>(&netevent_actor_name);
 
         match network_event {
