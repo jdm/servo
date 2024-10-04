@@ -38,7 +38,7 @@ macro_rules! unsafe_no_jsmanaged_fields(
 /// Generated JS-Rust bindings.
 #[allow(missing_docs, non_snake_case)]
 pub mod codegen {
-    #[allow(dead_code/*, crown::unrooted_must_root*/)]
+    #[allow(dead_code, crown::unrooted_must_root)]
     pub mod Bindings {
         include!(concat!(env!("OUT_DIR"), "/Bindings/mod.rs"));
     }
