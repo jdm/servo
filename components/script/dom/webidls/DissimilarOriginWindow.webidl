@@ -30,4 +30,6 @@ interface DissimilarOriginWindow : GlobalScope {
   attribute any opener;
   undefined blur();
   undefined focus();
+
+  getter object (DOMString name);
 };

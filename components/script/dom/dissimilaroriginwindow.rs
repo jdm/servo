@@ -2,11 +2,14 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+use std::ptr::NonNull;
+
 use base::id::PipelineId;
 use dom_struct::dom_struct;
+use ipc_channel::ipc;
 use js::jsapi::{Heap, JSObject};
 use js::jsval::{JSVal, UndefinedValue};
-use js::rust::{CustomAutoRooter, CustomAutoRooterGuard, HandleValue};
+use js::rust::{CustomAutoRooter, CustomAutoRooterGuard, HandleValue, HandleObject, MutableHandleObject};
 use script_traits::{ScriptMsg, StructuredSerializedData};
 use servo_url::ServoUrl;
 
@@ -14,14 +17,16 @@ use crate::dom::bindings::codegen::Bindings::DissimilarOriginWindowBinding;
 use crate::dom::bindings::codegen::Bindings::DissimilarOriginWindowBinding::DissimilarOriginWindowMethods;
 use crate::dom::bindings::codegen::Bindings::WindowBinding::WindowPostMessageOptions;
 use crate::dom::bindings::error::{Error, ErrorResult};
+use crate::dom::bindings::reflector::DomObject;
 use crate::dom::bindings::root::{Dom, DomRoot, MutNullableDom};
-use crate::dom::bindings::str::USVString;
+use crate::dom::bindings::str::{DOMString, USVString};
 use crate::dom::bindings::structuredclone;
 use crate::dom::bindings::trace::RootedTraceableBox;
 use crate::dom::dissimilaroriginlocation::DissimilarOriginLocation;
 use crate::dom::globalscope::GlobalScope;
 use crate::dom::windowproxy::WindowProxy;
 use crate::script_runtime::JSContext;
+use crate::script_thread::ScriptThread;
 
 /// Represents a dissimilar-origin `Window` that exists in another script thread.
 ///
@@ -46,11 +51,11 @@ pub struct DissimilarOriginWindow {
 
 impl DissimilarOriginWindow {
     #[allow(unsafe_code)]
-    pub fn new(global_to_clone_from: &GlobalScope, window_proxy: &WindowProxy) -> DomRoot<Self> {
+    pub fn new(global_to_clone_from: &GlobalScope, window_proxy: &WindowProxy, pipeline_id: PipelineId) -> DomRoot<Self> {
         let cx = GlobalScope::get_cx();
         let win = Box::new(Self {
             globalscope: GlobalScope::new_inherited(
-                PipelineId::new(),
+                pipeline_id,
                 global_to_clone_from.devtools_chan().cloned(),
                 global_to_clone_from.mem_profiler_chan().clone(),
                 global_to_clone_from.time_profiler_chan().clone(),
@@ -121,7 +126,7 @@ impl DissimilarOriginWindowMethods for DissimilarOriginWindow {
     // https://html.spec.whatwg.org/multipage/#dom-length
     fn Length(&self) -> u32 {
         // TODO: Implement x-origin length
-        0
+        self.SupportedPropertyNames().len() as u32
     }
 
     // https://html.spec.whatwg.org/multipage/#dom-window-close
@@ -192,9 +197,53 @@ impl DissimilarOriginWindowMethods for DissimilarOriginWindow {
         self.location
             .or_init(|| DissimilarOriginLocation::new(self))
     }
+
+    fn SupportedPropertyNames(&self) -> Vec<DOMString> {
+        let (sender, receiver) = ipc::channel().unwrap();
+        let _ = self.globalscope.script_to_constellation_chan().send(
+            ScriptMsg::GetChildNavigables(
+                self.globalscope.pipeline_id(),
+                sender,
+                None,
+            )
+        );
+        receiver.recv().unwrap()
+            .into_iter()
+            .map(|navigable| DOMString::from(navigable.name))
+            .collect()
+    }
+
+    fn NamedGetter(&self, _cx: JSContext, name: DOMString) -> Option<NonNull<JSObject>> {
+        let (sender, receiver) = ipc::channel().unwrap();
+        let _ = self.globalscope.script_to_constellation_chan().send(
+            ScriptMsg::GetChildNavigables(
+                self.globalscope.pipeline_id(),
+                sender,
+                Some(name.to_string()),
+            )
+        );
+        let navigables = receiver.recv().unwrap();
+        let Some(navigable) = navigables.first() else { return None };
+        let Some(window_proxy) = ScriptThread::remote_window_proxy_(
+            &self.globalscope,
+            navigable.top_level_browsing_context_id,
+            navigable.pipeline_id,
+            navigable.opener,
+        ) else { return None };
+
+        Some(NonNull::new(*window_proxy.reflector().get_jsobject()).unwrap())
+    }
 }
 
 impl DissimilarOriginWindow {
+    /*pub fn create_named_properties_object(
+        cx: JSContext,
+        proto: HandleObject,
+        object: MutableHandleObject,
+    ) {
+        crate::window_named_properties::create(cx, proto, object)
+    }*/
+
     /// <https://html.spec.whatwg.org/multipage/#window-post-message-steps>
     fn post_message_impl(
         &self,

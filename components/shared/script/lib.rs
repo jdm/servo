@@ -65,7 +65,7 @@ use webrender_traits::{
 pub use crate::script_msg::{
     DOMMessage, EventResult, HistoryEntryReplacement, IFrameSizeMsg, Job, JobError, JobResult,
     JobResultValue, JobType, LayoutMsg, LogEntry, SWManagerMsg, SWManagerSenders, ScopeThings,
-    ScriptMsg, ServiceWorkerMsg, TraversalDirection,
+    ScriptMsg, ServiceWorkerMsg, TraversalDirection, ChildNavigable,
 };
 use crate::serializable::{BlobData, BlobImpl};
 use crate::transferable::MessagePortImpl;
@@ -221,6 +221,8 @@ pub struct NewLayoutInfo {
     pub load_data: LoadData,
     /// Information about the initial window size.
     pub window_size: WindowSizeData,
+    ///
+    pub frame_name: Option<String>,
 }
 
 /// When a pipeline is closed, should its browsing context be discarded too?
@@ -665,6 +667,8 @@ pub struct InitialScriptState {
     pub compositor_api: CrossProcessCompositorApi,
     /// Application window's GL Context for Media player
     pub player_context: WindowGLContext,
+    ///
+    pub frame_name: Option<String>,
 }
 
 /// This trait allows creating a `ServiceWorkerManager` without depending on the `script`
@@ -716,6 +720,8 @@ pub struct IFrameLoadInfo {
     /// Wether this load should replace the current entry (reload). If true, the current
     /// entry will be replaced instead of a new entry being added.
     pub replace: HistoryEntryReplacement,
+    ///
+    pub name: String,
 }
 
 /// Specifies the information required to load a URL in an iframe.

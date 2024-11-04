@@ -3321,7 +3321,7 @@ rooted!(in(*cx) let mut prototype_proto = ptr::null_mut::<JSObject>());
 {getPrototypeProto};
 assert!(!prototype_proto.is_null());""")]
 
-        if self.descriptor.hasNamedPropertiesObject():
+        if self.descriptor.hasNamedPropertiesObject() and self.descriptor.interface.identifier.name != "DissimilarOriginWindow":
             assert not self.haveUnscopables
             code.append(CGGeneric(f"""
 rooted!(in(*cx) let mut prototype_proto_proto = prototype_proto.get());

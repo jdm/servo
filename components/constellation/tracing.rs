@@ -129,6 +129,7 @@ mod from_script {
     impl LogTarget for script_traits::ScriptMsg {
         fn log_target(&self) -> &'static str {
             match self {
+                Self::GetChildNavigables(..) => target!("GetChildNavigables"),
                 Self::CompleteMessagePortTransfer(..) => target!("CompleteMessagePortTransfer"),
                 Self::MessagePortTransferResult(..) => target!("MessagePortTransferResult"),
                 Self::NewMessagePort(..) => target!("NewMessagePort"),

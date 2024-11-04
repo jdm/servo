@@ -98,6 +98,8 @@ pub struct Pipeline {
     /// The last compositor [`Epoch`] that was laid out in this pipeline if "exit after load" is
     /// enabled.
     pub layout_epoch: Epoch,
+
+    pub name: Option<String>,
 }
 
 /// Initial setup data needed to construct a pipeline.
@@ -198,6 +200,8 @@ pub struct InitialPipelineState {
 
     /// User agent string to report in network requests.
     pub user_agent: Cow<'static, str>,
+
+    pub name: Option<String>,
 }
 
 pub struct NewPipeline {
@@ -222,6 +226,7 @@ impl Pipeline {
                     opener: state.opener,
                     load_data: state.load_data.clone(),
                     window_size: state.window_size,
+                    frame_name: state.name.clone(),
                 };
 
                 if let Err(e) =
@@ -295,6 +300,7 @@ impl Pipeline {
                     webxr_registry: state.webxr_registry,
                     player_context: state.player_context,
                     user_agent: state.user_agent,
+                    frame_name: state.name.clone(),
                 };
 
                 // Spawn the child process.
@@ -332,6 +338,7 @@ impl Pipeline {
             state.compositor_proxy,
             state.prev_throttled,
             state.load_data,
+            state.name,
         );
         Ok(NewPipeline {
             pipeline,
@@ -350,6 +357,7 @@ impl Pipeline {
         compositor_proxy: CompositorProxy,
         throttled: bool,
         load_data: LoadData,
+        name: Option<String>,
     ) -> Pipeline {
         let pipeline = Pipeline {
             id,
@@ -367,6 +375,7 @@ impl Pipeline {
             completely_loaded: false,
             title: String::new(),
             layout_epoch: Epoch(0),
+            name,
         };
 
         pipeline.set_throttled(throttled);
@@ -499,6 +508,7 @@ pub struct UnprivilegedPipelineContent {
     webxr_registry: webxr_api::Registry,
     player_context: WindowGLContext,
     user_agent: Cow<'static, str>,
+    frame_name: Option<String>,
 }
 
 impl UnprivilegedPipelineContent {
@@ -544,6 +554,7 @@ impl UnprivilegedPipelineContent {
                 compositor_api: self.cross_process_compositor_api.clone(),
                 player_context: self.player_context.clone(),
                 inherited_secure_context: self.load_data.inherited_secure_context,
+                frame_name: self.frame_name,
             },
             layout_factory,
             Arc::new(self.system_font_service.to_proxy()),

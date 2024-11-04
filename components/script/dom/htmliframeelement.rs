@@ -87,6 +87,7 @@ pub struct HTMLIFrameElement {
     sandbox_allowance: Cell<Option<SandboxAllowance>>,
     load_blocker: DomRefCell<Option<LoadBlocker>>,
     throttled: Cell<bool>,
+    frozen_name: DomRefCell<DOMString>,
 }
 
 impl HTMLIFrameElement {
@@ -189,6 +190,7 @@ impl HTMLIFrameElement {
             is_private: false, // FIXME
             inherited_secure_context: load_data.inherited_secure_context,
             replace,
+            name: self.frozen_name.borrow().to_string(),
         };
 
         let window_size = WindowSizeData {
@@ -222,6 +224,7 @@ impl HTMLIFrameElement {
                     opener: None,
                     load_data,
                     window_size,
+                    frame_name: Some(self.frozen_name.borrow().to_string()),
                 };
 
                 self.pipeline_id.set(Some(new_pipeline_id));
@@ -278,7 +281,7 @@ impl HTMLIFrameElement {
         // Note: the spec says to set the name 'when the nested browsing context is created'.
         // The current implementation sets the name on the window,
         // when the iframe attributes are first processed.
-        if mode == ProcessingMode::FirstTime {
+        /*if mode == ProcessingMode::FirstTime {
             if let Some(window) = self.GetContentWindow() {
                 window.set_name(
                     self.upcast::<Element>()
@@ -286,7 +289,7 @@ impl HTMLIFrameElement {
                         .map_or(DOMString::from(""), |n| DOMString::from(&*n)),
                 );
             }
-        }
+        }*/
 
         if mode == ProcessingMode::FirstTime &&
             !self.upcast::<Element>().has_attribute(&local_name!("src"))
@@ -370,6 +373,11 @@ impl HTMLIFrameElement {
         //  - [load event handling for iframes with no src may not be web
         //    compatible #4965](https://github.com/whatwg/html/issues/4965)
         //
+
+        *self.frozen_name.borrow_mut() = self.upcast::<Element>()
+            .get_name()
+            .map_or(DOMString::from(""), |n| DOMString::from(&*n));
+
         let url = ServoUrl::parse("about:blank").unwrap();
         let document = document_from_node(self);
         let window = window_from_node(self);
@@ -395,6 +403,10 @@ impl HTMLIFrameElement {
             HistoryEntryReplacement::Disabled,
             can_gc,
         );
+
+        if let Some(window) = self.GetContentWindow() {
+            window.set_name(self.frozen_name.borrow().clone());
+        }
     }
 
     fn destroy_nested_browsing_context(&self) {
@@ -447,6 +459,7 @@ impl HTMLIFrameElement {
             sandbox_allowance: Cell::new(None),
             load_blocker: DomRefCell::new(None),
             throttled: Cell::new(false),
+            frozen_name: DomRefCell::new(DOMString::new()),
         }
     }
 

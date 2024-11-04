@@ -39,7 +39,8 @@ use servo_url::{ImmutableOrigin, ServoUrl};
 use style::attr::parse_integer;
 
 use crate::dom::bindings::cell::DomRefCell;
-use crate::dom::bindings::conversions::{root_from_handleobject, ToJSValConvertible};
+use crate::dom::bindings::codegen::Bindings::DissimilarOriginWindowBinding::DissimilarOriginWindowMethods;
+use crate::dom::bindings::conversions::{root_from_handleobject, root_from_object, jsid_to_string, ToJSValConvertible};
 use crate::dom::bindings::error::{throw_dom_exception, Error, Fallible};
 use crate::dom::bindings::inheritance::Castable;
 use crate::dom::bindings::proxyhandler::set_property_descriptor;
@@ -226,6 +227,7 @@ impl WindowProxy {
         parent: Option<&WindowProxy>,
         opener: Option<BrowsingContextId>,
         creator: CreatorBrowsingContextInfo,
+        pipeline_id: PipelineId,
     ) -> DomRoot<WindowProxy> {
         unsafe {
             let handler = WindowProxyHandler::x_origin_proxy_handler();
@@ -244,7 +246,7 @@ impl WindowProxy {
             ));
 
             // Create a new dissimilar-origin window.
-            let window = DissimilarOriginWindow::new(global_to_clone_from, &window_proxy);
+            let window = DissimilarOriginWindow::new(global_to_clone_from, &window_proxy, pipeline_id);
             let window_jsobject = window.reflector().get_jsobject();
             assert!(!window_jsobject.get().is_null());
             assert_ne!(
@@ -330,6 +332,7 @@ impl WindowProxy {
                 opener: Some(self.browsing_context_id),
                 load_data,
                 window_size: window.window_size(),
+                frame_name: None,
             };
             let constellation_msg = ScriptMsg::ScriptNewAuxiliary(load_info);
             window.send_to_constellation(constellation_msg);
@@ -445,6 +448,7 @@ impl WindowProxy {
                             None,
                             None,
                             creator,
+                            PipelineId::new(), //XXXjdm
                         )
                     },
                     None => return NullValue(),
@@ -689,7 +693,8 @@ impl WindowProxy {
             return debug!("Attempt to unset the currently active window on a windowproxy that does not have one.");
         }
         let globalscope = self.global();
-        let window = DissimilarOriginWindow::new(&globalscope, self);
+        //XXXjdm
+        let window = DissimilarOriginWindow::new(&globalscope, self, PipelineId::new());
         self.set_window(
             window.upcast(),
             WindowProxyHandler::x_origin_proxy_handler(),
@@ -855,10 +860,11 @@ unsafe fn GetSubframeWindowProxy(
     id: RawHandleId,
 ) -> Option<(DomRoot<WindowProxy>, u32)> {
     let index = get_array_index_from_id(cx, Handle::from_raw(id));
+    let mut slot = UndefinedValue();
+    GetProxyPrivate(*proxy, &mut slot);
+    rooted!(in(cx) let target = slot.to_object());
+
     if let Some(index) = index {
-        let mut slot = UndefinedValue();
-        GetProxyPrivate(*proxy, &mut slot);
-        rooted!(in(cx) let target = slot.to_object());
         if let Ok(win) = root_from_handleobject::<Window>(target.handle(), cx) {
             let browsing_context_id = win.window_proxy().browsing_context_id();
             let (result_sender, result_receiver) = ipc::channel().unwrap();
@@ -897,6 +903,19 @@ unsafe fn GetSubframeWindowProxy(
                 .and_then(ScriptThread::find_window_proxy)
                 .map(|proxy| (proxy, JSPROP_READONLY as u32));
         }
+    }
+
+    if let Ok(win) =
+        root_from_handleobject::<DissimilarOriginWindow>(target.handle(), cx)
+    {
+        let name = jsid_to_string(cx, Handle::from_raw(id))?;
+        return win.NamedGetter(SafeJSContext::from_ptr(cx), DOMString::from(name))
+            .map(|proxy| {
+                let mut slot = UndefinedValue();
+                GetProxyReservedSlot(proxy.as_ptr(), 0, &mut slot);
+                let this = slot.to_private() as *const WindowProxy;
+                (DomRoot::from_ref(&*this), JSPROP_READONLY as u32)
+            })
     }
 
     None
@@ -1175,6 +1194,13 @@ unsafe extern "C" fn has_xorigin(
     id: RawHandleId,
     bp: *mut bool,
 ) -> bool {
+    println!("has: {:?}", crate::dom::bindings::conversions::jsid_to_string(cx, Handle::from_raw(id)));
+    let window = GetSubframeWindowProxy(cx, proxy, id);
+    if window.is_some() {
+        *bp = true;
+        return true;
+    }
+
     let mut slot = UndefinedValue();
     GetProxyPrivate(*proxy.ptr, &mut slot);
     rooted!(in(cx) let target = slot.to_object());

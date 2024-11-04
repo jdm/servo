@@ -236,6 +236,8 @@ struct InProgressLoad {
     canceller: FetchCanceller,
     /// If inheriting the security context
     inherited_secure_context: Option<bool>,
+    ///
+    frame_name: Option<String>,
 }
 
 impl InProgressLoad {
@@ -251,6 +253,7 @@ impl InProgressLoad {
         url: ServoUrl,
         origin: MutableOrigin,
         inherited_secure_context: Option<bool>,
+        frame_name: Option<String>,
     ) -> InProgressLoad {
         let navigation_start = CrossProcessInstant::now();
         InProgressLoad {
@@ -267,6 +270,7 @@ impl InProgressLoad {
             navigation_start,
             canceller: Default::default(),
             inherited_secure_context,
+            frame_name,
         }
     }
 }
@@ -826,6 +830,7 @@ impl ScriptThreadFactory for ScriptThread {
                 let secure = load_data.inherited_secure_context;
                 let mem_profiler_chan = state.mem_profiler_chan.clone();
                 let window_size = state.window_size;
+                let frame_name = state.frame_name.clone();
 
                 let script_thread = ScriptThread::new(
                     state,
@@ -853,6 +858,7 @@ impl ScriptThreadFactory for ScriptThread {
                     load_data.url.clone(),
                     origin,
                     secure,
+                    frame_name,
                 );
                 script_thread.pre_page_load(new_load, load_data);
 
@@ -2886,6 +2892,7 @@ impl ScriptThread {
             opener,
             load_data,
             window_size,
+            frame_name,
         } = new_layout_info;
 
         // Kick off the fetch for the new resource.
@@ -2899,6 +2906,7 @@ impl ScriptThread {
             load_data.url.clone(),
             origin,
             load_data.inherited_secure_context,
+            frame_name,
         );
         if load_data.url.as_str() == "about:blank" {
             self.start_page_load_about_blank(new_load, load_data.js_eval_result);
@@ -3463,6 +3471,20 @@ impl ScriptThread {
             .expect("Failed to get top-level id from constellation.")
     }
 
+    pub fn remote_window_proxy_(
+        global_to_clone: &GlobalScope,
+        top_level_browsing_context_id: TopLevelBrowsingContextId,
+        pipeline_id: PipelineId,
+        opener: Option<BrowsingContextId>,
+    ) -> Option<DomRoot<WindowProxy>> {
+        with_script_thread(|script_thread| script_thread.remote_window_proxy(
+            global_to_clone,
+            top_level_browsing_context_id,
+            pipeline_id,
+            opener,
+        ))
+    }        
+
     // Get the browsing context for a pipeline that may exist in another
     // script thread.  If the browsing context already exists in the
     // `window_proxies` map, we return it, otherwise we recursively
@@ -3505,6 +3527,7 @@ impl ScriptThread {
             parent_browsing_context.as_deref(),
             opener,
             creator,
+            pipeline_id,
         );
         self.window_proxies
             .borrow_mut()
@@ -3697,6 +3720,9 @@ impl ScriptThread {
             incomplete.parent_info,
             incomplete.opener,
         );
+        if let Some(name) = incomplete.frame_name {
+            window_proxy.set_name(DOMString::from(name));
+        }
         if window_proxy.parent().is_some() {
             // https://html.spec.whatwg.org/multipage/#navigating-across-documents:delaying-load-events-mode-2
             // The user agent must take this nested browsing context

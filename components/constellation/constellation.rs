@@ -144,7 +144,7 @@ use script_traits::{
     PortMessageTask, SWManagerMsg, SWManagerSenders, ScriptMsg as FromScriptMsg,
     ScriptToConstellationChan, ServiceWorkerManagerFactory, ServiceWorkerMsg,
     StructuredSerializedData, TimerSchedulerMsg, TraversalDirection, UpdatePipelineIdReason,
-    WebDriverCommandMsg, WindowSizeData, WindowSizeType,
+    WebDriverCommandMsg, WindowSizeData, WindowSizeType, ChildNavigable,
 };
 use serde::{Deserialize, Serialize};
 use servo_config::{opts, pref};
@@ -922,6 +922,7 @@ where
         sandbox: IFrameSandboxState,
         is_private: bool,
         throttled: bool,
+        name: Option<String>,
     ) {
         if self.shutting_down {
             return;
@@ -1025,6 +1026,7 @@ where
             webxr_registry: self.webxr_registry.clone(),
             player_context: self.player_context.clone(),
             user_agent: self.user_agent.clone(),
+            name,
         });
 
         let pipeline = match result {
@@ -1563,6 +1565,9 @@ where
         };
 
         match content {
+            FromScriptMsg::GetChildNavigables(pipeline_id, sender, name) => {
+                self.handle_get_child_navigables(pipeline_id, sender, name);
+            },
             FromScriptMsg::CompleteMessagePortTransfer(router_id, ports) => {
                 self.handle_complete_message_port_transfer(router_id, ports);
             },
@@ -2104,6 +2109,35 @@ where
             },
             _ => warn!("Wrong message type in handle_wgpu_request"),
         }
+    }
+
+    fn handle_get_child_navigables(
+        &self,
+        pipeline_id: PipelineId,
+        sender: IpcSender<Vec<ChildNavigable>>,
+        name: Option<String>,
+    ) {
+        let mut children = vec![];
+        if let Some(pipeline) = self.pipelines.get(&pipeline_id) {
+            for child in &pipeline.children {
+                if let Some(bc) = self.browsing_contexts.get(&child) {
+                    if let Some(child_pipeline) = self.pipelines.get(&bc.pipeline_id) {
+                        println!("{:?} vs {:?}", name, child_pipeline.name);
+                        if name.is_some() && name != child_pipeline.name {
+                            continue;
+                        }
+                        let navigable = ChildNavigable {
+                            pipeline_id: bc.pipeline_id.clone(),
+                            top_level_browsing_context_id: bc.top_level_id.clone(),
+                            opener: child_pipeline.opener.clone(),
+                            name: child_pipeline.name.clone().unwrap_or_default(),
+                        };
+                        children.push(navigable);
+                    }
+                }
+            }
+        }
+        let _ = sender.send(children);
     }
 
     #[cfg_attr(
@@ -2915,6 +2949,7 @@ where
             sandbox,
             is_private,
             throttled,
+            None,
         );
         self.add_pending_change(SessionHistoryChange {
             top_level_browsing_context_id,
@@ -3065,6 +3100,7 @@ where
             sandbox,
             is_private,
             throttled,
+            None,
         );
         self.add_pending_change(SessionHistoryChange {
             top_level_browsing_context_id,
@@ -3231,6 +3267,7 @@ where
             new_pipeline_id,
             is_private,
             mut replace,
+            name,
             ..
         } = load_info.info;
 
@@ -3317,6 +3354,7 @@ where
             load_info.sandbox,
             is_private,
             browsing_context_throttled,
+            Some(name),
         );
         self.add_pending_change(SessionHistoryChange {
             top_level_browsing_context_id,
@@ -3373,6 +3411,7 @@ where
             self.compositor_proxy.clone(),
             is_parent_throttled,
             load_info.load_data,
+            None,
         );
 
         assert!(!self.pipelines.contains_key(&new_pipeline_id));
@@ -3435,6 +3474,7 @@ where
             self.compositor_proxy.clone(),
             is_opener_throttled,
             load_data,
+            None,
         );
 
         assert!(!self.pipelines.contains_key(&new_pipeline_id));
@@ -3687,6 +3727,7 @@ where
                     sandbox,
                     is_private,
                     is_throttled,
+                    None,
                 );
                 self.add_pending_change(SessionHistoryChange {
                     top_level_browsing_context_id,
@@ -4008,6 +4049,7 @@ where
                     sandbox,
                     is_private,
                     throttled,
+                    None, //XXXjdm
                 );
                 self.add_pending_change(SessionHistoryChange {
                     top_level_browsing_context_id: top_level_id,

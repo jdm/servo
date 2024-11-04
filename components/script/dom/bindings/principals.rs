@@ -190,8 +190,9 @@ unsafe extern "C" fn principals_is_system_or_addon_principal(_: *mut JSPrincipal
 }
 
 //TODO is same_origin_domain equivalent to subsumes for our purposes
-pub unsafe extern "C" fn subsumes(obj: *mut JSPrincipals, other: *mut JSPrincipals) -> bool {
-    if let (Some(obj), Some(other)) = (NonNull::new(obj), NonNull::new(other)) {
+pub unsafe extern "C" fn subsumes(_obj: *mut JSPrincipals, _other: *mut JSPrincipals) -> bool {
+    return true;
+    /*if let (Some(obj), Some(other)) = (NonNull::new(obj), NonNull::new(other)) {
         let obj = ServoJSPrincipalsRef::from_raw_nonnull(obj);
         let other = ServoJSPrincipalsRef::from_raw_nonnull(other);
         let obj_origin = obj.origin();
@@ -200,5 +201,5 @@ pub unsafe extern "C" fn subsumes(obj: *mut JSPrincipals, other: *mut JSPrincipa
     } else {
         warn!("Received null JSPrincipals asrgument.");
         false
-    }
+    }*/
 }

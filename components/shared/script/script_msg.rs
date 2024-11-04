@@ -257,6 +257,21 @@ pub enum ScriptMsg {
     GetWebGPUChan(IpcSender<Option<WebGPU>>),
     /// Notify the constellation of a pipeline's document's title.
     TitleChanged(PipelineId, String),
+    ///
+    GetChildNavigables(PipelineId, IpcSender<Vec<ChildNavigable>>, Option<String>),
+}
+
+///
+#[derive(Serialize, Deserialize)]
+pub struct ChildNavigable {
+    ///
+    pub name: String,
+    ///
+    pub pipeline_id: PipelineId,
+    ///
+    pub top_level_browsing_context_id: TopLevelBrowsingContextId,
+    ///
+    pub opener: Option<BrowsingContextId>,
 }
 
 impl fmt::Debug for ScriptMsg {
@@ -315,6 +330,7 @@ impl fmt::Debug for ScriptMsg {
             RequestAdapter(..) => "RequestAdapter",
             GetWebGPUChan(..) => "GetWebGPUChan",
             TitleChanged(..) => "TitleChanged",
+            GetChildNavigables(..) => "GetChildNavigables",
         };
         write!(formatter, "ScriptMsg::{}", variant)
     }
