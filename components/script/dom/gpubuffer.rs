@@ -288,7 +288,7 @@ impl GPUBufferMethods for GPUBuffer {
     }
 
     /// <https://gpuweb.github.io/gpuweb/#dom-gpubuffer-getmappedrange>
-    #[allow(unsafe_code)]
+    #[allow(unsafe_code, crown::unrooted_must_root)]
     fn GetMappedRange(
         &self,
         _cx: JSContext,

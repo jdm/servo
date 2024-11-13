@@ -48,7 +48,7 @@ impl CryptoMethods for Crypto {
         self.subtle.or_init(|| SubtleCrypto::new(&self.global()))
     }
 
-    #[allow(unsafe_code)]
+    #[allow(unsafe_code, crown::unrooted_must_root)]
     // https://w3c.github.io/webcrypto/#Crypto-method-getRandomValues
     fn GetRandomValues(
         &self,

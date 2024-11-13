@@ -7,7 +7,7 @@ use std::rc::Rc;
 use dom_struct::dom_struct;
 use ipc_channel::ipc::{self, IpcSender};
 use ipc_channel::router::ROUTER;
-use js::jsapi::Heap;
+use js::jsapi::HandleObject;
 use script_traits::ScriptMsg;
 use webgpu::wgt::PowerPreference;
 use webgpu::{wgc, WebGPUResponse};
@@ -158,7 +158,7 @@ impl AsyncWGPUListener for GPU {
                         "{} ({:?})",
                         adapter.adapter_info.name, adapter.adapter_id.0
                     )),
-                    Heap::default(),
+                    HandleObject::null(),
                     adapter.features,
                     adapter.limits,
                     adapter.adapter_info,

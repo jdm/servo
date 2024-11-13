@@ -162,12 +162,12 @@ pub unsafe fn create_global_object(
 
     // Initialize the reserved slots before doing anything that can GC, to
     // avoid getting trace hooks called on a partially initialized object.
-    let private_val = PrivateValue(private);
-    JS_SetReservedSlot(rval.get(), DOM_OBJECT_SLOT, &private_val);
+    rooted!(in(*cx) let private_val = PrivateValue(private));
+    JS_SetReservedSlot(rval.get(), DOM_OBJECT_SLOT, &*private_val);
     let proto_array: Box<ProtoOrIfaceArray> =
         Box::new([ptr::null_mut::<JSObject>(); PrototypeList::PROTO_OR_IFACE_LENGTH]);
-    let val = PrivateValue(Box::into_raw(proto_array) as *const libc::c_void);
-    JS_SetReservedSlot(rval.get(), DOM_PROTOTYPE_SLOT, &val);
+    rooted!(in(*cx) let val = PrivateValue(Box::into_raw(proto_array) as *const libc::c_void));
+    JS_SetReservedSlot(rval.get(), DOM_PROTOTYPE_SLOT, &*val);
 
     let _ac = JSAutoRealm::new(*cx, rval.get());
     JS_FireOnNewGlobalObject(*cx, rval.handle());

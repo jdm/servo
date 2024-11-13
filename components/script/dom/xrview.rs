@@ -94,6 +94,7 @@ impl XRViewMethods for XRView {
     }
 
     /// <https://immersive-web.github.io/webxr/#dom-xrview-projectionmatrix>
+    #[allow(crown::unrooted_must_root)]
     fn ProjectionMatrix(&self, _cx: JSContext) -> Float32Array {
         if !self.proj.is_initialized() {
             let cx = GlobalScope::get_cx();

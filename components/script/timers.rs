@@ -370,6 +370,7 @@ struct JsTimerEntry {
 //      to the function when calling it)
 // TODO: Handle rooting during invocation when movable GC is turned on
 #[derive(JSTraceable, MallocSizeOf)]
+#[crown::unrooted_must_root_lint::must_root]
 pub struct JsTimerTask {
     #[ignore_malloc_size_of = "Because it is non-owning"]
     handle: JsTimerHandle,
@@ -396,6 +397,7 @@ pub enum TimerCallback {
 }
 
 #[derive(Clone, JSTraceable, MallocSizeOf)]
+#[crown::unrooted_must_root_lint::must_root]
 enum InternalTimerCallback {
     StringTimerCallback(DOMString),
     FunctionTimerCallback(
@@ -416,8 +418,9 @@ impl Default for JsTimers {
 }
 
 impl JsTimers {
-    // see https://html.spec.whatwg.org/multipage/#timer-initialisation-steps
-    pub fn set_timeout_or_interval(
+    // see https://html.spec.whatwg.org/multipage/#timer-initialisation-steps 
+    #[allow(crown::unrooted_must_root)]
+   pub fn set_timeout_or_interval(
         &self,
         global: &GlobalScope,
         callback: TimerCallback,

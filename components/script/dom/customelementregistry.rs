@@ -1089,7 +1089,7 @@ impl CustomElementReactionStack {
     }
 
     /// <https://html.spec.whatwg.org/multipage/#enqueue-a-custom-element-callback-reaction>
-    #[allow(unsafe_code)]
+    #[allow(unsafe_code, crown::unrooted_must_root)]
     pub fn enqueue_callback_reaction(
         &self,
         element: &Element,

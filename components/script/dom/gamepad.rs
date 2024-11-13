@@ -266,7 +266,7 @@ impl Gamepad {
             .expect("Failed to set axes data on gamepad.")
     }
 
-    #[allow(unsafe_code)]
+    #[allow(unsafe_code, crown::unrooted_must_root)]
     /// <https://www.w3.org/TR/gamepad/#dfn-map-and-normalize-axes>
     pub fn map_and_normalize_axes(&self, axis_index: usize, value: f64) {
         // Let normalizedValue be 2 (logicalValue − logicalMinimum) / (logicalMaximum − logicalMinimum) − 1.

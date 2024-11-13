@@ -231,6 +231,7 @@ impl AudioBufferMethods for AudioBuffer {
     }
 
     // https://webaudio.github.io/web-audio-api/#dom-audiobuffer-getchanneldata
+    #[allow(crown::unrooted_must_root)] // Float32Array values need to be rooted
     fn GetChannelData(&self, cx: JSContext, channel: u32) -> Fallible<Float32Array> {
         if channel >= self.number_of_channels {
             return Err(Error::IndexSize);

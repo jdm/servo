@@ -85,6 +85,7 @@ unsafe fn gen_type_error(global: &GlobalScope, string: String) -> RethrowError {
 }
 
 #[derive(JSTraceable)]
+#[crown::unrooted_must_root_lint::must_root]
 pub struct ModuleObject(Box<Heap<*mut JSObject>>);
 
 impl ModuleObject {
@@ -163,6 +164,7 @@ impl ModuleIdentity {
 }
 
 #[derive(JSTraceable)]
+#[crown::unrooted_must_root_lint::must_root]
 pub struct ModuleTree {
     #[no_trace]
     url: ServoUrl,

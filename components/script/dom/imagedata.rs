@@ -56,7 +56,7 @@ impl ImageData {
         }
     }
 
-    #[allow(unsafe_code)]
+    #[allow(unsafe_code, crown::unrooted_must_root)]
     fn new_with_jsobject(
         global: &GlobalScope,
         proto: Option<HandleObject>,
@@ -155,7 +155,7 @@ impl ImageData {
     }
 
     /// Nothing must change the array on the JS side while the slice is live.
-    #[allow(unsafe_code)]
+    #[allow(unsafe_code, crown::unrooted_must_root)]
     pub unsafe fn as_slice(&self) -> &[u8] {
         assert!(self.data.is_initialized());
         let internal_data = self
@@ -208,6 +208,7 @@ impl ImageDataMethods for ImageData {
     }
 
     /// <https://html.spec.whatwg.org/multipage/#dom-imagedata-data>
+    #[allow(crown::unrooted_must_root)]
     fn GetData(&self, _: JSContext) -> Fallible<Uint8ClampedArray> {
         self.data.get_buffer().map_err(|_| Error::JSFailed)
     }

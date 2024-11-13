@@ -5,7 +5,7 @@
 use std::rc::Rc;
 
 use dom_struct::dom_struct;
-use js::jsapi::{Heap, JSObject};
+use js::jsapi::{Heap, JSObject, HandleObject};
 use webgpu::wgc::instance::RequestDeviceError;
 use webgpu::wgt::MemoryHints;
 use webgpu::{wgt, WebGPU, WebGPUAdapter, WebGPURequest, WebGPUResponse};
@@ -49,7 +49,6 @@ impl GPUAdapter {
     fn new_inherited(
         channel: WebGPU,
         name: DOMString,
-        extensions: Heap<*mut JSObject>,
         features: &GPUSupportedFeatures,
         limits: &GPUSupportedLimits,
         info: &GPUAdapterInfo,
@@ -59,7 +58,7 @@ impl GPUAdapter {
             reflector_: Reflector::new(),
             channel,
             name,
-            extensions,
+            extensions: Heap::default(),
             features: Dom::from_ref(features),
             limits: Dom::from_ref(limits),
             info: Dom::from_ref(info),
@@ -72,7 +71,7 @@ impl GPUAdapter {
         global: &GlobalScope,
         channel: WebGPU,
         name: DOMString,
-        extensions: Heap<*mut JSObject>,
+        extensions: HandleObject,
         features: wgt::Features,
         limits: wgt::Limits,
         info: wgt::AdapterInfo,
@@ -82,12 +81,14 @@ impl GPUAdapter {
         let features = GPUSupportedFeatures::Constructor(global, None, features, can_gc).unwrap();
         let limits = GPUSupportedLimits::new(global, limits);
         let info = GPUAdapterInfo::new(global, info);
-        reflect_dom_object(
+        let obj = reflect_dom_object(
             Box::new(GPUAdapter::new_inherited(
-                channel, name, extensions, &features, &limits, &info, adapter,
+                channel, name, &features, &limits, &info, adapter,
             )),
             global,
-        )
+        );
+        obj.extensions.set(*extensions);
+        obj
     }
 }
 
@@ -213,7 +214,7 @@ impl AsyncWGPUListener for GPUAdapter {
                     &self.global(),
                     self.channel.clone(),
                     self,
-                    Heap::default(),
+                    HandleObject::null(),
                     descriptor.required_features,
                     descriptor.required_limits,
                     device_id,
@@ -237,7 +238,7 @@ impl AsyncWGPUListener for GPUAdapter {
                     &self.global(),
                     self.channel.clone(),
                     self,
-                    Heap::default(),
+                    HandleObject::null(),
                     wgt::Features::default(),
                     wgt::Limits::default(),
                     device_id,

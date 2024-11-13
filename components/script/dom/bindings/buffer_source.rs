@@ -25,6 +25,7 @@ use crate::script_runtime::JSContext;
 
 /// <https://webidl.spec.whatwg.org/#BufferSource>
 #[allow(dead_code)]
+#[crown::unrooted_must_root_lint::must_root]
 pub enum BufferSource {
     Int8Array(Box<Heap<*mut JSObject>>),
     Int16Array(Box<Heap<*mut JSObject>>),
@@ -42,6 +43,7 @@ pub enum BufferSource {
     Default(Box<Heap<*mut JSObject>>),
 }
 
+#[crown::unrooted_must_root_lint::must_root]
 pub struct HeapBufferSource<T> {
     buffer_source: BufferSource,
     phantom: PhantomData<T>,
@@ -71,6 +73,7 @@ unsafe impl<T> crate::dom::bindings::trace::JSTraceable for HeapBufferSource<T> 
     }
 }
 
+#[allow(crown::unrooted_must_root)]
 pub fn new_initialized_heap_buffer_source<T>(
     init: HeapTypedArrayInit,
 ) -> Result<HeapBufferSource<T>, ()>
@@ -116,6 +119,7 @@ where
     Ok(heap_buffer_source)
 }
 
+#[crown::unrooted_must_root_lint::must_root]
 pub enum HeapTypedArrayInit {
     Buffer(BufferSource),
     Info { len: u32, cx: JSContext },
@@ -126,6 +130,7 @@ where
     T: TypedArrayElement + TypedArrayElementCreator,
     T::Element: Clone + Copy,
 {
+    #[allow(crown::unrooted_must_root)]
     pub fn default() -> HeapBufferSource<T> {
         HeapBufferSource {
             buffer_source: BufferSource::Default(Box::default()),
@@ -133,6 +138,7 @@ where
         }
     }
 
+    #[allow(crown::unrooted_must_root)]
     pub fn set_data(&self, cx: JSContext, data: &[T::Element]) -> Result<(), ()> {
         rooted!(in (*cx) let mut array = ptr::null_mut::<JSObject>());
         let _: TypedArray<T, *mut JSObject> = create_buffer_source(cx, data, array.handle_mut())?;
@@ -343,6 +349,7 @@ where
         }
     }
 
+    #[allow(crown::unrooted_must_root)]
     pub fn get_buffer(&self) -> Result<TypedArray<T, *mut JSObject>, ()> {
         TypedArray::from(match &self.buffer_source {
             BufferSource::Int8Array(buffer) |
@@ -362,6 +369,7 @@ where
         })
     }
 
+    #[allow(crown::unrooted_must_root)]
     pub fn buffer_to_option(&self) -> Option<TypedArray<T, *mut JSObject>> {
         if self.is_initialized() {
             Some(self.get_buffer().expect("Failed to get buffer."))
@@ -373,6 +381,7 @@ where
 }
 
 /// <https://webidl.spec.whatwg.org/#arraybufferview-create>
+#[allow(crown::unrooted_must_root)]
 pub fn create_buffer_source<T>(
     cx: JSContext,
     data: &[T::Element],
@@ -390,6 +399,7 @@ where
     }
 }
 
+#[allow(crown::unrooted_must_root)]
 fn create_buffer_source_with_length<T>(
     cx: JSContext,
     len: usize,
@@ -408,6 +418,7 @@ where
 }
 
 #[derive(JSTraceable, MallocSizeOf)]
+#[crown::unrooted_must_root_lint::must_root]
 pub struct DataBlock {
     #[ignore_malloc_size_of = "Arc"]
     data: Arc<Box<[u8]>>,
@@ -485,6 +496,7 @@ impl DataBlock {
 }
 
 #[derive(JSTraceable, MallocSizeOf)]
+#[crown::unrooted_must_root_lint::must_root]
 pub struct DataView {
     #[no_trace]
     range: Range<usize>,
@@ -493,6 +505,7 @@ pub struct DataView {
 }
 
 impl DataView {
+    #[allow(crown::unrooted_must_root)]
     pub fn array_buffer(&self) -> ArrayBuffer {
         unsafe { ArrayBuffer::from(self.buffer.underlying_object().get()).unwrap() }
     }

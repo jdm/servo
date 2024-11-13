@@ -413,6 +413,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "bindgen"
+version = "0.70.1"
+source = "git+https://github.com/rust-lang/rust-bindgen/#2269982ab9a921a4d3e57d92090c8703b34fdd33"
+dependencies = [
+ "bitflags 2.6.0",
+ "cexpr",
+ "clang-sys",
+ "itertools 0.10.5",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "rustc-hash",
+ "shlex",
+ "syn",
+]
+
+[[package]]
 name = "bit-set"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4423,7 +4440,7 @@ version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77f793a01513d52fdaeaa687359ce3a9f032fe5cc60ce542744ff04f08b3925e"
 dependencies = [
- "bindgen",
+ "bindgen 0.69.5",
  "cc",
  "gl_generator",
  "lazy_static",
@@ -4434,9 +4451,8 @@ dependencies = [
 [[package]]
 name = "mozjs"
 version = "0.14.1"
-source = "git+https://github.com/servo/mozjs#8526195dce129d2ccd83e7e1e5d03a954c11fafe"
 dependencies = [
- "bindgen",
+ "bindgen 0.70.1",
  "cc",
  "lazy_static",
  "libc",
@@ -4447,9 +4463,8 @@ dependencies = [
 [[package]]
 name = "mozjs_sys"
 version = "0.128.3-4"
-source = "git+https://github.com/servo/mozjs#8526195dce129d2ccd83e7e1e5d03a954c11fafe"
 dependencies = [
- "bindgen",
+ "bindgen 0.70.1",
  "cc",
  "encoding_c",
  "encoding_c_mem",

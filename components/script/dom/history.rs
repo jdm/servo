@@ -51,18 +51,18 @@ pub struct History {
 
 impl History {
     pub fn new_inherited(window: &Window) -> History {
-        let state = Heap::default();
-        state.set(NullValue());
         History {
             reflector_: Reflector::new(),
             window: Dom::from_ref(window),
-            state,
+            state: Heap::default(),
             state_id: Cell::new(None),
         }
     }
 
     pub fn new(window: &Window) -> DomRoot<History> {
-        reflect_dom_object(Box::new(History::new_inherited(window)), window)
+        let obj = reflect_dom_object(Box::new(History::new_inherited(window)), window);
+        obj.state.set(NullValue());
+        obj
     }
 }
 

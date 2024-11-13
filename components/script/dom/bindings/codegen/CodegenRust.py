@@ -2899,12 +2899,11 @@ ensure_expando_object(*cx, obj.handle().into(), expando.handle_mut());
     else:
         copyFunc = "JS_InitializePropertiesFromCompatibleNativeObject"
     copyCode += f"""
-let mut slot = UndefinedValue();
-JS_GetReservedSlot(canonical_proto.get(), DOM_PROTO_UNFORGEABLE_HOLDER_SLOT, &mut slot);
+rooted!(in(*cx) let mut slot = UndefinedValue());
+JS_GetReservedSlot(canonical_proto.get(), DOM_PROTO_UNFORGEABLE_HOLDER_SLOT, &mut *slot.handle_mut());
 rooted!(in(*cx) let mut unforgeable_holder = ptr::null_mut::<JSObject>());
 unforgeable_holder.handle_mut().set(slot.to_object());
-assert!({copyFunc}(*cx, {obj}.handle(), unforgeable_holder.handle()));
-"""
+assert!({copyFunc}(*cx, {obj}.handle(), unforgeable_holder.handle()));"""
 
     return copyCode
 
@@ -3514,8 +3513,8 @@ assert!(!unforgeable_holder.is_null());
 """))
             code.append(InitLegacyUnforgeablePropertiesOnHolder(self.descriptor, self.properties))
             code.append(CGGeneric("""\
-let val = ObjectValue(unforgeable_holder.get());
-JS_SetReservedSlot(prototype.get(), DOM_PROTO_UNFORGEABLE_HOLDER_SLOT, &val)"""))
+rooted!(in(*cx) let val = ObjectValue(unforgeable_holder.get()));
+JS_SetReservedSlot(prototype.get(), DOM_PROTO_UNFORGEABLE_HOLDER_SLOT, &*val)"""))
 
         return CGList(code, "\n")
 
@@ -5631,7 +5630,8 @@ class CGProxyUnwrap(CGAbstractMethod):
         args = [Argument('RawHandleObject', 'obj')]
         CGAbstractMethod.__init__(self, descriptor, "UnwrapProxy",
                                   f'*const {descriptor.concreteType}', args,
-                                  alwaysInline=True, unsafe=True)
+                                  alwaysInline=True, unsafe=True,
+                                  extra_decorators=["#[allow(crown::unrooted_must_root)]"])
 
     def definition_body(self):
         return CGGeneric(f"""

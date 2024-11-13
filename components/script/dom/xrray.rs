@@ -136,6 +136,7 @@ impl XRRayMethods for XRRay {
     }
 
     /// <https://immersive-web.github.io/hit-test/#dom-xrray-matrix>
+    #[allow(crown::unrooted_must_root)]
     fn Matrix(&self, _cx: JSContext) -> Float32Array {
         // https://immersive-web.github.io/hit-test/#xrray-obtain-the-matrix
         if !self.matrix.is_initialized() {

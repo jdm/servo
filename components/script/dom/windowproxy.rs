@@ -851,7 +851,7 @@ fn parse_open_feature_boolean(tokenized_features: &IndexMap<String, String>, nam
 // This is only called from extern functions,
 // there's no use using the lifetimed handles here.
 // https://html.spec.whatwg.org/multipage/#accessing-other-browsing-contexts
-#[allow(unsafe_code, non_snake_case)]
+#[allow(unsafe_code, non_snake_case, crown::unrooted_must_root)]
 unsafe fn GetSubframeWindowProxy(
     cx: *mut JSContext,
     proxy: RawHandleObject,
@@ -905,7 +905,7 @@ unsafe fn GetSubframeWindowProxy(
     None
 }
 
-#[allow(unsafe_code, non_snake_case)]
+#[allow(unsafe_code, non_snake_case, crown::unrooted_must_root)]
 unsafe extern "C" fn getOwnPropertyDescriptor(
     cx: *mut JSContext,
     proxy: RawHandleObject,
@@ -932,7 +932,7 @@ unsafe extern "C" fn getOwnPropertyDescriptor(
     return JS_GetOwnPropertyDescriptorById(cx, target.handle().into(), id, desc, is_none);
 }
 
-#[allow(unsafe_code, non_snake_case)]
+#[allow(unsafe_code, non_snake_case, crown::unrooted_must_root)]
 unsafe extern "C" fn defineProperty(
     cx: *mut JSContext,
     proxy: RawHandleObject,
@@ -955,7 +955,7 @@ unsafe extern "C" fn defineProperty(
     JS_DefinePropertyById(cx, target.handle().into(), id, desc, res)
 }
 
-#[allow(unsafe_code)]
+#[allow(unsafe_code, crown::unrooted_must_root)]
 unsafe extern "C" fn has(
     cx: *mut JSContext,
     proxy: RawHandleObject,
@@ -980,7 +980,7 @@ unsafe extern "C" fn has(
     true
 }
 
-#[allow(unsafe_code)]
+#[allow(unsafe_code, crown::unrooted_must_root)]
 unsafe extern "C" fn get(
     cx: *mut JSContext,
     proxy: RawHandleObject,
@@ -1000,7 +1000,7 @@ unsafe extern "C" fn get(
     JS_ForwardGetPropertyTo(cx, target.handle().into(), id, receiver, vp)
 }
 
-#[allow(unsafe_code)]
+#[allow(unsafe_code, crown::unrooted_must_root)]
 unsafe extern "C" fn set(
     cx: *mut JSContext,
     proxy: RawHandleObject,
@@ -1171,7 +1171,7 @@ unsafe fn throw_security_error(cx: *mut JSContext, realm: InRealm) -> bool {
     false
 }
 
-#[allow(unsafe_code)]
+#[allow(unsafe_code, crown::unrooted_must_root)]
 unsafe extern "C" fn has_xorigin(
     cx: *mut JSContext,
     proxy: RawHandleObject,
@@ -1299,7 +1299,7 @@ static XORIGIN_PROXY_TRAPS: ProxyTraps = ProxyTraps {
 
 // How WindowProxy objects are garbage collected.
 
-#[allow(unsafe_code)]
+#[allow(unsafe_code, crown::unrooted_must_root)]
 unsafe extern "C" fn finalize(_fop: *mut GCContext, obj: *mut JSObject) {
     let mut slot = UndefinedValue();
     GetProxyReservedSlot(obj, 0, &mut slot);
@@ -1316,7 +1316,7 @@ unsafe extern "C" fn finalize(_fop: *mut GCContext, obj: *mut JSObject) {
     let _ = Box::from_raw(this);
 }
 
-#[allow(unsafe_code)]
+#[allow(unsafe_code, crown::unrooted_must_root)]
 unsafe extern "C" fn trace(trc: *mut JSTracer, obj: *mut JSObject) {
     let mut slot = UndefinedValue();
     GetProxyReservedSlot(obj, 0, &mut slot);

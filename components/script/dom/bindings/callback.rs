@@ -185,7 +185,8 @@ impl CallbackInterface {
 
     /// Returns the property with the given `name`, if it is a callable object,
     /// or an error otherwise.
-    pub fn get_callable_property(&self, cx: JSContext, name: &str) -> Fallible<JSVal> {
+    #[allow(crown::unrooted_must_root)] // This should use an outparam instead.
+    pub fn get_callable_property(&self, cx: JSContext, name: &str, ) -> Fallible<JSVal> {
         rooted!(in(*cx) let mut callable = UndefinedValue());
         rooted!(in(*cx) let obj = self.callback_holder().get());
         unsafe {

@@ -51,6 +51,7 @@ impl GamepadPose {
 
 impl GamepadPoseMethods for GamepadPose {
     // https://w3c.github.io/gamepad/extensions.html#dom-gamepadpose-position
+    #[allow(crown::unrooted_must_root)]
     fn GetPosition(&self, _cx: JSContext) -> Option<Float32Array> {
         self.position.buffer_to_option()
     }
@@ -61,16 +62,19 @@ impl GamepadPoseMethods for GamepadPose {
     }
 
     // https://w3c.github.io/gamepad/extensions.html#dom-gamepadpose-linearvelocity
+    #[allow(crown::unrooted_must_root)]
     fn GetLinearVelocity(&self, _cx: JSContext) -> Option<Float32Array> {
         self.linear_vel.buffer_to_option()
     }
 
     // https://w3c.github.io/gamepad/extensions.html#dom-gamepadpose-linearacceleration
+    #[allow(crown::unrooted_must_root)]
     fn GetLinearAcceleration(&self, _cx: JSContext) -> Option<Float32Array> {
         self.linear_acc.buffer_to_option()
     }
 
     // https://w3c.github.io/gamepad/extensions.html#dom-gamepadpose-orientation
+    #[allow(crown::unrooted_must_root)]
     fn GetOrientation(&self, _cx: JSContext) -> Option<Float32Array> {
         self.orientation.buffer_to_option()
     }
@@ -81,11 +85,13 @@ impl GamepadPoseMethods for GamepadPose {
     }
 
     // https://w3c.github.io/gamepad/extensions.html#dom-gamepadpose-angularvelocity
+    #[allow(crown::unrooted_must_root)]
     fn GetAngularVelocity(&self, _cx: JSContext) -> Option<Float32Array> {
         self.angular_vel.buffer_to_option()
     }
 
     // https://w3c.github.io/gamepad/extensions.html#dom-gamepadpose-angularacceleration
+    #[allow(crown::unrooted_must_root)]
     fn GetAngularAcceleration(&self, _cx: JSContext) -> Option<Float32Array> {
         self.angular_acc.buffer_to_option()
     }

@@ -27,6 +27,7 @@ pub unsafe fn finalize_global<T>(obj: *mut JSObject, this: *const T) {
     finalize_common::<T>(this);
 }
 
+#[allow(crown::unrooted_must_root)]
 pub unsafe fn finalize_weak_referenceable<T: WeakReferenceable>(
     obj: *mut JSObject,
     this: *const T,

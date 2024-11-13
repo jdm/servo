@@ -9,7 +9,7 @@ use std::cell::Cell;
 use std::rc::Rc;
 
 use dom_struct::dom_struct;
-use js::jsapi::{Heap, JSObject};
+use js::jsapi::{Heap, JSObject, HandleObject};
 use webgpu::wgc::id::{BindGroupLayoutId, PipelineLayoutId};
 use webgpu::wgc::pipeline as wgpu_pipe;
 use webgpu::wgc::pipeline::RenderPipelineDescriptor;
@@ -114,7 +114,6 @@ impl GPUDevice {
     fn new_inherited(
         channel: WebGPU,
         adapter: &GPUAdapter,
-        extensions: Heap<*mut JSObject>,
         features: &GPUSupportedFeatures,
         limits: &GPUSupportedLimits,
         device: webgpu::WebGPUDevice,
@@ -126,7 +125,7 @@ impl GPUDevice {
             eventtarget: EventTarget::new_inherited(),
             channel,
             adapter: Dom::from_ref(adapter),
-            extensions,
+            extensions: Heap::default(),
             features: Dom::from_ref(features),
             limits: Dom::from_ref(limits),
             label: DomRefCell::new(USVString::from(label)),
@@ -142,7 +141,7 @@ impl GPUDevice {
         global: &GlobalScope,
         channel: WebGPU,
         adapter: &GPUAdapter,
-        extensions: Heap<*mut JSObject>,
+        extensions: HandleObject,
         features: wgt::Features,
         limits: wgt::Limits,
         device: webgpu::WebGPUDevice,
@@ -158,7 +157,6 @@ impl GPUDevice {
             Box::new(GPUDevice::new_inherited(
                 channel,
                 adapter,
-                extensions,
                 &features,
                 &limits,
                 device,
@@ -168,6 +166,7 @@ impl GPUDevice {
             )),
             global,
         );
+        device.extensions.set(*extensions);
         queue.set_device(&device);
         device
     }

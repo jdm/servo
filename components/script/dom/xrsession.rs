@@ -996,6 +996,7 @@ impl XRSessionMethods for XRSession {
     }
 
     /// <https://www.w3.org/TR/webxr/#dom-xrsession-supportedframerates>
+    #[allow(crown::unrooted_must_root)]
     fn GetSupportedFrameRates(&self, cx: JSContext) -> Option<Float32Array> {
         let session = self.session.borrow();
         if self.mode == XRSessionMode::Inline || session.supported_frame_rates().is_empty() {

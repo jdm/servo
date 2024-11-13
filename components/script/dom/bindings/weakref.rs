@@ -52,6 +52,7 @@ pub struct WeakBox<T: WeakReferenceable> {
 /// Trait implemented by weak-referenceable interfaces.
 pub trait WeakReferenceable: DomObject + Sized {
     /// Downgrade a DOM object reference to a weak one.
+    #[allow(crown::unrooted_must_root)]
     fn downgrade(&self) -> WeakRef<Self> {
         unsafe {
             let object = self.reflector().get_jsobject().get();

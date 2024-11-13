@@ -933,7 +933,7 @@ impl XMLHttpRequestMethods for XMLHttpRequest {
         }
     }
 
-    #[allow(unsafe_code)]
+    #[allow(unsafe_code, crown::unrooted_must_root)]
     /// <https://xhr.spec.whatwg.org/#the-response-attribute>
     fn Response(&self, cx: JSContext, can_gc: CanGc, mut rval: MutableHandleValue) {
         match self.response_type.get() {

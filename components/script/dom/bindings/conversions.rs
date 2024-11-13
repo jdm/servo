@@ -370,6 +370,7 @@ pub fn is_dom_proxy(obj: *mut JSObject) -> bool {
 pub const DOM_OBJECT_SLOT: u32 = 0;
 
 /// Get the private pointer of a DOM object from a given reflector.
+#[allow(crown::unrooted_must_root)] // No GCs are possible while the value is unrooted.
 pub unsafe fn private_from_object(obj: *mut JSObject) -> *const libc::c_void {
     let mut value = UndefinedValue();
     if is_dom_object(obj) {
@@ -648,6 +649,7 @@ where
 
 /// Get a `DomRoot<T>` for a WindowProxy accessible from a `HandleValue`.
 /// Caller is responsible for throwing a JS exception if needed in case of error.
+#[allow(crown::unrooted_must_root)] // No GC is possible while the value is unrooted.
 pub unsafe fn windowproxy_from_handlevalue(
     v: HandleValue,
     _cx: *mut JSContext,

@@ -98,6 +98,7 @@ impl FileReaderSyncMethods for FileReaderSync {
     }
 
     /// <https://w3c.github.io/FileAPI/#readAsArrayBufferSyncSection>
+    #[allow(crown::unrooted_must_root)]
     fn ReadAsArrayBuffer(&self, cx: JSContext, blob: &Blob) -> Fallible<ArrayBuffer> {
         // step 1
         let blob_contents = FileReaderSync::get_blob_bytes(blob)?;

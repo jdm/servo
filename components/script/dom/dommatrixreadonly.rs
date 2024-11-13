@@ -776,6 +776,7 @@ impl DOMMatrixReadOnlyMethods for DOMMatrixReadOnly {
     }
 
     // https://drafts.fxtf.org/geometry-1/#dom-dommatrixreadonly-tofloat32array
+    #[allow(crown::unrooted_must_root)]
     fn ToFloat32Array(&self, cx: JSContext) -> Float32Array {
         let vec: Vec<f32> = self
             .matrix
@@ -790,6 +791,7 @@ impl DOMMatrixReadOnlyMethods for DOMMatrixReadOnly {
     }
 
     // https://drafts.fxtf.org/geometry-1/#dom-dommatrixreadonly-tofloat64array
+    #[allow(crown::unrooted_must_root)]
     fn ToFloat64Array(&self, cx: JSContext) -> Float64Array {
         rooted!(in (*cx) let mut array = ptr::null_mut::<JSObject>());
         create_buffer_source(cx, &self.matrix.borrow().to_array(), array.handle_mut())

@@ -130,6 +130,7 @@ pub fn to_frozen_array<T: ToJSValConvertible>(
 
 /// Returns the ProtoOrIfaceArray for the given global object.
 /// Fails if `global` is not a DOM global object.
+#[allow(crown::unrooted_must_root)] // No GC is possible while it's unrooted
 pub fn get_proto_or_iface_array(global: *mut JSObject) -> *mut ProtoOrIfaceArray {
     unsafe {
         assert_ne!(((*get_object_class(global)).flags & JSCLASS_DOM_GLOBAL), 0);

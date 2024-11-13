@@ -40,7 +40,8 @@ pub enum ConstantVal {
 
 impl ConstantSpec {
     /// Returns a `JSVal` that represents the value of this `ConstantSpec`.
-    pub fn get_value(&self) -> JSVal {
+    #[allow(crown::unrooted_must_root)] // These values are rooted immediately by the caller.
+    fn get_value(&self) -> JSVal {
         match self.value {
             ConstantVal::Null => NullValue(),
             ConstantVal::Int(i) => Int32Value(i),

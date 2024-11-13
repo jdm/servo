@@ -167,6 +167,7 @@ impl XRRigidTransformMethods for XRRigidTransform {
         })
     }
     // https://immersive-web.github.io/webxr/#dom-xrrigidtransform-matrix
+    #[allow(crown::unrooted_must_root)]
     fn Matrix(&self, _cx: JSContext) -> Float32Array {
         if !self.matrix.is_initialized() {
             self.matrix
