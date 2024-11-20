@@ -67,6 +67,7 @@ pub struct OneshotTimers {
 }
 
 #[derive(DenyPublicFields, JSTraceable, MallocSizeOf)]
+#[allow(crown::unrooted_must_root)]
 struct OneshotTimer {
     handle: OneshotTimerHandle,
     #[no_trace]
@@ -79,6 +80,7 @@ struct OneshotTimer {
 // A replacement trait would have a method such as
 //     `invoke<T: DomObject>(self: Box<Self>, this: &T, js_timers: &JsTimers);`.
 #[derive(JSTraceable, MallocSizeOf)]
+#[crown::unrooted_must_root_lint::must_root]
 pub enum OneshotTimerCallback {
     XhrTimeout(XHRTimeoutCallback),
     EventSourceTimeout(EventSourceTimeoutCallback),
@@ -89,6 +91,7 @@ pub enum OneshotTimerCallback {
 }
 
 impl OneshotTimerCallback {
+    #[allow(crown::unrooted_must_root)]
     fn invoke<T: DomObject>(self, this: &T, js_timers: &JsTimers, can_gc: CanGc) {
         match self {
             OneshotTimerCallback::XhrTimeout(callback) => callback.invoke(can_gc),
@@ -143,6 +146,7 @@ impl OneshotTimers {
         *chan = Some(timer_event_chan);
     }
 
+    #[allow(crown::unrooted_must_root)]
     pub fn schedule_callback(
         &self,
         callback: OneshotTimerCallback,
@@ -191,6 +195,7 @@ impl OneshotTimers {
         }
     }
 
+    #[allow(crown::unrooted_must_root)]
     pub fn fire_timer(&self, id: TimerEventId, global: &GlobalScope, can_gc: CanGc) {
         let expected_id = self.expected_event_id.get();
         if expected_id != id {
@@ -507,6 +512,7 @@ impl JsTimers {
     }
 
     // see https://html.spec.whatwg.org/multipage/#timer-initialisation-steps
+    #[allow(crown::unrooted_must_root)]
     fn initialize_and_schedule(&self, global: &GlobalScope, mut task: JsTimerTask) {
         let handle = task.handle;
         let mut active_timers = self.active_timers.borrow_mut();
@@ -540,6 +546,7 @@ fn clamp_duration(nesting_level: u32, unclamped: Duration) -> Duration {
 
 impl JsTimerTask {
     // see https://html.spec.whatwg.org/multipage/#timer-initialisation-steps
+    #[allow(crown::unrooted_must_root)]
     pub fn invoke<T: DomObject>(self, this: &T, timers: &JsTimers, can_gc: CanGc) {
         // step 4.1 can be ignored, because we proactively prevent execution
         // of this task when its scheduled execution is canceled.

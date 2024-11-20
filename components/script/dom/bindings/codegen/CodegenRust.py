@@ -5143,10 +5143,11 @@ class CGUnionConversionStruct(CGThing):
             actualType = f"Rc<{actualType}>"
         returnType = f"Result<Option<{actualType}>, ()>"
         jsConversion = templateVars["jsConversion"]
+        decorator = "#[allow(crown::unrooted_must_root)]" if "Array" in actualType else ""
 
         return CGWrapper(
             CGIndenter(jsConversion, 4),
-            pre=f"unsafe fn TryConvertTo{t.name}(cx: SafeJSContext, value: HandleValue) -> {returnType} {{\n",
+            pre=f"{decorator}unsafe fn TryConvertTo{t.name}(cx: SafeJSContext, value: HandleValue) -> {returnType} {{\n",
             post="\n}")
 
     def define(self):
@@ -5193,7 +5194,7 @@ class ClassMethod(ClassItem):
                  virtual=False, const=False, bodyInHeader=False,
                  templateArgs=None, visibility='public', body=None,
                  breakAfterReturnDecl="\n", unsafe=False,
-                 breakAfterSelf="\n", override=False):
+                 breakAfterSelf="\n", override=False, decorators=[]):
         """
         override indicates whether to flag the method as MOZ_OVERRIDE
         """
@@ -5212,6 +5213,7 @@ class ClassMethod(ClassItem):
         self.breakAfterSelf = breakAfterSelf
         self.override = override
         self.unsafe = unsafe
+        self.decorators = decorators
         ClassItem.__init__(self, name, visibility)
 
     def getDecorators(self, declaring):
@@ -5247,7 +5249,7 @@ class ClassMethod(ClassItem):
         const = ' const' if self.const else ''
         override = ' MOZ_OVERRIDE' if self.override else ''
         return (
-            f"{self.getDecorators(True)}{self.breakAfterReturnDecl}"
+            f"{'\n'.join(self.decorators)}{self.getDecorators(True)}{self.breakAfterReturnDecl}"
             f"{visibility}{unsafe}fn {self.name}{templateClause}({args})"
             f"{returnType}{const}{override}{body}{self.breakAfterSelf}"
         )
@@ -7297,7 +7299,7 @@ def return_type(descriptorProvider, rettype, infallible):
 class CGNativeMember(ClassMethod):
     def __init__(self, descriptorProvider, member, name, signature, extendedAttrs,
                  breakAfter=True, passJSBitsAsNeeded=True, visibility="public",
-                 unsafe=False):
+                 unsafe=False, decorators=[]):
         """
         If passJSBitsAsNeeded is false, we don't automatically pass in a
         JSContext* or a JSObject* based on the return and argument types.
@@ -7317,7 +7319,8 @@ class CGNativeMember(ClassMethod):
                                     and not signature[0].isUndefined()),
                              breakAfterSelf=breakAfterSelf,
                              unsafe=unsafe,
-                             visibility=visibility)
+                             visibility=visibility,
+                             decorators=decorators)
 
     def getReturnType(self, type):
         infallible = 'infallible' in self.extendedAttrs
@@ -7494,7 +7497,7 @@ class FakeMember():
 
 
 class CallbackMember(CGNativeMember):
-    def __init__(self, sig, name, descriptorProvider, needThisHandling):
+    def __init__(self, sig, name, descriptorProvider, needThisHandling, decorators=[]):
         """
         needThisHandling is True if we need to be able to accept a specified
         thisObj, False otherwise.
@@ -7525,7 +7528,8 @@ class CallbackMember(CGNativeMember):
                                 extendedAttrs={},
                                 passJSBitsAsNeeded=False,
                                 unsafe=needThisHandling,
-                                visibility=visibility)
+                                visibility=visibility,
+                                decorators=decorators)
         # We have to do all the generation of our body now, because
         # the caller relies on us throwing if we can't manage it.
         self.exceptionCode = "return Err(JSFailed);\n"
@@ -7676,9 +7680,9 @@ class CallbackMember(CGNativeMember):
 
 
 class CallbackMethod(CallbackMember):
-    def __init__(self, sig, name, descriptorProvider, needThisHandling):
+    def __init__(self, sig, name, descriptorProvider, needThisHandling, decorators=[]):
         CallbackMember.__init__(self, sig, name, descriptorProvider,
-                                needThisHandling)
+                                needThisHandling, decorators)
 
     def getRvalDecl(self):
         if self.usingOutparam:
@@ -7733,7 +7737,7 @@ class CallbackOperationBase(CallbackMethod):
     def __init__(self, signature, jsName, nativeName, descriptor, singleOperation):
         self.singleOperation = singleOperation
         self.methodName = jsName
-        CallbackMethod.__init__(self, signature, nativeName, descriptor, singleOperation)
+        CallbackMethod.__init__(self, signature, nativeName, descriptor, singleOperation, decorators=["#[allow(crown::unrooted_must_root)]"])
 
     def getThisObj(self):
         if not self.singleOperation:

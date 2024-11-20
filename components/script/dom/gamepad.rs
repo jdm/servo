@@ -185,6 +185,7 @@ impl GamepadMethods for Gamepad {
     }
 
     // https://w3c.github.io/gamepad/#dom-gamepad-axes
+    #[allow(crown::unrooted_must_root)]
     fn Axes(&self, _cx: JSContext) -> Float64Array {
         self.axes.get_buffer().expect("Failed to get gamepad axes.")
     }

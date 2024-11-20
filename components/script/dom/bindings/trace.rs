@@ -41,7 +41,7 @@ use indexmap::IndexMap;
 /// A trait to allow tracing (only) DOM objects.
 pub use js::gc::Traceable as JSTraceable;
 use js::glue::{CallObjectTracer, CallScriptTracer, CallStringTracer, CallValueTracer};
-use js::jsapi::{GCTraceKindToAscii, Heap, JSObject, JSScript, JSString, JSTracer, TraceKind};
+use js::jsapi::{GCTraceKindToAscii, Heap, JSObject, JSScript, JSString, JSTracer, TraceKind, HandleValueArray};
 use js::jsval::JSVal;
 use js::rust::{GCMethods, Handle};
 use malloc_size_of::{MallocSizeOf, MallocSizeOfOps};
@@ -578,6 +578,12 @@ impl<'a, T: 'static + JSTraceable> RootedVec<'a, T> {
             RootedTraceableSet::add(root);
         }
         RootedVec { root }
+    }
+}
+
+impl<'a> RootedVec<'a, JSVal> {
+    pub fn handle_value_array(&self) -> HandleValueArray {
+        unsafe { HandleValueArray::from_rooted_slice(self.root.v.as_slice()) }
     }
 }
 

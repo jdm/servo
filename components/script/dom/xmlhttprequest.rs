@@ -1300,6 +1300,7 @@ impl XMLHttpRequest {
         self.dispatch_progress_event(false, type_, len, total, can_gc);
     }
 
+    #[allow(crown::unrooted_must_root)]
     fn set_timeout(&self, duration: Duration) {
         // Sets up the object to timeout in a given number of milliseconds
         // This will cancel all previous timeouts
@@ -1356,6 +1357,7 @@ impl XMLHttpRequest {
     }
 
     /// <https://xhr.spec.whatwg.org/#arraybuffer-response>
+    #[allow(crown::unrooted_must_root)]
     fn arraybuffer_response(&self, cx: JSContext) -> Option<ArrayBuffer> {
         // Step 5: Set the response object to a new ArrayBuffer with the received bytes
         // For caching purposes, skip this step if the response is already created
@@ -1440,7 +1442,7 @@ impl XMLHttpRequest {
         self.response_xml.get()
     }
 
-    #[allow(unsafe_code)]
+    #[allow(unsafe_code, crown::unrooted_must_root)]
     /// <https://xhr.spec.whatwg.org/#json-response>
     fn json_response(&self, cx: JSContext, mut rval: MutableHandleValue) {
         // Step 1

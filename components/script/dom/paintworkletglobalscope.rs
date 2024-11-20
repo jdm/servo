@@ -305,23 +305,30 @@ impl PaintWorkletGlobalScope {
         // TODO: Step 10
         // Steps 11-12
         debug!("Invoking paint function {}.", name);
-        rooted_vec!(let arguments_values <- arguments.iter().cloned()
-                    .map(|argument| CSSStyleValue::new(self.upcast(), argument)));
-        let arguments_value_vec: Vec<JSVal> = arguments_values
+        rooted_vec!(
+            let arguments_values <- arguments.iter().cloned()
+                .map(|argument| CSSStyleValue::new(self.upcast(), argument))
+        );
+        rooted_vec!(let mut arguments_value_vec);
+        for argument in arguments_values.iter() {
+            arguments_value_vec.push(ObjectValue(argument.reflector().get_jsobject().get()));
+        }
+        
+        /*let arguments_value_vec: Vec<JSVal> = arguments_values
             .iter()
             .map(|argument| ObjectValue(argument.reflector().get_jsobject().get()))
-            .collect();
-        let arguments_value_array =
-            unsafe { HandleValueArray::from_rooted_slice(&arguments_value_vec) };
+            .collect();*/
+        /*let arguments_value_array =
+        unsafe { HandleValueArray::from_rooted_slice(&arguments_values.as_slice()) };*/
+        let arguments_value_array = arguments_value_vec.handle_value_array();
         rooted!(in(*cx) let argument_object = unsafe { NewArrayObject(*cx, &arguments_value_array) });
 
-        let args_slice = [
-            ObjectValue(rendering_context.reflector().get_jsobject().get()),
-            ObjectValue(paint_size.reflector().get_jsobject().get()),
-            ObjectValue(properties.reflector().get_jsobject().get()),
-            ObjectValue(argument_object.get()),
-        ];
-        let args = unsafe { HandleValueArray::from_rooted_slice(&args_slice) };
+        rooted_vec!(let mut args);
+        args.push(ObjectValue(rendering_context.reflector().get_jsobject().get()));
+        args.push(ObjectValue(paint_size.reflector().get_jsobject().get()));
+        args.push(ObjectValue(properties.reflector().get_jsobject().get()));
+        args.push(ObjectValue(argument_object.get()));
+        //let args = unsafe { HandleValueArray::from_rooted_slice(&args_slice) };
 
         rooted!(in(*cx) let mut result = UndefinedValue());
         unsafe {
@@ -329,7 +336,7 @@ impl PaintWorkletGlobalScope {
                 *cx,
                 paint_instance.handle(),
                 paint_function.handle(),
-                &args,
+                &args.handle_value_array(),
                 result.handle_mut(),
             );
         }

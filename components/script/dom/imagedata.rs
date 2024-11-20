@@ -108,6 +108,7 @@ impl ImageData {
         ))
     }
 
+    #[allow(crown::unrooted_must_root)]
     fn new_without_jsobject(
         global: &GlobalScope,
         proto: Option<HandleObject>,

@@ -32,6 +32,7 @@ use crate::realms::InRealm;
 use crate::script_runtime::{CanGc, JSContext};
 
 #[derive(JSTraceable, MallocSizeOf)]
+#[crown::unrooted_must_root_lint::must_root]
 pub struct ActiveBufferMapping {
     // TODO(sagudev): Use IpcSharedMemory when https://github.com/servo/ipc-channel/pull/356 lands
     /// <https://gpuweb.github.io/gpuweb/#active-buffer-mapping-data>
@@ -85,6 +86,7 @@ pub struct GPUBuffer {
 }
 
 impl GPUBuffer {
+    #[allow(crown::unrooted_must_root)]
     fn new_inherited(
         channel: WebGPU,
         buffer: WebGPUBuffer,
@@ -107,7 +109,7 @@ impl GPUBuffer {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments, crown::unrooted_must_root)]
     pub fn new(
         global: &GlobalScope,
         channel: WebGPU,
@@ -133,6 +135,7 @@ impl GPUBuffer {
     }
 
     /// <https://gpuweb.github.io/gpuweb/#dom-gpudevice-createbuffer>
+    #[allow(crown::unrooted_must_root)]
     pub fn create(
         device: &GPUDevice,
         descriptor: &GPUBufferDescriptor,
@@ -185,7 +188,7 @@ impl Drop for GPUBuffer {
 }
 
 impl GPUBufferMethods for GPUBuffer {
-    #[allow(unsafe_code)]
+    #[allow(unsafe_code, crown::unrooted_must_root)]
     /// <https://gpuweb.github.io/gpuweb/#dom-gpubuffer-unmap>
     fn Unmap(&self) {
         // Step 1
@@ -376,6 +379,7 @@ impl GPUBuffer {
         }
     }
 
+    #[allow(crown::unrooted_must_root)]
     fn map_success(&self, p: &Rc<Promise>, wgpu_mapping: Mapping) {
         let mut pending_map = self.pending_map.borrow_mut();
 

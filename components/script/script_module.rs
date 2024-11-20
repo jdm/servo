@@ -149,6 +149,7 @@ pub enum ModuleIdentity {
 }
 
 impl ModuleIdentity {
+    #[allow(crown::unrooted_must_root)]
     pub fn get_module_tree(&self, global: &GlobalScope) -> Rc<ModuleTree> {
         match self {
             ModuleIdentity::ModuleUrl(url) => {
@@ -227,6 +228,7 @@ impl ModuleTree {
         &self.record
     }
 
+    #[allow(crown::unrooted_must_root)]
     pub fn set_record(&self, record: ModuleObject) {
         *self.record.borrow_mut() = Some(record);
     }
@@ -843,6 +845,7 @@ impl ModuleTree {
 
     /// <https://html.spec.whatwg.org/multipage/#fetch-the-descendants-of-and-link-a-module-script>
     /// step 4-7.
+    #[allow(crown::unrooted_must_root)]
     fn advance_finished_and_link(&self, global: &GlobalScope) {
         {
             if !self.has_all_ready_descendants(global) {
@@ -945,6 +948,7 @@ impl ModuleOwner {
         }
     }
 
+    #[allow(crown::unrooted_must_root)]
     pub fn notify_owner_to_finish(
         &self,
         module_identity: ModuleIdentity,
@@ -999,7 +1003,7 @@ impl ModuleOwner {
         }
     }
 
-    #[allow(unsafe_code)]
+    #[allow(unsafe_code, crown::unrooted_must_root)]
     /// <https://html.spec.whatwg.org/multipage/#hostimportmoduledynamically(referencingscriptormodule,-specifier,-promisecapability):fetch-an-import()-module-script-graph>
     /// Step 6-9
     pub fn finish_dynamic_module(
@@ -1144,7 +1148,7 @@ impl FetchResponseListener for ModuleContext {
 
     /// <https://html.spec.whatwg.org/multipage/#fetch-a-single-module-script>
     /// Step 9-12
-    #[allow(unsafe_code)]
+    #[allow(unsafe_code, crown::unrooted_must_root)]
     fn process_response_eof(
         &mut self,
         _: RequestId,
@@ -1622,7 +1626,7 @@ struct DynamicModule {
 }
 
 /// <https://html.spec.whatwg.org/multipage/#fetch-a-single-module-script>
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, crown::unrooted_must_root)]
 fn fetch_single_module_script(
     owner: ModuleOwner,
     url: ServoUrl,
@@ -1768,7 +1772,7 @@ fn fetch_single_module_script(
     }
 }
 
-#[allow(unsafe_code)]
+#[allow(unsafe_code, crown::unrooted_must_root)]
 /// <https://html.spec.whatwg.org/multipage/#fetch-an-inline-module-script-graph>
 pub(crate) fn fetch_inline_module_script(
     owner: ModuleOwner,

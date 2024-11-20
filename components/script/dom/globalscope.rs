@@ -2222,6 +2222,7 @@ impl GlobalScope {
         &self.consumed_rejections
     }
 
+    #[allow(crown::unrooted_must_root)]
     pub fn set_module_map(&self, url: ServoUrl, module: ModuleTree) {
         self.module_map.borrow_mut().insert(url, Rc::new(module));
     }
@@ -2230,6 +2231,7 @@ impl GlobalScope {
         &self.module_map
     }
 
+    #[allow(crown::unrooted_must_root)]
     pub fn set_inline_module_map(&self, script_id: ScriptId, module: ModuleTree) {
         self.inline_module_map
             .borrow_mut()
@@ -2757,6 +2759,7 @@ impl GlobalScope {
     }
 
     /// <https://html.spec.whatwg.org/multipage/#timer-initialisation-steps>
+    #[allow(crown::unrooted_must_root)]
     pub fn schedule_callback(
         &self,
         callback: OneshotTimerCallback,

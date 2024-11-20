@@ -1008,7 +1008,7 @@ impl HTMLScriptElement {
         );
     }
 
-    #[allow(unsafe_code)]
+    #[allow(unsafe_code, crown::unrooted_must_root)]
     /// <https://html.spec.whatwg.org/multipage/#run-a-module-script>
     pub fn run_a_module_script(&self, script: &ScriptOrigin, _rethrow_errors: bool, can_gc: CanGc) {
         // TODO use a settings object rather than this element's document/window
@@ -1033,7 +1033,7 @@ impl HTMLScriptElement {
                 .cloned()
         };
 
-        if let Some(module_tree) = tree {
+        if let Some(ref module_tree) = tree {
             // Step 6.
             {
                 let module_error = module_tree.get_rethrow_error().borrow();

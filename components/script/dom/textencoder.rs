@@ -64,6 +64,7 @@ impl TextEncoderMethods for TextEncoder {
     }
 
     /// <https://encoding.spec.whatwg.org/#dom-textencoder-encode>
+    #[allow(crown::unrooted_must_root)]
     fn Encode(&self, cx: JSContext, input: USVString) -> Uint8Array {
         let encoded = input.0.as_bytes();
 

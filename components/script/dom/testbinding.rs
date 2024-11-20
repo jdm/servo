@@ -222,6 +222,7 @@ impl TestBindingMethods for TestBinding {
         ByteStringOrLong::ByteString(ByteString::new(vec![]))
     }
     fn SetUnion9Attribute(&self, _: ByteStringOrLong) {}
+    #[allow(crown::unrooted_must_root)]
     fn ArrayAttribute(&self, cx: SafeJSContext) -> Uint8ClampedArray {
         let data: [u8; 16] = [0; 16];
 
@@ -679,6 +680,7 @@ impl TestBindingMethods for TestBinding {
     fn PassCallbackInterface(&self, _: Rc<EventListener>) {}
     fn PassSequence(&self, _: Vec<i32>) {}
     fn PassAnySequence(&self, _: SafeJSContext, _: CustomAutoRooterGuard<Vec<JSVal>>) {}
+    #[allow(crown::unrooted_must_root)]
     fn AnySequencePassthrough(
         &self,
         _: SafeJSContext,
@@ -965,6 +967,7 @@ impl TestBindingMethods for TestBinding {
     fn ReceiveRecordOfRecords(&self) -> Record<DOMString, Record<DOMString, i32>> {
         Record::new()
     }
+    #[allow(crown::unrooted_must_root)]
     fn ReceiveAnyRecord(&self) -> Record<DOMString, JSVal> {
         Record::new()
     }
