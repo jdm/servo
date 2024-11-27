@@ -249,12 +249,13 @@ impl Transferable for MessagePort {
         return_object.set(transferred_port.reflector().rootable().get());
 
         // Store the DOM port where it will be passed along to script in the message-event.
-        if let Some(ports) = sc_reader.message_ports.as_mut() {
+        /*if let Some(ports) = sc_reader.message_ports.as_mut() {
             ports.push(transferred_port);
         } else {
             let ports = vec![transferred_port];
             sc_reader.message_ports = Some(ports);
-        }
+        }*/
+        sc_reader.message_ports.push(transferred_port);
 
         Ok(())
     }

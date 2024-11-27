@@ -6,6 +6,7 @@
 //! (<https://html.spec.whatwg.org/multipage/#serializable-objects>).
 
 use crate::dom::bindings::reflector::DomObject;
+use crate::dom::bindings::root::DomRoot;
 use crate::dom::bindings::structuredclone::{StructuredDataReader, StructuredDataWriter};
 use crate::dom::globalscope::GlobalScope;
 use crate::script_runtime::CanGc;
@@ -29,5 +30,5 @@ pub(crate) trait Serializable: DomObject {
         sc_reader: &mut StructuredDataReader,
         extra_data: StorageKey,
         can_gc: CanGc,
-    ) -> Result<(), ()>;
+    ) -> Result<DomRoot<Self>, ()> where Self: Sized;
 }

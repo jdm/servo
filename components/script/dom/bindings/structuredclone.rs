@@ -68,13 +68,16 @@ unsafe fn read_blob(
         &mut index as *mut u32
     ));
     let storage_key = StorageKey { index, name_space };
-    if <Blob as Serializable>::deserialize(owner, sc_reader, storage_key, can_gc).is_ok() {
-        if let Some(blobs) = &sc_reader.blobs {
+    if let Ok(blob) = <Blob as Serializable>::deserialize(owner, sc_reader, storage_key, can_gc) {
+        /*if let Some(blobs) = &sc_reader.blobs {
             let blob = blobs
                 .get(&storage_key)
                 .expect("No blob found at storage key.");
             return blob.reflector().get_jsobject().get();
-        }
+    }*/
+        let ptr = blob.reflector().get_jsobject().get();
+        sc_reader.blobs.push(blob);
+        return ptr;
     }
     warn!(
         "Reading structured data for a blob failed in {:?}.",
@@ -258,10 +261,10 @@ static STRUCTURED_CLONE_CALLBACKS: JSStructuredCloneCallbacks = JSStructuredClon
 /// <https://html.spec.whatwg.org/multipage/#safe-passing-of-structured-data>
 pub(crate) struct StructuredDataReader {
     /// A map of deserialized blobs, stored temporarily here to keep them rooted.
-    pub(crate) blobs: Option<HashMap<StorageKey, DomRoot<Blob>>>,
+    pub(crate) blobs: Vec<DomRoot<Blob>>,
     /// A vec of transfer-received DOM ports,
     /// to be made available to script through a message event.
-    pub(crate) message_ports: Option<Vec<DomRoot<MessagePort>>>,
+    pub(crate) message_ports: Vec<DomRoot<MessagePort>>,
     /*/// A map of port implementations,
     /// used as part of the "transfer-receiving" steps of ports,
     /// to produce the DOM ports stored in `message_ports` above.
@@ -352,8 +355,8 @@ pub(crate) fn read(
     let cx = GlobalScope::get_cx();
     let _ac = enter_realm(global);
     let mut sc_reader = StructuredDataReader {
-        blobs: None,
-        message_ports: None,
+        blobs: Default::default(),
+        message_ports: Default::default(),
         serialized_objects: mem::take(&mut data.serialized_objects),
         transferred_objects: mem::take(&mut data.transferred_objects),
     };
@@ -391,10 +394,11 @@ pub(crate) fn read(
             // Any transfer-received port-impls should have been taken out.
             assert!(sc_reader.transferred_objects.is_empty());
 
-            match sc_reader.message_ports.take() {
+            /*match sc_reader.message_ports.take() {
                 Some(ports) => return Ok(ports),
                 None => return Ok(Vec::with_capacity(0)),
-            }
+        }*/
+            return Ok(mem::take(&mut sc_reader.message_ports));
         }
         Err(())
     }

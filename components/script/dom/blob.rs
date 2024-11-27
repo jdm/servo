@@ -129,7 +129,7 @@ impl Serializable for Blob {
         sc_reader: &mut StructuredDataReader,
         storage_key: StorageKey,
         can_gc: CanGc,
-    ) -> Result<(), ()> {
+    ) -> Result<DomRoot<Blob>, ()> {
         // 1. Re-build the key for the storage location
         // of the serialized object.
         let namespace_id = PipelineNamespaceId(storage_key.name_space);
@@ -156,12 +156,7 @@ impl Serializable for Blob {
     }*/
         let blob_impl = sc_reader.serialized_objects.remove::<BlobImpl>(id).expect("No serialized blob found");
 
-        let deserialized_blob = Blob::new(owner, blob_impl, can_gc);
-
-        let blobs = sc_reader.blobs.get_or_insert_with(HashMap::new);
-        blobs.insert(storage_key, deserialized_blob);
-
-        Ok(())
+        Ok(Blob::new(owner, blob_impl, can_gc))
     }
 }
 

@@ -8,6 +8,7 @@
 use js::jsapi::MutableHandleObject;
 
 use crate::dom::bindings::reflector::DomObject;
+use crate::dom::bindings::root::DomRoot;
 use crate::dom::bindings::structuredclone::{StructuredDataReader, StructuredDataWriter};
 use crate::dom::globalscope::GlobalScope;
 
