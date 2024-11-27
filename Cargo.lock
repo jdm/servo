@@ -6442,6 +6442,7 @@ version = "0.0.1"
 dependencies = [
  "background_hang_monitor_api",
  "base",
+ "bincode",
  "bitflags 2.8.0",
  "bluetooth_traits",
  "canvas_traits",

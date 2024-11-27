@@ -1170,7 +1170,9 @@ impl GlobalScope {
                     // Step 9, sort by creation order,
                     // done by using a queue to store channels in creation order.
                     .for_each(|channel| {
-                        let data = data.clone_for_broadcast();
+                        let data = data.clone_for_broadcast(/*|tag, namespace| {
+                            crate::dom::bindings::structuredclone::clone_for_broadcast(&data, tag, namespace)
+                        }*/);
                         let origin = origin.clone();
 
                         // Step 10: Queue a task on the DOM manipulation task-source,

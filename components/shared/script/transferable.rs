@@ -9,11 +9,11 @@
 
 use std::collections::VecDeque;
 
-use base::id::MessagePortId;
+use base::id::{MessagePortId, MessagePortIndex};
 use malloc_size_of_derive::MallocSizeOf;
 use serde::{Deserialize, Serialize};
 
-use crate::PortMessageTask;
+use crate::{PortMessageTask, TypeIndexable};
 
 #[derive(Debug, Deserialize, MallocSizeOf, Serialize)]
 enum MessagePortState {
@@ -157,5 +157,15 @@ impl MessagePortImpl {
     pub fn close(&mut self) {
         // Step 1
         self.state = MessagePortState::Detached;
+    }
+}
+
+impl TypeIndexable for MessagePortImpl {
+    type Index = MessagePortIndex;
+    type TypeTag = crate::TransferableTypes;
+    const TYPE_TAG: Self::TypeTag = crate::TransferableTypes::MessagePort;
+
+    fn clone_for_broadcast(&self) -> Option<Self> {
+        None
     }
 }

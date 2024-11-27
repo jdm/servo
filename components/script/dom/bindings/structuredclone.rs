@@ -5,10 +5,11 @@
 //! This module implements structured cloning, as defined by [HTML](https://html.spec.whatwg.org/multipage/#safe-passing-of-structured-data).
 
 use std::collections::HashMap;
+use std::mem;
 use std::os::raw;
 use std::ptr;
 
-use base::id::{BlobId, MessagePortId};
+use base::id::{BlobId, MessagePortId, AnyIndex, NamespaceIndex, Index, BlobIndex};
 use js::glue::{
     CopyJSStructuredCloneData, DeleteJSAutoStructuredCloneBuffer, GetLengthOfJSStructuredCloneData,
     NewJSAutoStructuredCloneBuffer, WriteBytesToJSStructuredCloneData,
@@ -261,22 +262,26 @@ pub(crate) struct StructuredDataReader {
     /// A vec of transfer-received DOM ports,
     /// to be made available to script through a message event.
     pub(crate) message_ports: Option<Vec<DomRoot<MessagePort>>>,
-    /// A map of port implementations,
+    /*/// A map of port implementations,
     /// used as part of the "transfer-receiving" steps of ports,
     /// to produce the DOM ports stored in `message_ports` above.
     pub(crate) port_impls: Option<HashMap<MessagePortId, MessagePortImpl>>,
     /// A map of blob implementations,
     /// used as part of the "deserialize" steps of blobs,
     /// to produce the DOM blobs stored in `blobs` above.
-    pub(crate) blob_impls: Option<HashMap<BlobId, BlobImpl>>,
+    pub(crate) blob_impls: Option<HashMap<BlobId, BlobImpl>>,*/
+    pub(crate) serialized_objects: script_traits::TypeIndexedMap<script_traits::SerializableTypes>,
+    pub(crate) transferred_objects: script_traits::TypeIndexedMap<script_traits::TransferableTypes>,
 }
 
 /// A data holder for transferred and serialized objects.
 pub(crate) struct StructuredDataWriter {
-    /// Transferred ports.
+    /*/// Transferred ports.
     pub(crate) ports: Option<HashMap<MessagePortId, MessagePortImpl>>,
     /// Serialized blobs.
-    pub(crate) blobs: Option<HashMap<BlobId, BlobImpl>>,
+    pub(crate) blobs: Option<HashMap<BlobId, BlobImpl>>,*/
+    pub(crate) serialized_objects: script_traits::TypeIndexedMap<script_traits::SerializableTypes>,
+    pub(crate) transferred_objects: script_traits::TypeIndexedMap<script_traits::TransferableTypes>,
 }
 
 /// Writes a structured clone. Returns a `DataClone` error if that fails.
@@ -291,8 +296,8 @@ pub(crate) fn write(
             transfer.to_jsval(*cx, val.handle_mut());
         }
         let mut sc_writer = StructuredDataWriter {
-            ports: None,
-            blobs: None,
+            serialized_objects: Default::default(),
+            transferred_objects: Default::default(),
         };
         let sc_writer_ptr = &mut sc_writer as *mut _;
 
@@ -329,8 +334,8 @@ pub(crate) fn write(
 
         let data = StructuredSerializedData {
             serialized: data,
-            ports: sc_writer.ports.take(),
-            blobs: sc_writer.blobs.take(),
+            serialized_objects: mem::take(&mut sc_writer.serialized_objects),
+            transferred_objects: mem::take(&mut sc_writer.transferred_objects),
         };
 
         Ok(data)
@@ -349,8 +354,8 @@ pub(crate) fn read(
     let mut sc_reader = StructuredDataReader {
         blobs: None,
         message_ports: None,
-        port_impls: data.ports.take(),
-        blob_impls: data.blobs.take(),
+        serialized_objects: mem::take(&mut data.serialized_objects),
+        transferred_objects: mem::take(&mut data.transferred_objects),
     };
     let sc_reader_ptr = &mut sc_reader as *mut _;
     unsafe {
@@ -384,7 +389,7 @@ pub(crate) fn read(
 
         if result {
             // Any transfer-received port-impls should have been taken out.
-            assert!(sc_reader.port_impls.is_none());
+            assert!(sc_reader.transferred_objects.is_empty());
 
             match sc_reader.message_ports.take() {
                 Some(ports) => return Ok(ports),
@@ -394,3 +399,15 @@ pub(crate) fn read(
         Err(())
     }
 }
+
+/*pub(crate) fn clone_for_broadcast(
+    data: &StructuredSerializedData,
+    tag: u32,
+    namespace: NamespaceIndex<AnyIndex>,
+) -> Option<Vec<u8>> {
+    match tag {
+        _ if tag == StructuredCloneTags::DomBlob as u32 =>
+            data.clone_index_for_broadcast::<BlobImpl>(namespace.into_typed::<BlobIndex>()),
+        _ => None
+    }
+}*/

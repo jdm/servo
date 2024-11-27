@@ -4,14 +4,16 @@
 
 use std::collections::HashMap;
 use std::num::NonZeroU32;
+use std::ptr::NonNull;
 use std::rc::Rc;
 
-use base::id::{BlobId, BlobIndex, PipelineNamespaceId};
+use base::id::{BlobId, Index, PipelineNamespaceId, BlobIndex};
 use dom_struct::dom_struct;
 use encoding_rs::UTF_8;
 use js::rust::HandleObject;
 use net_traits::filemanager_thread::RelativePos;
-use script_traits::serializable::BlobImpl;
+use script_traits::TypeIndexable;
+use script_traits::serializable::{BlobImpl, BlobData};
 use uuid::Uuid;
 
 use crate::body::{run_array_buffer_data_algorithm, FetchedData};
@@ -101,11 +103,12 @@ impl Serializable for Blob {
         let new_blob_id = blob_impl.blob_id();
 
         // 2. Store the object at a given key.
-        let blobs = sc_writer.blobs.get_or_insert_with(HashMap::new);
-        blobs.insert(new_blob_id, blob_impl);
+        /*let blobs = sc_writer.blobs.get_or_insert_with(HashMap::new);
+        blobs.insert(new_blob_id, blob_impl);*/
+        sc_writer.serialized_objects.insert(new_blob_id, blob_impl);
 
         let PipelineNamespaceId(name_space) = new_blob_id.namespace_id;
-        let BlobIndex(index) = new_blob_id.index;
+        let Index(index, _) = new_blob_id.index;
         let index = index.get();
 
         let name_space = name_space.to_ne_bytes();
@@ -131,15 +134,17 @@ impl Serializable for Blob {
         // of the serialized object.
         let namespace_id = PipelineNamespaceId(storage_key.name_space);
         let index =
-            BlobIndex(NonZeroU32::new(storage_key.index).expect("Deserialized blob index is zero"));
+            Index::new(storage_key.index).expect("Deserialized blob index is zero");
 
         let id = BlobId {
             namespace_id,
             index,
         };
 
+        println!("{:?} {:?}", id, sc_reader.serialized_objects);
+
         // 2. Get the transferred object from its storage, using the key.
-        let blob_impls_map = sc_reader
+        /*let blob_impls_map = sc_reader
             .blob_impls
             .as_mut()
             .expect("The SC holder does not have any blob impls");
@@ -148,7 +153,8 @@ impl Serializable for Blob {
             .expect("No blob to be deserialized found.");
         if blob_impls_map.is_empty() {
             sc_reader.blob_impls = None;
-        }
+    }*/
+        let blob_impl = sc_reader.serialized_objects.remove::<BlobImpl>(id).expect("No serialized blob found");
 
         let deserialized_blob = Blob::new(owner, blob_impl, can_gc);
 

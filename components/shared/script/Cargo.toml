@@ -18,6 +18,7 @@ webgpu = []
 [dependencies]
 background_hang_monitor_api = { workspace = true }
 base = { workspace = true }
+bincode = { workspace = true }
 bitflags = { workspace = true }
 bluetooth_traits = { workspace = true, optional = true }
 canvas_traits = { workspace = true }

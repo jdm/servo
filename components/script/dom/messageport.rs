@@ -5,14 +5,14 @@
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::convert::TryInto;
-use std::num::NonZeroU32;
 use std::rc::Rc;
 
-use base::id::{MessagePortId, MessagePortIndex, PipelineNamespaceId};
+use base::id::{MessagePortId, Index, PipelineNamespaceId};
 use dom_struct::dom_struct;
 use js::jsapi::{Heap, JSObject, MutableHandleObject};
 use js::rust::{CustomAutoRooter, CustomAutoRooterGuard, HandleValue};
 use script_traits::PortMessageTask;
+use script_traits::transferable::MessagePortImpl;
 
 use crate::dom::bindings::codegen::Bindings::EventHandlerBinding::EventHandlerNonNull;
 use crate::dom::bindings::codegen::Bindings::MessagePortBinding::{
@@ -173,16 +173,17 @@ impl Transferable for MessagePort {
         let transferred_port = self.global().mark_port_as_transferred(id);
 
         // 2. Store the transferred object at a given key.
-        if let Some(ports) = sc_writer.ports.as_mut() {
+        /*if let Some(ports) = sc_writer.ports.as_mut() {
             ports.insert(*id, transferred_port);
         } else {
             let mut ports = HashMap::new();
             ports.insert(*id, transferred_port);
             sc_writer.ports = Some(ports);
-        }
+        }*/
+        sc_writer.transferred_objects.insert(*id, transferred_port);
 
         let PipelineNamespaceId(name_space) = (id).namespace_id;
-        let MessagePortIndex(index) = (id).index;
+        let Index(index, _) = (id).index;
         let index = index.get();
 
         let mut big: [u8; 8] = [0; 8];
@@ -204,6 +205,8 @@ impl Transferable for MessagePort {
         extra_data: u64,
         return_object: MutableHandleObject,
     ) -> Result<(), ()> {
+        println!("{:?}", sc_reader.transferred_objects);
+
         // 1. Re-build the key for the storage location
         // of the transferred object.
         let big: [u8; 8] = extra_data.to_ne_bytes();
@@ -214,12 +217,11 @@ impl Transferable for MessagePort {
                 .try_into()
                 .expect("name_space to be a slice of four."),
         ));
-        let index = MessagePortIndex(
-            NonZeroU32::new(u32::from_ne_bytes(
+        let index = Index::new(
+            u32::from_ne_bytes(
                 index.try_into().expect("index to be a slice of four."),
-            ))
-            .expect("Index to be non-zero"),
-        );
+            )
+        ).expect("Index to be non-zero");
 
         let id = MessagePortId {
             namespace_id,
@@ -228,7 +230,7 @@ impl Transferable for MessagePort {
 
         // 2. Get the transferred object from its storage, using the key.
         // Assign the transfer-received port-impl, and total number of transferred ports.
-        let (ports_len, port_impl) = if let Some(ports) = sc_reader.port_impls.as_mut() {
+        /*let (ports_len, port_impl) = if let Some(ports) = sc_reader.port_impls.as_mut() {
             let ports_len = ports.len();
             let port_impl = ports.remove(&id).expect("Transferred port to be stored");
             if ports.is_empty() {
@@ -237,7 +239,8 @@ impl Transferable for MessagePort {
             (ports_len, port_impl)
         } else {
             panic!("A messageport was transfer-received, yet the SC holder does not have any port impls");
-        };
+    };*/
+        let port_impl = sc_reader.transferred_objects.remove::<MessagePortImpl>(id).expect("Missing serialized port implementation");
 
         let transferred_port =
             MessagePort::new_transferred(owner, id, port_impl.entangled_port_id(), CanGc::note());
@@ -249,8 +252,7 @@ impl Transferable for MessagePort {
         if let Some(ports) = sc_reader.message_ports.as_mut() {
             ports.push(transferred_port);
         } else {
-            let mut ports = Vec::with_capacity(ports_len);
-            ports.push(transferred_port);
+            let ports = vec![transferred_port];
             sc_reader.message_ports = Some(ports);
         }
 

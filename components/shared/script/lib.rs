@@ -22,7 +22,7 @@ use background_hang_monitor_api::BackgroundHangMonitorRegister;
 use base::cross_process_instant::CrossProcessInstant;
 use base::id::{
     BlobId, BrowsingContextId, HistoryStateId, MessagePortId, PipelineId, PipelineNamespaceId,
-    TopLevelBrowsingContextId,
+    TopLevelBrowsingContextId, Indexable, AnyIndex, NamespaceIndex, Index, BlobIndex
 };
 use base::Epoch;
 use bitflags::bitflags;
@@ -757,16 +757,111 @@ impl ScriptToConstellationChan {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, MallocSizeOf, Copy, Clone)]
+///
+pub enum SerializableTypes {
+    ///
+    Blob,
+}
+
+impl TypeTagMarker for SerializableTypes {}
+
+#[derive(Debug, Serialize, Deserialize, MallocSizeOf, Copy, Clone)]
+///
+pub enum TransferableTypes {
+    ///
+    MessagePort,
+}
+
+impl TypeTagMarker for TransferableTypes {}
+
 /// A data-holder for serialized data and transferred objects.
 /// <https://html.spec.whatwg.org/multipage/#structuredserializewithtransfer>
 #[derive(Debug, Deserialize, MallocSizeOf, Serialize)]
 pub struct StructuredSerializedData {
     /// Data serialized by SpiderMonkey.
     pub serialized: Vec<u8>,
-    /// Serialized in a structured callback,
+    ///
+    pub serialized_objects: TypeIndexedMap<SerializableTypes>,
+    ///
+    pub transferred_objects: TypeIndexedMap<TransferableTypes>,
+    /*/// Serialized in a structured callback,
     pub blobs: Option<HashMap<BlobId, BlobImpl>>,
     /// Transferred objects.
-    pub ports: Option<HashMap<MessagePortId, MessagePortImpl>>,
+    pub ports: Option<HashMap<MessagePortId, MessagePortImpl>>,*/
+}
+
+#[derive(MallocSizeOf, /*Serialize, Deserialize,*/ Debug)]
+///
+pub struct TypeIndexedMap<T: TypeTagMarker> {
+    dom_objects: HashMap<NamespaceIndex<AnyIndex>, (T, Vec<u8>)>,
+}
+
+impl<T: TypeTagMarker> Serialize for TypeIndexedMap<T> {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        self.dom_objects.serialize(s)
+    }
+}
+
+impl<'a, T: TypeTagMarker> Deserialize<'a> for TypeIndexedMap<T> {
+    fn deserialize<D: serde::Deserializer<'a>>(d: D) -> Result<Self, D::Error> {
+        let dom_objects = Deserialize::deserialize(d)?;
+        Ok(TypeIndexedMap {
+            dom_objects,
+        })
+    }
+}
+
+impl<T: TypeTagMarker> std::default::Default for TypeIndexedMap<T> {
+    fn default() -> TypeIndexedMap<T> {
+        TypeIndexedMap {
+            dom_objects: HashMap::new(),
+        }
+    }
+}
+
+///
+pub trait TypeTagMarker: Serialize + for<'a> Deserialize<'a> + malloc_size_of::MallocSizeOf + std::fmt::Debug {}
+
+///
+pub trait TypeIndexable: for<'a> Deserialize<'a> + Serialize {
+    ///
+    type Index: Indexable;
+    ///
+    type TypeTag: TypeTagMarker;
+    ///
+    const TYPE_TAG: Self::TypeTag;
+
+    ///
+    fn clone_for_broadcast(&self) -> Option<Self>;
+}
+
+impl<TT: TypeTagMarker> TypeIndexedMap<TT> {
+    fn with_capacity(capacity: usize) -> TypeIndexedMap<TT> {
+        TypeIndexedMap {
+            dom_objects: HashMap::with_capacity(capacity)
+        }
+    }
+
+    ///
+    pub fn is_empty(&self) -> bool {
+        self.dom_objects.is_empty()
+    }
+
+    ///
+    pub fn insert<T: TypeIndexable<TypeTag = TT>>(&mut self, index: NamespaceIndex<T::Index>, value: T) {
+        let untyped_index = index.into_untyped();
+        let serialized = bincode::serialize(&value).unwrap();
+        self.dom_objects.insert(untyped_index, (T::TYPE_TAG, serialized));
+    }
+
+    ///
+    pub fn remove<T: TypeIndexable<TypeTag = TT>>(&mut self, index: NamespaceIndex<T::Index>) -> Option<T> {
+        let untyped_index = index.into_untyped();
+        let (_type_tag, serialized) = self.dom_objects.remove(&untyped_index)?;
+        let deserialized: T = bincode::deserialize(&serialized[..]).ok()?;
+        Some(deserialized)
+    }
 }
 
 impl StructuredSerializedData {
@@ -774,39 +869,37 @@ impl StructuredSerializedData {
     pub fn clone_for_broadcast(&self) -> StructuredSerializedData {
         let serialized = self.serialized.clone();
 
-        let blobs = if let Some(blobs) = self.blobs.as_ref() {
-            let mut blob_clones = HashMap::with_capacity(blobs.len());
+        let mut serialized_objects = TypeIndexedMap::<SerializableTypes>::with_capacity(self.serialized_objects.dom_objects.len());
+        fn perform_clone<T: TypeIndexable>(serialized: &[u8]) -> Option<Vec<u8>> {
+            let deserialized: T = bincode::deserialize(serialized).ok()?;
+            let cloned = deserialized.clone_for_broadcast();
+            bincode::serialize(&cloned).ok()
+        }
 
-            for (original_id, blob) in blobs.iter() {
-                let type_string = blob.type_string();
+        for (original_id, (tag, obj)) in &self.serialized_objects.dom_objects {
+            let cloned = match tag {
+                SerializableTypes::Blob => perform_clone::<BlobImpl>(obj),
+            };
+            let Some(cloned_obj) = cloned else {
+                warn!("Couldn't clone object with id {:?}, ignoring", original_id);
+                continue;
+            };
 
-                if let BlobData::Memory(ref bytes) = blob.blob_data() {
-                    let blob_clone = BlobImpl::new_from_bytes(bytes.clone(), type_string);
+            serialized_objects.dom_objects.insert(*original_id, (*tag, cloned_obj));
+        }
 
-                    // Note: we insert the blob at the original id,
-                    // otherwise this will not match the storage key as serialized by SM in `serialized`.
-                    // The clone has it's own new Id however.
-                    blob_clones.insert(*original_id, blob_clone);
-                } else {
-                    // Not panicking only because this is called from the constellation.
-                    warn!("Serialized blob not in memory format(should never happen).");
-                }
-            }
-            Some(blob_clones)
-        } else {
-            None
-        };
-
-        if self.ports.is_some() {
+        if !self.transferred_objects.dom_objects.is_empty() {
             // Not panicking only because this is called from the constellation.
             warn!("Attempt to broadcast structured serialized data including ports(should never happen).");
         }
 
         StructuredSerializedData {
             serialized,
-            blobs,
+            //blobs,
+            serialized_objects,
             // Ports cannot be broadcast.
-            ports: None,
+            transferred_objects: Default::default(),
+            //ports: None,
         }
     }
 }

@@ -11,11 +11,13 @@
 use std::cell::RefCell;
 use std::path::PathBuf;
 
-use base::id::BlobId;
+use base::id::{BlobId, BlobIndex};
 use malloc_size_of_derive::MallocSizeOf;
 use net_traits::filemanager_thread::RelativePos;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+
+use crate::TypeIndexable;
 
 /// File-based blob
 #[derive(Debug, Deserialize, MallocSizeOf, Serialize)]
@@ -147,5 +149,21 @@ impl BlobImpl {
     /// Get a mutable ref to the data
     pub fn blob_data_mut(&mut self) -> &mut BlobData {
         &mut self.blob_data
+    }
+}
+
+impl TypeIndexable for BlobImpl {
+    type Index = BlobIndex;
+    type TypeTag = crate::SerializableTypes;
+    const TYPE_TAG: Self::TypeTag = crate::SerializableTypes::Blob;
+
+    fn clone_for_broadcast(&self) -> Option<Self> {
+        let type_string = self.type_string();
+
+        if let BlobData::Memory(ref bytes) = self.blob_data() {
+            return Some(BlobImpl::new_from_bytes(bytes.clone(), type_string));
+        }
+        log::warn!("Serialized blob not in memory format(should never happen).");
+        None
     }
 }
