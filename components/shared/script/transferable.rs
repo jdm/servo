@@ -161,7 +161,7 @@ impl MessagePortImpl {
 }
 
 impl TypeIndexable for MessagePortImpl {
-    type Index = MessagePortIndex;
+    //type Index = MessagePortIndex;
     type TypeTag = crate::TransferableTypes;
     const TYPE_TAG: Self::TypeTag = crate::TransferableTypes::MessagePort;
 

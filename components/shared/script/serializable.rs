@@ -153,7 +153,7 @@ impl BlobImpl {
 }
 
 impl TypeIndexable for BlobImpl {
-    type Index = BlobIndex;
+    //type Index = BlobIndex;
     type TypeTag = crate::SerializableTypes;
     const TYPE_TAG: Self::TypeTag = crate::SerializableTypes::Blob;
 

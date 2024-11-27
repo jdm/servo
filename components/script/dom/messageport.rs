@@ -240,7 +240,7 @@ impl Transferable for MessagePort {
         } else {
             panic!("A messageport was transfer-received, yet the SC holder does not have any port impls");
     };*/
-        let port_impl = sc_reader.transferred_objects.remove::<MessagePortImpl>(id).expect("Missing serialized port implementation");
+        let port_impl = sc_reader.transferred_objects.remove::<MessagePortImpl, _>(id).expect("Missing serialized port implementation");
 
         let transferred_port =
             MessagePort::new_transferred(owner, id, port_impl.entangled_port_id(), CanGc::note());

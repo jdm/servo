@@ -825,8 +825,8 @@ pub trait TypeTagMarker: Serialize + for<'a> Deserialize<'a> + malloc_size_of::M
 
 ///
 pub trait TypeIndexable: for<'a> Deserialize<'a> + Serialize {
-    ///
-    type Index: Indexable;
+    /*///
+    type Index: Indexable = AnyIndex;*/
     ///
     type TypeTag: TypeTagMarker;
     ///
@@ -849,14 +849,14 @@ impl<TT: TypeTagMarker> TypeIndexedMap<TT> {
     }
 
     ///
-    pub fn insert<T: TypeIndexable<TypeTag = TT>>(&mut self, index: NamespaceIndex<T::Index>, value: T) {
+    pub fn insert<T: TypeIndexable<TypeTag = TT>, U>(&mut self, index: NamespaceIndex<U>, value: T) {
         let untyped_index = index.into_untyped();
         let serialized = bincode::serialize(&value).unwrap();
         self.dom_objects.insert(untyped_index, (T::TYPE_TAG, serialized));
     }
 
     ///
-    pub fn remove<T: TypeIndexable<TypeTag = TT>>(&mut self, index: NamespaceIndex<T::Index>) -> Option<T> {
+    pub fn remove<T: TypeIndexable<TypeTag = TT>, U>(&mut self, index: NamespaceIndex<U>) -> Option<T> {
         let untyped_index = index.into_untyped();
         let (_type_tag, serialized) = self.dom_objects.remove(&untyped_index)?;
         let deserialized: T = bincode::deserialize(&serialized[..]).ok()?;

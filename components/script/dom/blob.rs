@@ -154,7 +154,7 @@ impl Serializable for Blob {
         if blob_impls_map.is_empty() {
             sc_reader.blob_impls = None;
     }*/
-        let blob_impl = sc_reader.serialized_objects.remove::<BlobImpl>(id).expect("No serialized blob found");
+        let blob_impl = sc_reader.serialized_objects.remove::<BlobImpl, _>(id).expect("No serialized blob found");
 
         Ok(Blob::new(owner, blob_impl, can_gc))
     }
