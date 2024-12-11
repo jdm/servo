@@ -554,27 +554,10 @@ pub mod virtualmethods;
 pub mod visibilitystateentry;
 pub mod vttcue;
 pub mod vttregion;
-pub mod webgl2renderingcontext;
-pub mod webgl_extensions;
-pub mod webgl_validations;
-pub mod webglactiveinfo;
-pub mod webglbuffer;
-pub mod webglcontextevent;
-pub mod webglframebuffer;
-pub mod webglobject;
-pub mod webglprogram;
-pub mod webglquery;
-pub mod webglrenderbuffer;
-pub mod webglrenderingcontext;
-pub mod webglsampler;
-pub mod webglshader;
-pub mod webglshaderprecisionformat;
-pub mod webglsync;
-pub mod webgltexture;
-pub mod webgltransformfeedback;
-pub mod webgluniformlocation;
-pub mod webglvertexarrayobject;
-pub mod webglvertexarrayobjectoes;
+#[cfg(feature = "webgl")]
+mod webgl;
+#[cfg(feature = "webgl")]
+pub use self::webgl::*;
 pub mod websocket;
 #[cfg(feature = "webxr")]
 mod webxr;
@@ -605,4 +588,3 @@ pub mod xmlserializer;
 pub mod xpathevaluator;
 pub mod xpathexpression;
 pub mod xpathresult;
-pub use self::webgl_extensions::ext::*;

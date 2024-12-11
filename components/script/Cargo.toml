@@ -22,6 +22,7 @@ js_backtrace = []
 refcell_backtrace = ["accountable-refcell"]
 webxr = ["webxr-api"]
 webgpu = []
+webgl = []
 
 [build-dependencies]
 phf_codegen = "0.11"

@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+// skip-unless CARGO_FEATURE_WEBGL
+
 // https://www.khronos.org/registry/webgl/specs/latest/1.0/#5.15
 [Exposed=Window]
 interface WebGLContextEvent : Event {
