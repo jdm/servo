@@ -56,7 +56,7 @@ pub(crate) trait MicrotaskRunnable {
 #[derive(JSTraceable, MallocSizeOf)]
 pub(crate) struct EnqueuedPromiseCallback {
     #[ignore_malloc_size_of = "Rc has unclear ownership"]
-    pub(crate) callback: Rc<PromiseJobCallback>,
+    pub(crate) callback: Rc<PromiseJobCallback<crate::DomTypeHolder>>,
     #[no_trace]
     pub(crate) pipeline: PipelineId,
     pub(crate) is_user_interacting: bool,
@@ -67,7 +67,7 @@ pub(crate) struct EnqueuedPromiseCallback {
 #[derive(JSTraceable, MallocSizeOf)]
 pub(crate) struct UserMicrotask {
     #[ignore_malloc_size_of = "Rc has unclear ownership"]
-    pub(crate) callback: Rc<VoidFunction>,
+    pub(crate) callback: Rc<VoidFunction<crate::DomTypeHolder>>,
     #[no_trace]
     pub(crate) pipeline: PipelineId,
 }

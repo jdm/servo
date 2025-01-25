@@ -123,7 +123,7 @@ pub(crate) struct HTMLCanvasElement {
     // This id and hashmap are used to keep track of ongoing toBlob() calls.
     callback_id: Cell<u32>,
     #[ignore_malloc_size_of = "not implemented for webidl callbacks"]
-    blob_callbacks: RefCell<HashMap<u32, Rc<BlobCallback>>>,
+    blob_callbacks: RefCell<HashMap<u32, Rc<BlobCallback<crate::DomTypeHolder>>>>,
 }
 
 impl HTMLCanvasElement {
@@ -631,7 +631,7 @@ impl HTMLCanvasElementMethods<crate::DomTypeHolder> for HTMLCanvasElement {
     fn ToBlob(
         &self,
         _cx: JSContext,
-        callback: Rc<BlobCallback>,
+        callback: Rc<BlobCallback<crate::DomTypeHolder>>,
         mime_type: DOMString,
         quality: HandleValue,
     ) -> Fallible<()> {

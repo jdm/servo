@@ -186,7 +186,7 @@ impl HTMLElementMethods<crate::DomTypeHolder> for HTMLElement {
     }
 
     // https://html.spec.whatwg.org/multipage/#handler-onerror
-    fn GetOnerror(&self, can_gc: CanGc) -> Option<Rc<OnErrorEventHandlerNonNull>> {
+    fn GetOnerror(&self, can_gc: CanGc) -> Option<Rc<OnErrorEventHandlerNonNull<crate::DomTypeHolder>>> {
         if self.is_body_or_frameset() {
             let document = self.owner_document();
             if document.has_browsing_context() {
@@ -201,7 +201,7 @@ impl HTMLElementMethods<crate::DomTypeHolder> for HTMLElement {
     }
 
     // https://html.spec.whatwg.org/multipage/#handler-onerror
-    fn SetOnerror(&self, listener: Option<Rc<OnErrorEventHandlerNonNull>>) {
+    fn SetOnerror(&self, listener: Option<Rc<OnErrorEventHandlerNonNull<crate::DomTypeHolder>>>) {
         if self.is_body_or_frameset() {
             let document = self.owner_document();
             if document.has_browsing_context() {
@@ -215,7 +215,7 @@ impl HTMLElementMethods<crate::DomTypeHolder> for HTMLElement {
     }
 
     // https://html.spec.whatwg.org/multipage/#handler-onload
-    fn GetOnload(&self, can_gc: CanGc) -> Option<Rc<EventHandlerNonNull>> {
+    fn GetOnload(&self, can_gc: CanGc) -> Option<Rc<EventHandlerNonNull<crate::DomTypeHolder>>> {
         if self.is_body_or_frameset() {
             let document = self.owner_document();
             if document.has_browsing_context() {
@@ -230,7 +230,7 @@ impl HTMLElementMethods<crate::DomTypeHolder> for HTMLElement {
     }
 
     // https://html.spec.whatwg.org/multipage/#handler-onload
-    fn SetOnload(&self, listener: Option<Rc<EventHandlerNonNull>>) {
+    fn SetOnload(&self, listener: Option<Rc<EventHandlerNonNull<crate::DomTypeHolder>>>) {
         if self.is_body_or_frameset() {
             let document = self.owner_document();
             if document.has_browsing_context() {
@@ -243,7 +243,7 @@ impl HTMLElementMethods<crate::DomTypeHolder> for HTMLElement {
     }
 
     // https://html.spec.whatwg.org/multipage/#handler-onblur
-    fn GetOnblur(&self, can_gc: CanGc) -> Option<Rc<EventHandlerNonNull>> {
+    fn GetOnblur(&self, can_gc: CanGc) -> Option<Rc<EventHandlerNonNull<crate::DomTypeHolder>>> {
         if self.is_body_or_frameset() {
             let document = self.owner_document();
             if document.has_browsing_context() {
@@ -258,7 +258,7 @@ impl HTMLElementMethods<crate::DomTypeHolder> for HTMLElement {
     }
 
     // https://html.spec.whatwg.org/multipage/#handler-onblur
-    fn SetOnblur(&self, listener: Option<Rc<EventHandlerNonNull>>) {
+    fn SetOnblur(&self, listener: Option<Rc<EventHandlerNonNull<crate::DomTypeHolder>>>) {
         if self.is_body_or_frameset() {
             let document = self.owner_document();
             if document.has_browsing_context() {
@@ -271,7 +271,7 @@ impl HTMLElementMethods<crate::DomTypeHolder> for HTMLElement {
     }
 
     // https://html.spec.whatwg.org/multipage/#handler-onfocus
-    fn GetOnfocus(&self, can_gc: CanGc) -> Option<Rc<EventHandlerNonNull>> {
+    fn GetOnfocus(&self, can_gc: CanGc) -> Option<Rc<EventHandlerNonNull<crate::DomTypeHolder>>> {
         if self.is_body_or_frameset() {
             let document = self.owner_document();
             if document.has_browsing_context() {
@@ -286,7 +286,7 @@ impl HTMLElementMethods<crate::DomTypeHolder> for HTMLElement {
     }
 
     // https://html.spec.whatwg.org/multipage/#handler-onfocus
-    fn SetOnfocus(&self, listener: Option<Rc<EventHandlerNonNull>>) {
+    fn SetOnfocus(&self, listener: Option<Rc<EventHandlerNonNull<crate::DomTypeHolder>>>) {
         if self.is_body_or_frameset() {
             let document = self.owner_document();
             if document.has_browsing_context() {
@@ -299,7 +299,7 @@ impl HTMLElementMethods<crate::DomTypeHolder> for HTMLElement {
     }
 
     // https://html.spec.whatwg.org/multipage/#handler-onresize
-    fn GetOnresize(&self, can_gc: CanGc) -> Option<Rc<EventHandlerNonNull>> {
+    fn GetOnresize(&self, can_gc: CanGc) -> Option<Rc<EventHandlerNonNull<crate::DomTypeHolder>>> {
         if self.is_body_or_frameset() {
             let document = self.owner_document();
             if document.has_browsing_context() {
@@ -314,7 +314,7 @@ impl HTMLElementMethods<crate::DomTypeHolder> for HTMLElement {
     }
 
     // https://html.spec.whatwg.org/multipage/#handler-onresize
-    fn SetOnresize(&self, listener: Option<Rc<EventHandlerNonNull>>) {
+    fn SetOnresize(&self, listener: Option<Rc<EventHandlerNonNull<crate::DomTypeHolder>>>) {
         if self.is_body_or_frameset() {
             let document = self.owner_document();
             if document.has_browsing_context() {
@@ -327,7 +327,7 @@ impl HTMLElementMethods<crate::DomTypeHolder> for HTMLElement {
     }
 
     // https://html.spec.whatwg.org/multipage/#handler-onscroll
-    fn GetOnscroll(&self, can_gc: CanGc) -> Option<Rc<EventHandlerNonNull>> {
+    fn GetOnscroll(&self, can_gc: CanGc) -> Option<Rc<EventHandlerNonNull<crate::DomTypeHolder>>> {
         if self.is_body_or_frameset() {
             let document = self.owner_document();
             if document.has_browsing_context() {
@@ -342,7 +342,7 @@ impl HTMLElementMethods<crate::DomTypeHolder> for HTMLElement {
     }
 
     // https://html.spec.whatwg.org/multipage/#handler-onscroll
-    fn SetOnscroll(&self, listener: Option<Rc<EventHandlerNonNull>>) {
+    fn SetOnscroll(&self, listener: Option<Rc<EventHandlerNonNull<crate::DomTypeHolder>>>) {
         if self.is_body_or_frameset() {
             let document = self.owner_document();
             if document.has_browsing_context() {

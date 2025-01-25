@@ -77,8 +77,8 @@ pub(crate) enum BaseAudioContextOptions {
 #[derive(JSTraceable)]
 struct DecodeResolver {
     pub(crate) promise: Rc<Promise>,
-    pub(crate) success_callback: Option<Rc<DecodeSuccessCallback>>,
-    pub(crate) error_callback: Option<Rc<DecodeErrorCallback>>,
+    pub(crate) success_callback: Option<Rc<DecodeSuccessCallback<crate::DomTypeHolder>>>,
+    pub(crate) error_callback: Option<Rc<DecodeErrorCallback<crate::DomTypeHolder>>>,
 }
 
 type BoxedSliceOfPromises = Box<[Rc<Promise>]>;

@@ -61,7 +61,7 @@ impl NodeIterator {
         document: &Document,
         root_node: &Node,
         what_to_show: u32,
-        node_filter: Option<Rc<NodeFilter>>,
+        node_filter: Option<Rc<NodeFilter<crate::DomTypeHolder>>>,
     ) -> DomRoot<NodeIterator> {
         let filter = match node_filter {
             None => Filter::None,
@@ -83,7 +83,7 @@ impl NodeIteratorMethods<crate::DomTypeHolder> for NodeIterator {
     }
 
     // https://dom.spec.whatwg.org/#dom-nodeiterator-filter
-    fn GetFilter(&self) -> Option<Rc<NodeFilter>> {
+    fn GetFilter(&self) -> Option<Rc<NodeFilter<crate::DomTypeHolder>>> {
         match self.filter {
             Filter::None => None,
             Filter::Callback(ref nf) => Some((*nf).clone()),
@@ -228,5 +228,5 @@ impl NodeIterator {
 #[derive(JSTraceable)]
 pub(crate) enum Filter {
     None,
-    Callback(Rc<NodeFilter>),
+    Callback(Rc<NodeFilter<crate::DomTypeHolder>>),
 }

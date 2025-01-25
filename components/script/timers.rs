@@ -386,14 +386,14 @@ pub(crate) enum IsInterval {
 #[derive(Clone)]
 pub(crate) enum TimerCallback {
     StringTimerCallback(DOMString),
-    FunctionTimerCallback(Rc<Function>),
+    FunctionTimerCallback(Rc<Function<crate::DomTypeHolder>>),
 }
 
 #[derive(Clone, JSTraceable, MallocSizeOf)]
 enum InternalTimerCallback {
     StringTimerCallback(DOMString),
     FunctionTimerCallback(
-        #[ignore_malloc_size_of = "Rc"] Rc<Function>,
+        #[ignore_malloc_size_of = "Rc"] Rc<Function<crate::DomTypeHolder>>,
         #[ignore_malloc_size_of = "Rc"] Rc<Box<[Heap<JSVal>]>>,
     ),
 }

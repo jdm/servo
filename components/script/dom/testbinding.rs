@@ -675,8 +675,8 @@ impl TestBindingMethods<crate::DomTypeHolder> for TestBinding {
     fn PassUnionWithTypedef2(&self, _: UnionTypes::LongSequenceOrStringOrURLOrBlob) {}
     fn PassAny(&self, _: SafeJSContext, _: HandleValue) {}
     fn PassObject(&self, _: SafeJSContext, _: *mut JSObject) {}
-    fn PassCallbackFunction(&self, _: Rc<Function>) {}
-    fn PassCallbackInterface(&self, _: Rc<EventListener>) {}
+    fn PassCallbackFunction(&self, _: Rc<Function<crate::DomTypeHolder>>) {}
+    fn PassCallbackInterface(&self, _: Rc<EventListener<crate::DomTypeHolder>>) {}
     fn PassSequence(&self, _: Vec<i32>) {}
     fn PassAnySequence(&self, _: SafeJSContext, _: CustomAutoRooterGuard<Vec<JSVal>>) {}
     fn AnySequencePassthrough(
@@ -727,8 +727,8 @@ impl TestBindingMethods<crate::DomTypeHolder> for TestBinding {
     fn PassNullableUnion4(&self, _: Option<LongSequenceOrBoolean>) {}
     fn PassNullableUnion5(&self, _: Option<UnsignedLongOrBoolean>) {}
     fn PassNullableUnion6(&self, _: Option<ByteStringOrLong>) {}
-    fn PassNullableCallbackFunction(&self, _: Option<Rc<Function>>) {}
-    fn PassNullableCallbackInterface(&self, _: Option<Rc<EventListener>>) {}
+    fn PassNullableCallbackFunction(&self, _: Option<Rc<Function<crate::DomTypeHolder>>>) {}
+    fn PassNullableCallbackInterface(&self, _: Option<Rc<EventListener<crate::DomTypeHolder>>>) {}
     fn PassNullableSequence(&self, _: Option<Vec<i32>>) {}
 
     fn PassOptionalBoolean(&self, _: Option<bool>) {}
@@ -757,8 +757,8 @@ impl TestBindingMethods<crate::DomTypeHolder> for TestBinding {
     fn PassOptionalUnion6(&self, _: Option<ByteStringOrLong>) {}
     fn PassOptionalAny(&self, _: SafeJSContext, _: HandleValue) {}
     fn PassOptionalObject(&self, _: SafeJSContext, _: Option<*mut JSObject>) {}
-    fn PassOptionalCallbackFunction(&self, _: Option<Rc<Function>>) {}
-    fn PassOptionalCallbackInterface(&self, _: Option<Rc<EventListener>>) {}
+    fn PassOptionalCallbackFunction(&self, _: Option<Rc<Function<crate::DomTypeHolder>>>) {}
+    fn PassOptionalCallbackInterface(&self, _: Option<Rc<EventListener<crate::DomTypeHolder>>>) {}
     fn PassOptionalSequence(&self, _: Option<Vec<i32>>) {}
 
     fn PassOptionalNullableBoolean(&self, _: Option<Option<bool>>) {}
@@ -786,8 +786,8 @@ impl TestBindingMethods<crate::DomTypeHolder> for TestBinding {
     fn PassOptionalNullableUnion4(&self, _: Option<Option<LongSequenceOrBoolean>>) {}
     fn PassOptionalNullableUnion5(&self, _: Option<Option<UnsignedLongOrBoolean>>) {}
     fn PassOptionalNullableUnion6(&self, _: Option<Option<ByteStringOrLong>>) {}
-    fn PassOptionalNullableCallbackFunction(&self, _: Option<Option<Rc<Function>>>) {}
-    fn PassOptionalNullableCallbackInterface(&self, _: Option<Option<Rc<EventListener>>>) {}
+    fn PassOptionalNullableCallbackFunction(&self, _: Option<Option<Rc<Function<crate::DomTypeHolder>>>>) {}
+    fn PassOptionalNullableCallbackInterface(&self, _: Option<Option<Rc<EventListener<crate::DomTypeHolder>>>>) {}
     fn PassOptionalNullableSequence(&self, _: Option<Option<Vec<i32>>>) {}
 
     fn PassOptionalBooleanWithDefault(&self, _: bool) {}
@@ -827,7 +827,7 @@ impl TestBindingMethods<crate::DomTypeHolder> for TestBinding {
     fn PassOptionalNullableUnionWithDefault(&self, _: Option<HTMLElementOrLong>) {}
     fn PassOptionalNullableUnion2WithDefault(&self, _: Option<EventOrString>) {}
     // fn PassOptionalNullableCallbackFunctionWithDefault(self, _: Option<Function>) {}
-    fn PassOptionalNullableCallbackInterfaceWithDefault(&self, _: Option<Rc<EventListener>>) {}
+    fn PassOptionalNullableCallbackInterfaceWithDefault(&self, _: Option<Rc<EventListener<crate::DomTypeHolder>>>) {}
     fn PassOptionalAnyWithDefault(&self, _: SafeJSContext, _: HandleValue) {}
 
     fn PassOptionalNullableBooleanWithNonNullDefault(&self, _: Option<bool>) {}
@@ -1007,8 +1007,8 @@ impl TestBindingMethods<crate::DomTypeHolder> for TestBinding {
 
     fn PromiseNativeHandler(
         &self,
-        resolve: Option<Rc<SimpleCallback>>,
-        reject: Option<Rc<SimpleCallback>>,
+        resolve: Option<Rc<SimpleCallback<crate::DomTypeHolder>>>,
+        reject: Option<Rc<SimpleCallback<crate::DomTypeHolder>>>,
         comp: InRealm,
         can_gc: CanGc,
     ) -> Rc<Promise> {
@@ -1025,10 +1025,10 @@ impl TestBindingMethods<crate::DomTypeHolder> for TestBinding {
         #[derive(JSTraceable, MallocSizeOf)]
         struct SimpleHandler {
             #[ignore_malloc_size_of = "Rc has unclear ownership semantics"]
-            handler: Rc<SimpleCallback>,
+            handler: Rc<SimpleCallback<crate::DomTypeHolder>>,
         }
         impl SimpleHandler {
-            fn new_boxed(callback: Rc<SimpleCallback>) -> Box<dyn Callback> {
+            fn new_boxed(callback: Rc<SimpleCallback<crate::DomTypeHolder>>) -> Box<dyn Callback> {
                 Box::new(SimpleHandler { handler: callback })
             }
         }

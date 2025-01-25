@@ -59,7 +59,7 @@ impl TreeWalker {
         document: &Document,
         root_node: &Node,
         what_to_show: u32,
-        node_filter: Option<Rc<NodeFilter>>,
+        node_filter: Option<Rc<NodeFilter<crate::DomTypeHolder>>>,
     ) -> DomRoot<TreeWalker> {
         let filter = match node_filter {
             None => Filter::None,
@@ -81,7 +81,7 @@ impl TreeWalkerMethods<crate::DomTypeHolder> for TreeWalker {
     }
 
     // https://dom.spec.whatwg.org/#dom-treewalker-filter
-    fn GetFilter(&self) -> Option<Rc<NodeFilter>> {
+    fn GetFilter(&self) -> Option<Rc<NodeFilter<crate::DomTypeHolder>>> {
         match self.filter {
             Filter::None => None,
             Filter::Dom(ref nf) => Some(nf.clone()),
@@ -478,5 +478,5 @@ impl Iterator for &TreeWalker {
 #[derive(JSTraceable)]
 pub(crate) enum Filter {
     None,
-    Dom(Rc<NodeFilter>),
+    Dom(Rc<NodeFilter<crate::DomTypeHolder>>),
 }

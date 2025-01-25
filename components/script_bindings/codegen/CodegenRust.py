@@ -16,9 +16,11 @@ import functools
 
 from WebIDL import (
     BuiltinTypes,
+    IDLArgument,
     IDLBuiltinType,
     IDLDefaultDictionaryValue,
     IDLEmptySequenceValue,
+    IDLInterface,
     IDLInterfaceMember,
     IDLNullableType,
     IDLNullValue,
@@ -58,6 +60,37 @@ RUST_KEYWORDS = {"abstract", "alignof", "as", "become", "box", "break", "const",
                  "priv", "proc", "pub", "pure", "ref", "return", "static", "self", "sizeof",
                  "struct", "super", "true", "trait", "type", "typeof", "unsafe", "unsized",
                  "use", "virtual", "where", "while", "yield"}
+
+
+def isDomInterface(t, logging=False):
+    while isinstance(t, IDLNullableType) or isinstance(t, IDLWrapperType):
+        t = t.inner
+    if isinstance(t, IDLInterface):
+        return True
+    if t.isCallback():
+        return True
+    return t.isInterface() and (t.isGeckoInterface() or (t.isSpiderMonkeyInterface() and not t.isBufferSource()))
+
+
+def containsDomInterface(t, logging=False):
+    if isinstance(t, IDLArgument):
+        t = t.type
+    while isinstance(t, IDLNullableType) or isinstance(t, IDLWrapperType):
+        t = t.inner
+    if t.isEnum():
+        return False
+    if isDomInterface(t):
+        # TODO
+        if t.isCallback():
+            return True
+        return False
+    if t.isUnion():
+        return any(map(lambda x: containsDomInterface(x), t.flatMemberTypes))
+    if t.isDictionary():
+        return any(map(lambda x: containsDomInterface(x), t.members)) or (t.parent and containsDomInterface(t.parent))
+    if t.isSequence():
+        return containsDomInterface(t.inner)
+    return False
 
 
 def toStringBool(arg):
@@ -1044,7 +1077,7 @@ def getJSToNativeConversionInfo(type, descriptorProvider, failureCode=None,
         assert not type.treatNonObjectAsNull() or not type.treatNonCallableAsNull()
 
         callback = type.unroll().callback
-        declType = CGGeneric(callback.identifier.name)
+        declType = CGGeneric(f"{callback.identifier.name}<D>")
         finalDeclType = CGTemplatedType("Rc", declType)
 
         conversion = CGCallbackTempRoot(declType.define())
@@ -1150,8 +1183,10 @@ def getJSToNativeConversionInfo(type, descriptorProvider, failureCode=None,
         assert not type.nullable() or (isMember and isMember != "Dictionary")
 
         typeName = f"{CGDictionary.makeModuleName(type.inner)}::{CGDictionary.makeDictionaryName(type.inner)}"
+        if containsDomInterface(type):
+            typeName += "<D>"
         declType = CGGeneric(typeName)
-        empty = f"{typeName}::empty()"
+        empty = f"{typeName.replace('<D>', '::<D>')}::empty()"
 
         if type_needs_tracing(type):
             declType = CGTemplatedType("RootedTraceableBox", declType)
@@ -1472,7 +1507,7 @@ def getRetvalDeclarationForType(returnType, descriptorProvider):
         return result
     if returnType.isCallback():
         callback = returnType.unroll().callback
-        result = CGGeneric(f'Rc<{getModuleFromObject(callback)}::{callback.identifier.name}>')
+        result = CGGeneric(f'Rc<{getModuleFromObject(callback)}::{callback.identifier.name}<D>>')
         if returnType.nullable():
             result = CGWrapper(result, pre="Option<", post=">")
         return result
@@ -1497,7 +1532,8 @@ def getRetvalDeclarationForType(returnType, descriptorProvider):
     if returnType.isDictionary():
         nullable = returnType.nullable()
         dictName = returnType.inner.name if nullable else returnType.name
-        result = CGGeneric(dictName)
+        generic = "<D>" if containsDomInterface(returnType) else ""
+        result = CGGeneric(f"{dictName}{generic}")
         if type_needs_tracing(returnType):
             result = CGWrapper(result, pre="RootedTraceableBox<", post=">")
         if nullable:
@@ -2581,7 +2617,7 @@ class CGGeneric(CGThing):
 
 class CGCallbackTempRoot(CGGeneric):
     def __init__(self, name):
-        CGGeneric.__init__(self, f"{name}::new(cx, ${{val}}.get().to_object())")
+        CGGeneric.__init__(self, f"{name.replace('<D>', '::<D>')}::new(cx, ${{val}}.get().to_object())")
 
 
 def getAllTypes(descriptors, dictionaries, callbacks, typedefs):
@@ -3247,9 +3283,9 @@ class CGAbstractExternMethod(CGAbstractMethod):
     Abstract base class for codegen of implementation-only (no
     declaration) static methods.
     """
-    def __init__(self, descriptor, name, returnType, args, doesNotPanic=False):
+    def __init__(self, descriptor, name, returnType, args, doesNotPanic=False, templateArgs=None):
         CGAbstractMethod.__init__(self, descriptor, name, returnType, args,
-                                  inline=False, extern=True, doesNotPanic=doesNotPanic)
+                                  inline=False, extern=True, doesNotPanic=doesNotPanic, templateArgs=templateArgs)
 
 
 class PropertyArrays():
@@ -4141,7 +4177,7 @@ class CGSpecializedMethod(CGAbstractExternMethod):
                 Argument('RawHandleObject', '_obj'),
                 Argument('*mut libc::c_void', 'this'),
                 Argument('*const JSJitMethodCallArgs', 'args')]
-        CGAbstractExternMethod.__init__(self, descriptor, name, 'bool', args)
+        CGAbstractExternMethod.__init__(self, descriptor, name, 'bool', args, templateArgs=["D: DomTypes"])
 
     def definition_body(self):
         nativeName = CGSpecializedMethod.makeNativeName(self.descriptor,
@@ -4178,7 +4214,7 @@ class CGMethodPromiseWrapper(CGAbstractExternMethod):
                 Argument('RawHandleObject', '_obj'),
                 Argument('*mut libc::c_void', 'this'),
                 Argument('*const JSJitMethodCallArgs', 'args')]
-        CGAbstractExternMethod.__init__(self, descriptor, name, 'bool', args)
+        CGAbstractExternMethod.__init__(self, descriptor, name, 'bool', args, templateArgs=["D: DomTypes"])
 
     def definition_body(self):
         return CGGeneric(fill(
@@ -5012,6 +5048,8 @@ def getUnionTypeTemplateVars(type, descriptorProvider):
     elif type.isDictionary():
         name = type.name
         typeName = name
+        if containsDomInterface(type):
+            typeName += "<D>"
     elif type.isSequence() or type.isRecord():
         name = type.name
         inner = getUnionTypeTemplateVars(innerContainerType(type), descriptorProvider)
@@ -5036,7 +5074,7 @@ def getUnionTypeTemplateVars(type, descriptorProvider):
         typeName = f"typedarray::Heap{name}"
     elif type.isCallback():
         name = type.name
-        typeName = name
+        typeName = f"{name}<D>"
     else:
         raise TypeError(f"Can't handle {type} in unions yet")
 
@@ -5068,6 +5106,13 @@ class CGUnionStruct(CGThing):
         self.type = type
         self.derives = config.getUnionConfig(str(type)).get('derives', [])
         self.descriptorProvider = descriptorProvider
+
+        if containsDomInterface(self.type):
+            self.generic = "<D: DomTypes + 'static>"
+            self.genericSuffix = "<D>"
+        else:
+            self.generic = ""
+            self.genericSuffix = ""
 
     def membersNeedTracing(self):
         for t in self.type.flatMemberTypes:
@@ -5473,7 +5518,7 @@ class ClassConstructor(ClassItem):
         body = f' {{\n{body}}}'
 
         return f"""
-pub(crate) unsafe fn {self.getDecorators(True)}new({args}) -> Rc<{cgClass.getNameString()}>{body}
+pub(crate) unsafe fn {self.getDecorators(True)}new({args}) -> Rc<{cgClass.getNameString().replace(': DomTypes', '')}>{body}
 """
 
     def define(self, cgClass):
@@ -7632,6 +7677,7 @@ class CGCallback(CGClass):
                          bases=[ClassBase(baseName)],
                          constructors=self.getConstructors(),
                          methods=realMethods,
+                         templateSpecialization=['D: DomTypes'],
                          decorators="#[derive(JSTraceable, PartialEq)]\n"
                                     "#[cfg_attr(crown, allow(crown::unrooted_must_root))]\n"
                                     "#[cfg_attr(crown, crown::unrooted_must_root_lint::allow_unrooted_interior)]")
@@ -7643,7 +7689,7 @@ class CGCallback(CGClass):
             visibility="pub",
             explicit=False,
             baseConstructors=[
-                f"{self.baseName}::new()"
+                f"{self.baseName.replace('<D>', '')}::new()"
             ])]
 
     def getMethodImpls(self, method):
@@ -7713,7 +7759,7 @@ def callbackSetterName(attr, descriptor):
 class CGCallbackFunction(CGCallback):
     def __init__(self, callback, descriptorProvider):
         CGCallback.__init__(self, callback, descriptorProvider,
-                            "CallbackFunction",
+                            "CallbackFunction<D>",
                             methods=[CallCallback(callback, descriptorProvider)])
 
     def getConstructors(self):
@@ -7724,12 +7770,12 @@ class CGCallbackFunctionImpl(CGGeneric):
     def __init__(self, callback):
         type = callback.identifier.name
         impl = (f"""
-impl CallbackContainer for {type} {{
-    unsafe fn new(cx: SafeJSContext, callback: *mut JSObject) -> Rc<{type}> {{
+impl<D: DomTypes> CallbackContainer<D> for {type}<D> {{
+    unsafe fn new(cx: SafeJSContext, callback: *mut JSObject) -> Rc<{type}<D>> {{
         {type}::new(cx, callback)
     }}
 
-    fn callback_holder(&self) -> &CallbackObject {{
+    fn callback_holder(&self) -> &CallbackObject<D> {{
         self.parent.callback_holder()
     }}
 }}
@@ -7753,7 +7799,7 @@ class CGCallbackInterface(CGCallback):
         methods = [CallbackOperation(m, sig, descriptor) for m in methods
                    for sig in m.signatures()]
         assert not iface.isJSImplemented() or not iface.ctor()
-        CGCallback.__init__(self, iface, descriptor, "CallbackInterface", methods)
+        CGCallback.__init__(self, iface, descriptor, "CallbackInterface<D>", methods)
 
 
 class FakeMember():

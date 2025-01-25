@@ -228,7 +228,7 @@ class Descriptor(DescriptorProvider):
         elif self.interface.isCallback():
             ty = 'crate::dom::bindings::codegen::Bindings::%sBinding::%s' % (ifaceName, ifaceName)
             pathDefault = ty
-            self.returnType = "Rc<%s>" % ty
+            self.returnType = "Rc<%s<D>>" % ty
             self.argumentType = "???"
             self.nativeType = ty
         else:

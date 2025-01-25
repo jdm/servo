@@ -308,7 +308,7 @@ fn get_callback(
     cx: JSContext,
     prototype: HandleObject,
     name: &CStr,
-) -> Fallible<Option<Rc<Function>>> {
+) -> Fallible<Option<Rc<Function<crate::DomTypeHolder>>>> {
     rooted!(in(*cx) let mut callback = UndefinedValue());
     unsafe {
         // Step 10.4.1
@@ -625,28 +625,28 @@ impl CustomElementRegistryMethods<crate::DomTypeHolder> for CustomElementRegistr
 #[derive(Clone, JSTraceable, MallocSizeOf)]
 pub(crate) struct LifecycleCallbacks {
     #[ignore_malloc_size_of = "Rc"]
-    connected_callback: Option<Rc<Function>>,
+    connected_callback: Option<Rc<Function<crate::DomTypeHolder>>>,
 
     #[ignore_malloc_size_of = "Rc"]
-    disconnected_callback: Option<Rc<Function>>,
+    disconnected_callback: Option<Rc<Function<crate::DomTypeHolder>>>,
 
     #[ignore_malloc_size_of = "Rc"]
-    adopted_callback: Option<Rc<Function>>,
+    adopted_callback: Option<Rc<Function<crate::DomTypeHolder>>>,
 
     #[ignore_malloc_size_of = "Rc"]
-    attribute_changed_callback: Option<Rc<Function>>,
+    attribute_changed_callback: Option<Rc<Function<crate::DomTypeHolder>>>,
 
     #[ignore_malloc_size_of = "Rc"]
-    form_associated_callback: Option<Rc<Function>>,
+    form_associated_callback: Option<Rc<Function<crate::DomTypeHolder>>>,
 
     #[ignore_malloc_size_of = "Rc"]
-    form_reset_callback: Option<Rc<Function>>,
+    form_reset_callback: Option<Rc<Function<crate::DomTypeHolder>>>,
 
     #[ignore_malloc_size_of = "Rc"]
-    form_disabled_callback: Option<Rc<Function>>,
+    form_disabled_callback: Option<Rc<Function<crate::DomTypeHolder>>>,
 
     #[ignore_malloc_size_of = "Rc"]
-    form_state_restore_callback: Option<Rc<Function>>,
+    form_state_restore_callback: Option<Rc<Function<crate::DomTypeHolder>>>,
 }
 
 #[derive(Clone, JSTraceable, MallocSizeOf)]
@@ -978,7 +978,7 @@ pub(crate) fn try_upgrade_element(element: &Element) {
 pub(crate) enum CustomElementReaction {
     Upgrade(#[ignore_malloc_size_of = "Rc"] Rc<CustomElementDefinition>),
     Callback(
-        #[ignore_malloc_size_of = "Rc"] Rc<Function>,
+        #[ignore_malloc_size_of = "Rc"] Rc<Function<crate::DomTypeHolder>>,
         #[ignore_malloc_size_of = "mozjs"] Box<[Heap<JSVal>]>,
     ),
 }

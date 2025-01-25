@@ -33,12 +33,12 @@ pub(crate) struct IntersectionObserver {
     /// > with the intersection root, as per the processing model.
     /// <https://w3c.github.io/IntersectionObserver/#intersection-observer-callback>
     #[ignore_malloc_size_of = "Rc are hard"]
-    callback: Rc<IntersectionObserverCallback>,
+    callback: Rc<IntersectionObserverCallback<crate::DomTypeHolder>>,
 }
 
 impl IntersectionObserver {
     pub(crate) fn new_inherited(
-        callback: Rc<IntersectionObserverCallback>,
+        callback: Rc<IntersectionObserverCallback<crate::DomTypeHolder>>,
         _init: &IntersectionObserverInit,
     ) -> Self {
         Self {
@@ -50,7 +50,7 @@ impl IntersectionObserver {
     fn new(
         window: &Window,
         proto: Option<HandleObject>,
-        callback: Rc<IntersectionObserverCallback>,
+        callback: Rc<IntersectionObserverCallback<crate::DomTypeHolder>>,
         init: &IntersectionObserverInit,
         can_gc: CanGc,
     ) -> DomRoot<Self> {
@@ -132,7 +132,7 @@ impl IntersectionObserverMethods<crate::DomTypeHolder> for IntersectionObserver 
         window: &Window,
         proto: Option<HandleObject>,
         can_gc: CanGc,
-        callback: Rc<IntersectionObserverCallback>,
+        callback: Rc<IntersectionObserverCallback<crate::DomTypeHolder>>,
         init: &IntersectionObserverInit,
     ) -> DomRoot<IntersectionObserver> {
         Self::new(window, proto, callback, init, can_gc)

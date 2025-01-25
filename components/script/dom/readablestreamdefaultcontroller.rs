@@ -284,7 +284,7 @@ pub(crate) struct ReadableStreamDefaultController {
 
     /// <https://streams.spec.whatwg.org/#readablestreamdefaultcontroller-strategysizealgorithm>
     #[ignore_malloc_size_of = "mozjs"]
-    strategy_size: RefCell<Option<Rc<QueuingStrategySize>>>,
+    strategy_size: RefCell<Option<Rc<QueuingStrategySize<crate::DomTypeHolder>>>>,
 
     /// <https://streams.spec.whatwg.org/#readablestreamdefaultcontroller-closerequested>
     close_requested: Cell<bool>,
@@ -305,7 +305,7 @@ impl ReadableStreamDefaultController {
         global: &GlobalScope,
         underlying_source_type: UnderlyingSourceType,
         strategy_hwm: f64,
-        strategy_size: Rc<QueuingStrategySize>,
+        strategy_size: Rc<QueuingStrategySize<crate::DomTypeHolder>>,
         can_gc: CanGc,
     ) -> ReadableStreamDefaultController {
         ReadableStreamDefaultController {
@@ -331,7 +331,7 @@ impl ReadableStreamDefaultController {
         global: &GlobalScope,
         underlying_source: UnderlyingSourceType,
         strategy_hwm: f64,
-        strategy_size: Rc<QueuingStrategySize>,
+        strategy_size: Rc<QueuingStrategySize<crate::DomTypeHolder>>,
         can_gc: CanGc,
     ) -> DomRoot<ReadableStreamDefaultController> {
         reflect_dom_object(

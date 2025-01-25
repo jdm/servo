@@ -47,14 +47,14 @@ enum ObserverType {
 pub(crate) struct PerformanceObserver {
     reflector_: Reflector,
     #[ignore_malloc_size_of = "can't measure Rc values"]
-    callback: Rc<PerformanceObserverCallback>,
+    callback: Rc<PerformanceObserverCallback<crate::DomTypeHolder>>,
     entries: DomRefCell<DOMPerformanceEntryList>,
     observer_type: Cell<ObserverType>,
 }
 
 impl PerformanceObserver {
     fn new_inherited(
-        callback: Rc<PerformanceObserverCallback>,
+        callback: Rc<PerformanceObserverCallback<crate::DomTypeHolder>>,
         entries: DomRefCell<DOMPerformanceEntryList>,
     ) -> PerformanceObserver {
         PerformanceObserver {
@@ -67,7 +67,7 @@ impl PerformanceObserver {
 
     pub(crate) fn new(
         global: &GlobalScope,
-        callback: Rc<PerformanceObserverCallback>,
+        callback: Rc<PerformanceObserverCallback<crate::DomTypeHolder>>,
         entries: DOMPerformanceEntryList,
         can_gc: CanGc,
     ) -> DomRoot<PerformanceObserver> {
@@ -78,7 +78,7 @@ impl PerformanceObserver {
     fn new_with_proto(
         global: &GlobalScope,
         proto: Option<HandleObject>,
-        callback: Rc<PerformanceObserverCallback>,
+        callback: Rc<PerformanceObserverCallback<crate::DomTypeHolder>>,
         entries: DOMPerformanceEntryList,
         can_gc: CanGc,
     ) -> DomRoot<PerformanceObserver> {
@@ -105,7 +105,7 @@ impl PerformanceObserver {
             .Call_(self, &observer_entry_list, self, ExceptionHandling::Report);
     }
 
-    pub(crate) fn callback(&self) -> Rc<PerformanceObserverCallback> {
+    pub(crate) fn callback(&self) -> Rc<PerformanceObserverCallback<crate::DomTypeHolder>> {
         self.callback.clone()
     }
 
@@ -124,7 +124,7 @@ impl PerformanceObserverMethods<crate::DomTypeHolder> for PerformanceObserver {
         global: &GlobalScope,
         proto: Option<HandleObject>,
         can_gc: CanGc,
-        callback: Rc<PerformanceObserverCallback>,
+        callback: Rc<PerformanceObserverCallback<crate::DomTypeHolder>>,
     ) -> Fallible<DomRoot<PerformanceObserver>> {
         Ok(PerformanceObserver::new_with_proto(
             global,
