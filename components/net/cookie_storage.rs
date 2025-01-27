@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use std::time::SystemTime;
 
 use log::{debug, info};
+use malloc_size_of_derive::MallocSizeOf;
 use net_traits::pub_domains::reg_suffix;
 use net_traits::CookieSource;
 use serde::{Deserialize, Serialize};
@@ -18,7 +19,7 @@ use servo_url::ServoUrl;
 
 use crate::cookie::ServoCookie;
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, MallocSizeOf)]
 pub struct CookieStorage {
     version: u32,
     cookies_map: HashMap<String, Vec<ServoCookie>>,

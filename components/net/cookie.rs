@@ -10,6 +10,7 @@ use std::net::{Ipv4Addr, Ipv6Addr};
 use std::time::SystemTime;
 
 use cookie::Cookie;
+use malloc_size_of_derive::MallocSizeOf;
 use net_traits::pub_domains::is_pub_domain;
 use net_traits::CookieSource;
 use serde::{Deserialize, Serialize};
@@ -18,12 +19,13 @@ use servo_url::ServoUrl;
 /// A stored cookie that wraps the definition in cookie-rs. This is used to implement
 /// various behaviours defined in the spec that rely on an associated request URL,
 /// which cookie-rs and hyper's header parsing do not support.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, MallocSizeOf)]
 pub struct ServoCookie {
     #[serde(
         deserialize_with = "hyper_serde::deserialize",
         serialize_with = "hyper_serde::serialize"
     )]
+    #[ignore_malloc_size_of = "Defined in third-party crate; hard to meausure."]
     pub cookie: Cookie<'static>,
     pub host_only: bool,
     pub persistent: bool,

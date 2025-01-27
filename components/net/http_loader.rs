@@ -42,6 +42,10 @@ use hyper_util::client::legacy::Client;
 use ipc_channel::ipc::{self, IpcSender};
 use ipc_channel::router::ROUTER;
 use log::{debug, error, info, log_enabled, warn};
+use malloc_size_of::{
+    MallocSizeOf as MallocSizeOfTrait, MallocSizeOfOps, MallocUnconditionalSizeOf,
+};
+use malloc_size_of_derive::MallocSizeOf;
 use net_traits::http_status::HttpStatus;
 use net_traits::pub_domains::reg_suffix;
 use net_traits::request::Origin::Origin as SpecificOrigin;
@@ -58,6 +62,8 @@ use net_traits::{
     ReferrerPolicy, ResourceAttribute, ResourceFetchTiming, ResourceTimeValue,
     DOCUMENT_ACCEPT_HEADER_VALUE,
 };
+use profile_traits::mem::{Report, ReportKind};
+use profile_traits::path;
 use servo_arc::Arc;
 use servo_url::{ImmutableOrigin, ServoUrl};
 use tokio::sync::mpsc::{
@@ -80,7 +86,7 @@ use crate::http_cache::{CacheKey, HttpCache};
 use crate::resource_thread::{AuthCache, AuthCacheEntry};
 
 /// The various states an entry of the HttpCache can be in.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, MallocSizeOf, PartialEq)]
 pub enum HttpCacheEntryState {
     /// The entry is fully up-to-date,
     /// there are no pending concurrent stores,
@@ -90,7 +96,23 @@ pub enum HttpCacheEntryState {
     PendingStore(usize),
 }
 
-type HttpCacheState = Mutex<HashMap<CacheKey, Arc<(Mutex<HttpCacheEntryState>, Condvar)>>>;
+#[derive(MallocSizeOf)]
+struct CacheStateDataInner {
+    state: Mutex<HttpCacheEntryState>,
+    #[ignore_malloc_size_of = "defined in std"]
+    condition: Condvar,
+}
+
+#[derive(Clone)]
+pub struct CacheStateData(Arc<CacheStateDataInner>);
+
+impl MallocSizeOfTrait for CacheStateData {
+    fn size_of(&self, ops: &mut MallocSizeOfOps) -> usize {
+        self.0.unconditional_size_of(ops)
+    }
+}
+
+type HttpCacheState = Mutex<HashMap<CacheKey, CacheStateData>>;
 
 pub struct HttpState {
     pub hsts_list: RwLock<HstsList>,
@@ -105,6 +127,51 @@ pub struct HttpState {
     pub client: Client<Connector, crate::connector::BoxedBody>,
     pub override_manager: CertificateErrorOverrideManager,
     pub embedder_proxy: Mutex<EmbedderProxy>,
+}
+
+impl HttpState {
+    pub(crate) fn collect_reports(
+        &self,
+        kind: &str,
+        reports: &mut Vec<Report>,
+        ops: &mut MallocSizeOfOps,
+    ) {
+        reports.push(Report {
+            path: path!["net", "memory-cache", kind, "data"],
+            kind: ReportKind::ExplicitJemallocHeapSize,
+            size: self.http_cache.read().unwrap().size_of(ops),
+        });
+
+        reports.push(Report {
+            path: path!["net", "memory-cache", kind, "state"],
+            kind: ReportKind::ExplicitJemallocHeapSize,
+            size: self.http_cache_state.lock().unwrap().size_of(ops),
+        });
+
+        reports.push(Report {
+            path: path!["net", "auth-cache", kind],
+            kind: ReportKind::ExplicitJemallocHeapSize,
+            size: self.auth_cache.read().unwrap().size_of(ops),
+        });
+
+        reports.push(Report {
+            path: path!["net", "history-states", kind],
+            kind: ReportKind::ExplicitJemallocHeapSize,
+            size: self.history_states.read().unwrap().size_of(ops),
+        });
+
+        reports.push(Report {
+            path: path!["net", "hsts", kind],
+            kind: ReportKind::ExplicitJemallocHeapSize,
+            size: self.hsts_list.read().unwrap().size_of(ops),
+        });
+
+        reports.push(Report {
+            path: path!["net", "cookies", kind],
+            kind: ReportKind::ExplicitJemallocHeapSize,
+            size: self.cookie_jar.read().unwrap().size_of(ops),
+        });
+    }
 }
 
 /// Step 13 of <https://fetch.spec.whatwg.org/#concept-fetch>.
@@ -1342,17 +1409,21 @@ async fn http_network_or_cache_fetch(
     // Note that this is a different workflow from the one involving `wait_for_cached_response`.
     // That one happens when a fetch gets a cache hit, and the resource is pending completion from the network.
     {
-        let (lock, cvar) = {
+        let CacheStateDataInner {
+            state: lock,
+            condition: cvar,
+        } = {
             let entry_key = CacheKey::new(http_request);
             let mut state_map = context.state.http_cache_state.lock().unwrap();
             &*state_map
                 .entry(entry_key)
                 .or_insert_with(|| {
-                    Arc::new((
-                        Mutex::new(HttpCacheEntryState::ReadyToConstruct),
-                        Condvar::new(),
-                    ))
+                    CacheStateData(Arc::new(CacheStateDataInner {
+                        state: Mutex::new(HttpCacheEntryState::ReadyToConstruct),
+                        condition: Condvar::new(),
+                    }))
                 })
+                .0
                 .clone()
         };
 
@@ -1441,12 +1512,16 @@ async fn http_network_or_cache_fetch(
     // and set the state to ready to construct,
     // if no stores are pending.
     fn update_http_cache_state(context: &FetchContext, http_request: &Request) {
-        let (lock, cvar) = {
+        let CacheStateDataInner {
+            state: lock,
+            condition: cvar,
+        } = {
             let entry_key = CacheKey::new(http_request);
             let mut state_map = context.state.http_cache_state.lock().unwrap();
             &*state_map
                 .get_mut(&entry_key)
                 .expect("Entry in http-cache state to have been previously inserted")
+                .0
                 .clone()
         };
         let mut state = lock.lock().unwrap();
