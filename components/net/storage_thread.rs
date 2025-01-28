@@ -7,8 +7,11 @@ use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 use std::thread;
 
-use ipc_channel::ipc::{self, IpcReceiver, IpcSender};
+use ipc_channel::ipc::{self, IpcReceiver, IpcSender, IpcReceiverSet};
+use malloc_size_of::{MallocSizeOf, MallocSizeOfOps};
 use net_traits::storage_thread::{StorageThreadMsg, StorageType};
+use profile_traits::mem::{ProfilerChan, ReportsChan, Report, ReportKind};
+use profile_traits::path;
 use servo_url::ServoUrl;
 
 use crate::resource_thread;
@@ -16,17 +19,23 @@ use crate::resource_thread;
 const QUOTA_SIZE_LIMIT: usize = 5 * 1024 * 1024;
 
 pub trait StorageThreadFactory {
-    fn new(config_dir: Option<PathBuf>) -> Self;
+    fn new(config_dir: Option<PathBuf>, mem_profiler_chan: ProfilerChan) -> Self;
 }
 
 impl StorageThreadFactory for IpcSender<StorageThreadMsg> {
     /// Create a storage thread
-    fn new(config_dir: Option<PathBuf>) -> IpcSender<StorageThreadMsg> {
+    fn new(config_dir: Option<PathBuf>, mem_profiler_chan: ProfilerChan) -> IpcSender<StorageThreadMsg> {
         let (chan, port) = ipc::channel().unwrap();
         thread::Builder::new()
             .name("StorageManager".to_owned())
             .spawn(move || {
-                StorageManager::new(port, config_dir).start();
+                let (reports_sender, reports_receiver) = ipc::channel().unwrap();
+                mem_profiler_chan.run_with_memory_reporting(
+                    || StorageManager::new(config_dir).start(port, reports_receiver),
+                    String::from("storage-thread-reporter"),
+                    reports_sender,
+                    |reports_sender| reports_sender,
+                )
             })
             .expect("Thread spawning failed");
         chan
@@ -34,20 +43,18 @@ impl StorageThreadFactory for IpcSender<StorageThreadMsg> {
 }
 
 struct StorageManager {
-    port: IpcReceiver<StorageThreadMsg>,
     session_data: HashMap<String, (usize, BTreeMap<String, String>)>,
     local_data: HashMap<String, (usize, BTreeMap<String, String>)>,
     config_dir: Option<PathBuf>,
 }
 
 impl StorageManager {
-    fn new(port: IpcReceiver<StorageThreadMsg>, config_dir: Option<PathBuf>) -> StorageManager {
+    fn new(config_dir: Option<PathBuf>) -> StorageManager {
         let mut local_data = HashMap::new();
         if let Some(ref config_dir) = config_dir {
             resource_thread::read_json_from_file(&mut local_data, config_dir, "local_data.json");
         }
         StorageManager {
-            port,
             session_data: HashMap::new(),
             local_data,
             config_dir,
@@ -56,40 +63,76 @@ impl StorageManager {
 }
 
 impl StorageManager {
-    fn start(&mut self) {
+    fn start(&mut self, port: IpcReceiver<StorageThreadMsg>, reports_receiver: IpcReceiver<ReportsChan>) {
+        let mut rx_set = IpcReceiverSet::new().unwrap();
+        let main_id = rx_set.add(port).unwrap();
+        let reports_id = rx_set.add(reports_receiver).unwrap();
         loop {
-            match self.port.recv().unwrap() {
-                StorageThreadMsg::Length(sender, url, storage_type) => {
-                    self.length(sender, url, storage_type)
-                },
-                StorageThreadMsg::Key(sender, url, storage_type, index) => {
-                    self.key(sender, url, storage_type, index)
-                },
-                StorageThreadMsg::Keys(sender, url, storage_type) => {
-                    self.keys(sender, url, storage_type)
-                },
-                StorageThreadMsg::SetItem(sender, url, storage_type, name, value) => {
-                    self.set_item(sender, url, storage_type, name, value);
-                    self.save_state()
-                },
-                StorageThreadMsg::GetItem(sender, url, storage_type, name) => {
-                    self.request_item(sender, url, storage_type, name)
-                },
-                StorageThreadMsg::RemoveItem(sender, url, storage_type, name) => {
-                    self.remove_item(sender, url, storage_type, name);
-                    self.save_state()
-                },
-                StorageThreadMsg::Clear(sender, url, storage_type) => {
-                    self.clear(sender, url, storage_type);
-                    self.save_state()
-                },
-                StorageThreadMsg::Exit(sender) => {
-                    // Nothing to do since we save localstorage set eagerly.
-                    let _ = sender.send(());
-                    break;
-                },
+            for receiver in rx_set.select().unwrap().into_iter() {
+                // Handles case where profiler thread shuts down before storage thread.
+                if let ipc::IpcSelectionResult::ChannelClosed(..) = receiver {
+                    continue;
+                }
+                let (id, data) = receiver.unwrap();
+                if id == reports_id {
+                    if let Ok(msg) = data.to() {
+                        self.process_report(msg);
+                    }
+                    continue;
+                }
+                let Ok(msg) = data.to() else {
+                    continue;
+                };
+                match msg {
+                    StorageThreadMsg::Length(sender, url, storage_type) => {
+                        self.length(sender, url, storage_type)
+                    },
+                    StorageThreadMsg::Key(sender, url, storage_type, index) => {
+                        self.key(sender, url, storage_type, index)
+                    },
+                    StorageThreadMsg::Keys(sender, url, storage_type) => {
+                        self.keys(sender, url, storage_type)
+                    },
+                    StorageThreadMsg::SetItem(sender, url, storage_type, name, value) => {
+                        self.set_item(sender, url, storage_type, name, value);
+                        self.save_state()
+                    },
+                    StorageThreadMsg::GetItem(sender, url, storage_type, name) => {
+                        self.request_item(sender, url, storage_type, name)
+                    },
+                    StorageThreadMsg::RemoveItem(sender, url, storage_type, name) => {
+                        self.remove_item(sender, url, storage_type, name);
+                        self.save_state()
+                    },
+                    StorageThreadMsg::Clear(sender, url, storage_type) => {
+                        self.clear(sender, url, storage_type);
+                        self.save_state()
+                    },
+                    StorageThreadMsg::Exit(sender) => {
+                        // Nothing to do since we save localstorage set eagerly.
+                        let _ = sender.send(());
+                        break;
+                    },
+                }
             }
         }
+    }
+
+    fn process_report(&self, sender: ReportsChan) {
+        let mut ops = MallocSizeOfOps::new(servo_allocator::usable_size, None, None);
+        let reports = vec![
+            Report {
+                path: path!["storage", "session"],
+                kind: ReportKind::ExplicitJemallocHeapSize,
+                size: self.session_data.size_of(&mut ops),
+            },
+            Report {
+                path: path!["storage", "local"],
+                kind: ReportKind::ExplicitJemallocHeapSize,
+                size: self.local_data.size_of(&mut ops),
+            },
+        ];
+        sender.send(reports);
     }
 
     fn save_state(&self) {
