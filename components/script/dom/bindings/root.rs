@@ -207,7 +207,8 @@ where
     T: DomObject + MallocSizeOf,
 {
     fn size_of(&self, ops: &mut MallocSizeOfOps) -> usize {
-        (**self).size_of(ops)
+        0
+        //(**self).size_of(ops)
     }
 }
 

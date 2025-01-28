@@ -10,6 +10,8 @@ use std::{mem, thread};
 use imsz::imsz_from_reader;
 use ipc_channel::ipc::IpcSharedMemory;
 use log::{debug, warn};
+use malloc_size_of::{MallocSizeOf as MallocSizeOfTrait, MallocSizeOfOps};
+use malloc_size_of_derive::MallocSizeOf;
 use net_traits::image_cache::{
     ImageCache, ImageCacheResult, ImageOrMetadataAvailable, ImageResponder, ImageResponse,
     PendingImageId, UsePlaceholder,
@@ -97,6 +99,7 @@ type ImageKey = (ServoUrl, ImmutableOrigin, Option<CorsSettings>);
 
 // Represents all the currently pending loads/decodings. For
 // performance reasons, loads are indexed by a dedicated load key.
+#[derive(MallocSizeOf)]
 struct AllPendingLoads {
     // The loads, indexed by a load key. Used during most operations,
     // for performance reasons.
@@ -179,6 +182,7 @@ enum CacheResult<'a> {
 /// Images that fail to load (due to network or decode
 /// failure) are still stored here, so that they aren't
 /// fetched again.
+#[derive(MallocSizeOf)]
 struct CompletedLoad {
     image_response: ImageResponse,
     id: PendingImageId,
@@ -196,9 +200,10 @@ struct DecoderMsg {
     image: Option<Image>,
 }
 
+#[derive(MallocSizeOf)]
 enum ImageBytes {
     InProgress(Vec<u8>),
-    Complete(Arc<Vec<u8>>),
+    Complete(#[conditional_malloc_size_of] Arc<Vec<u8>>),
 }
 
 impl ImageBytes {
@@ -233,6 +238,7 @@ impl ImageBytes {
 // A key used to communicate during loading.
 type LoadKey = PendingImageId;
 
+#[derive(MallocSizeOf)]
 struct LoadKeyGenerator {
     counter: u64,
 }
@@ -256,6 +262,7 @@ enum LoadResult {
 
 /// Represents an image that is either being loaded
 /// by the resource thread, or decoded by a worker thread.
+#[derive(MallocSizeOf)]
 struct PendingLoad {
     /// The bytes loaded so far. Reset to an empty vector once loading
     /// is complete and the buffer has been transmitted to the decoder.
@@ -314,6 +321,7 @@ impl PendingLoad {
 // ======================================================================
 // Image cache implementation.
 // ======================================================================
+#[derive(MallocSizeOf)]
 struct ImageCacheStore {
     // Images that are loading over network, or decoding.
     pending_loads: AllPendingLoads,
@@ -322,12 +330,14 @@ struct ImageCacheStore {
     completed_loads: HashMap<ImageKey, CompletedLoad>,
 
     // The placeholder image used when an image fails to load
+    #[ignore_malloc_size_of = ""]
     placeholder_image: Arc<Image>,
 
     // The URL used for the placeholder image
     placeholder_url: ServoUrl,
 
     // Cross-process compositor API instance.
+    #[ignore_malloc_size_of = ""]
     compositor_api: CrossProcessCompositorApi,
 }
 
@@ -407,10 +417,13 @@ impl ImageCacheStore {
     }
 }
 
+#[derive(MallocSizeOf)]
 pub struct ImageCacheImpl {
+    #[conditional_malloc_size_of]
     store: Arc<Mutex<ImageCacheStore>>,
 
     /// Thread pool for image decoding
+    #[ignore_malloc_size_of = ""]
     thread_pool: CoreResourceThreadPool,
 }
 
@@ -618,6 +631,10 @@ impl ImageCache for ImageCacheImpl {
                 }
             },
         }
+    }
+
+    fn size_of(&self, ops: &mut MallocSizeOfOps) -> usize {
+        MallocSizeOfTrait::size_of(self, ops)
     }
 }
 

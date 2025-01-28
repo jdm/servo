@@ -152,7 +152,7 @@ use crate::navigation::{InProgressLoad, NavigationListener};
 use crate::realms::enter_realm;
 use crate::script_module::ScriptFetchOptions;
 use crate::script_runtime::{
-    CanGc, JSContext, Runtime, ScriptThreadEventCategory, ThreadSafeJSContext,
+    self, CanGc, JSContext, Runtime, ScriptThreadEventCategory, ThreadSafeJSContext,
 };
 use crate::task_queue::TaskQueue;
 use crate::task_source::{SendableTaskSource, TaskSourceName};
@@ -2461,11 +2461,17 @@ impl ScriptThread {
             document.window().layout().collect_reports(&mut reports);
         }
 
-        let mut ops = MallocSizeOfOps::new(servo_allocator::usable_size, None, None);
+        let mut ops = MallocSizeOfOps::new(servo_allocator::usable_size, None, Some(Box::new(script_runtime::seen_pointer)));
         reports.push(Report {
             path: path![path, "script-thread"],
             kind: ReportKind::ExplicitJemallocHeapSize,
             size: self.size_of(&mut ops),
+        });
+
+        reports.push(Report {
+            path: path![path, "image-cache"],
+            kind: ReportKind::ExplicitJemallocHeapSize,
+            size: self.image_cache.size_of(&mut ops),
         });
 
         reports_chan.send(reports);

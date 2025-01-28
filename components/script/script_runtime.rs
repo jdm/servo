@@ -816,6 +816,10 @@ thread_local!(static SEEN_POINTERS: LazyCell<RefCell<HashSet<*const c_void>>> = 
     LazyCell::new(|| RefCell::new(HashSet::new()))
 });
 
+pub(crate) fn seen_pointer(ptr: *const c_void) -> bool {
+    SEEN_POINTERS.with(|pointers| !pointers.borrow_mut().insert(ptr))
+}
+
 #[allow(unsafe_code)]
 unsafe extern "C" fn get_size(obj: *mut JSObject) -> usize {
     match get_dom_class(obj) {
@@ -825,8 +829,6 @@ unsafe extern "C" fn get_size(obj: *mut JSObject) -> usize {
             if dom_object.is_null() {
                 return 0;
             }
-            let seen_pointer =
-                move |ptr| SEEN_POINTERS.with(|pointers| !pointers.borrow_mut().insert(ptr));
             let mut ops = MallocSizeOfOps::new(
                 servo_allocator::usable_size,
                 None,
