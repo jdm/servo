@@ -4,17 +4,20 @@
 
 use std::borrow::ToOwned;
 use std::cell::OnceCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::ops::{Deref, RangeInclusive};
 use std::sync::Arc;
 use std::{fmt, thread};
 
 use app_units::Au;
 use atomic_refcell::AtomicRefCell;
-use ipc_channel::ipc::{self, IpcReceiver, IpcSender};
+use ipc_channel::ipc::{self, IpcReceiver, IpcSender, IpcReceiverSet};
 use log::debug;
+use malloc_size_of::{MallocSizeOf as MallocSizeOfTrait, MallocSizeOfOps};
 use malloc_size_of_derive::MallocSizeOf;
 use parking_lot::{Mutex, RwLock};
+use profile_traits::mem::{ProfilerChan, Report, ReportsChan, ReportKind};
+use profile_traits::path;
 use serde::{Deserialize, Serialize};
 use servo_config::pref;
 use servo_url::ServoUrl;
@@ -70,7 +73,7 @@ pub enum SystemFontServiceMessage {
     Ping,
 }
 
-#[derive(Default)]
+#[derive(Default, MallocSizeOf)]
 struct ResolvedGenericFontFamilies {
     default: OnceCell<LowercaseFontFamilyName>,
     serif: OnceCell<LowercaseFontFamilyName>,
@@ -84,9 +87,10 @@ struct ResolvedGenericFontFamilies {
 /// The system font service. There is one of these for every Servo instance. This is a thread,
 /// responsible for reading the list of system fonts, handling requests to match against
 /// them, and ensuring that only one copy of system font data is loaded at a time.
+#[derive(MallocSizeOf)]
 pub struct SystemFontService {
-    port: IpcReceiver<SystemFontServiceMessage>,
     local_families: FontStore,
+    #[ignore_malloc_size_of = ""]
     compositor_api: CrossProcessCompositorApi,
     webrender_fonts: HashMap<FontIdentifier, FontKey>,
     font_instances: HashMap<(FontKey, Au), FontInstanceKey>,
@@ -118,67 +122,107 @@ impl SystemFontServiceProxySender {
 }
 
 impl SystemFontService {
-    pub fn spawn(compositor_api: CrossProcessCompositorApi) -> SystemFontServiceProxySender {
+    pub fn spawn(compositor_api: CrossProcessCompositorApi, mem_profiler_chan: ProfilerChan) -> SystemFontServiceProxySender {
         let (sender, receiver) = ipc::channel().unwrap();
 
         thread::Builder::new()
             .name("SystemFontService".to_owned())
             .spawn(move || {
-                #[allow(clippy::default_constructed_unit_structs)]
-                let mut cache = SystemFontService {
-                    port: receiver,
-                    local_families: Default::default(),
-                    compositor_api,
-                    webrender_fonts: HashMap::new(),
-                    font_instances: HashMap::new(),
-                    generic_fonts: Default::default(),
-                    free_font_keys: Default::default(),
-                    free_font_instance_keys: Default::default(),
-                };
+                let (reports_sender, reports_receiver) = ipc::channel().unwrap();
+                mem_profiler_chan.run_with_memory_reporting(
+                    || {
+                        #[allow(clippy::default_constructed_unit_structs)]
+                        let mut cache = SystemFontService {
+                            local_families: Default::default(),
+                            compositor_api,
+                            webrender_fonts: HashMap::new(),
+                            font_instances: HashMap::new(),
+                            generic_fonts: Default::default(),
+                            free_font_keys: Default::default(),
+                            free_font_instance_keys: Default::default(),
+                        };
 
-                cache.fetch_new_keys();
-                cache.refresh_local_families();
-                cache.run();
+                        cache.fetch_new_keys();
+                        cache.refresh_local_families();
+                        cache.run(receiver, reports_receiver);
+                    },
+                    String::from("system-font-reporter"),
+                    reports_sender,
+                    |reports_sender| reports_sender,
+                )
             })
             .expect("Thread spawning failed");
 
         SystemFontServiceProxySender(sender)
     }
 
-    fn run(&mut self) {
+    fn run(&mut self, port: IpcReceiver<SystemFontServiceMessage>, reports_receiver: IpcReceiver<ReportsChan>) {
+        let mut rx_set = IpcReceiverSet::new().unwrap();
+        let main_id = rx_set.add(port).unwrap();
+        let reports_id = rx_set.add(reports_receiver).unwrap();
         loop {
-            let msg = self.port.recv().unwrap();
+            for receiver in rx_set.select().unwrap().into_iter() {
+                // Handles case where profiler thread shuts down before font thread.
+                if let ipc::IpcSelectionResult::ChannelClosed(..) = receiver {
+                    continue;
+                }
 
-            #[cfg(feature = "tracing")]
-            let _span =
-                tracing::trace_span!("SystemFontServiceMessage", servo_profiling = true).entered();
-            match msg {
-                SystemFontServiceMessage::GetFontTemplates(
-                    font_descriptor,
-                    font_family,
-                    result_sender,
-                ) => {
-                    let _ =
-                        result_sender.send(self.get_font_templates(font_descriptor, font_family));
-                },
-                SystemFontServiceMessage::GetFontInstance(identifier, pt_size, flags, result) => {
-                    let _ = result.send(self.get_font_instance(identifier, pt_size, flags));
-                },
-                SystemFontServiceMessage::GetFontKey(result_sender) => {
-                    self.fetch_new_keys();
-                    let _ = result_sender.send(self.free_font_keys.pop().unwrap());
-                },
-                SystemFontServiceMessage::GetFontInstanceKey(result_sender) => {
-                    self.fetch_new_keys();
-                    let _ = result_sender.send(self.free_font_instance_keys.pop().unwrap());
-                },
-                SystemFontServiceMessage::Ping => (),
-                SystemFontServiceMessage::Exit(result) => {
-                    let _ = result.send(());
-                    break;
-                },
+                let (id, data) = receiver.unwrap();
+                if id == reports_id {
+                    if let Ok(msg) = data.to() {
+                        self.process_report(msg);
+                    }
+                    continue;
+                }
+
+                let Ok(msg) = data.to() else {
+                    continue;
+                };
+
+                #[cfg(feature = "tracing")]
+                let _span =
+                    tracing::trace_span!("SystemFontServiceMessage", servo_profiling = true).entered();
+                match msg {
+                    SystemFontServiceMessage::GetFontTemplates(
+                        font_descriptor,
+                        font_family,
+                        result_sender,
+                    ) => {
+                        let _ =
+                            result_sender.send(self.get_font_templates(font_descriptor, font_family));
+                    },
+                    SystemFontServiceMessage::GetFontInstance(identifier, pt_size, flags, result) => {
+                        let _ = result.send(self.get_font_instance(identifier, pt_size, flags));
+                    },
+                    SystemFontServiceMessage::GetFontKey(result_sender) => {
+                        self.fetch_new_keys();
+                        let _ = result_sender.send(self.free_font_keys.pop().unwrap());
+                    },
+                    SystemFontServiceMessage::GetFontInstanceKey(result_sender) => {
+                        self.fetch_new_keys();
+                        let _ = result_sender.send(self.free_font_instance_keys.pop().unwrap());
+                    },
+                    SystemFontServiceMessage::Ping => (),
+                    SystemFontServiceMessage::Exit(result) => {
+                        let _ = result.send(());
+                        break;
+                    },
+                }
             }
         }
+    }
+
+    fn process_report(&self, reports: ReportsChan) {
+        let mut seen_pointers = HashSet::new();
+        let seen_ptr = move |ptr| !seen_pointers.insert(ptr);
+        let mut ops = MallocSizeOfOps::new(servo_allocator::usable_size, None, Some(Box::new(seen_ptr)));
+        reports.send(vec![
+            Report {
+                path: path!["fonts"],
+                kind: ReportKind::ExplicitJemallocHeapSize,
+                size: self.size_of(&mut ops),
+            },
+        ]);
     }
 
     #[cfg_attr(
@@ -565,7 +609,7 @@ impl SystemFontServiceProxy {
     }
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, MallocSizeOf, PartialEq, Serialize)]
 pub struct LowercaseFontFamilyName {
     inner: String,
 }

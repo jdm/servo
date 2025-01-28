@@ -2034,6 +2034,7 @@ dependencies = [
  "net_traits",
  "num-traits",
  "parking_lot",
+ "profile_traits",
  "range",
  "serde",
  "servo_allocator",
@@ -6674,6 +6675,7 @@ version = "0.0.1"
 dependencies = [
  "accountable-refcell",
  "app_units",
+ "atomic_refcell",
  "content-security-policy",
  "crossbeam-channel",
  "dom",

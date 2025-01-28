@@ -1123,7 +1123,7 @@ fn create_constellation(
     );
 
     let system_font_service = Arc::new(
-        SystemFontService::spawn(compositor_proxy.cross_process_compositor_api.clone()).to_proxy(),
+        SystemFontService::spawn(compositor_proxy.cross_process_compositor_api.clone(), mem_profiler_chan.clone()).to_proxy(),
     );
 
     let (canvas_create_sender, canvas_ipc_sender) = CanvasPaintThread::start(

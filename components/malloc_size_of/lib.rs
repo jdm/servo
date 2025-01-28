@@ -244,6 +244,12 @@ impl<T: MallocSizeOf + Copy> MallocSizeOf for std::cell::Cell<T> {
     }
 }
 
+impl<T: MallocSizeOf> MallocSizeOf for atomic_refcell::AtomicRefCell<T> {
+    fn size_of(&self, ops: &mut MallocSizeOfOps) -> usize {
+        self.borrow().size_of(ops)
+    }
+}
+
 impl<T: MallocSizeOf> MallocSizeOf for std::cell::RefCell<T> {
     fn size_of(&self, ops: &mut MallocSizeOfOps) -> usize {
         self.borrow().size_of(ops)
@@ -737,6 +743,7 @@ malloc_size_of_is_webrender_malloc_size_of!(webrender_api::BoxShadowClipMode);
 malloc_size_of_is_webrender_malloc_size_of!(webrender_api::ColorF);
 malloc_size_of_is_webrender_malloc_size_of!(webrender_api::ExtendMode);
 malloc_size_of_is_webrender_malloc_size_of!(webrender_api::FontInstanceKey);
+malloc_size_of_is_webrender_malloc_size_of!(webrender_api::FontKey);
 malloc_size_of_is_webrender_malloc_size_of!(webrender_api::GlyphInstance);
 malloc_size_of_is_webrender_malloc_size_of!(webrender_api::GradientStop);
 malloc_size_of_is_webrender_malloc_size_of!(webrender_api::ImageKey);

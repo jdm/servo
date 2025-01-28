@@ -7,6 +7,8 @@ use std::sync::Arc;
 
 use atomic_refcell::AtomicRefCell;
 use log::warn;
+use malloc_size_of_derive::MallocSizeOf;
+use malloc_size_of::{MallocSizeOfOps, MallocSizeOf as MallocSizeOfTrait, MallocShallowSizeOf, MallocConditionalSizeOf};
 use parking_lot::RwLock;
 use style::stylesheets::DocumentStyleSheet;
 use style::values::computed::{FontStyle, FontWeight};
@@ -16,7 +18,7 @@ use crate::font_context::WebFontDownloadState;
 use crate::font_template::{FontTemplate, FontTemplateRef, FontTemplateRefMethods, IsOblique};
 use crate::system_font_service::{FontIdentifier, LowercaseFontFamilyName};
 
-#[derive(Default)]
+#[derive(Default, MallocSizeOf)]
 pub struct FontStore {
     pub(crate) families: HashMap<LowercaseFontFamilyName, FontTemplates>,
     web_fonts_loading: Vec<(DocumentStyleSheet, usize)>,
@@ -114,6 +116,13 @@ struct SimpleFamily {
     bold_italic: Option<FontTemplateRef>,
 }
 
+impl MallocSizeOfTrait for SimpleFamily {
+    fn size_of(&self, ops: &mut MallocSizeOfOps) -> usize {
+        let mut measure = |template_ref: &Option<FontTemplateRef>| template_ref.as_ref().map_or(0, |val| val.conditional_size_of(ops));
+        measure(&self.regular) + measure(&self.bold) + measure(&self.italic) + measure(&self.bold_italic)
+    }
+}
+
 impl SimpleFamily {
     /// Find a font in this family that matches a given descriptor.
     fn find_for_descriptor(&self, descriptor_to_match: &FontDescriptor) -> Option<FontTemplateRef> {
@@ -166,6 +175,17 @@ impl SimpleFamily {
 pub struct FontTemplates {
     pub(crate) templates: Vec<FontTemplateRef>,
     simple_family: Option<SimpleFamily>,
+}
+
+impl MallocSizeOfTrait for FontTemplates {
+    fn size_of(&self, ops: &mut MallocSizeOfOps) -> usize {
+        let mut n = self.templates.shallow_size_of(ops);
+        for elem in &self.templates {
+            n += elem.conditional_size_of(ops);
+        }
+        n += self.simple_family.size_of(ops);
+        n
+    }
 }
 
 impl Default for FontTemplates {
