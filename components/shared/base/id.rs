@@ -267,7 +267,7 @@ impl BrowsingContextId {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, MallocSizeOf, PartialEq)]
 pub struct BrowsingContextGroupId(pub u32);
 impl fmt::Display for BrowsingContextGroupId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

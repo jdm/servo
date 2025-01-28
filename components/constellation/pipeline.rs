@@ -26,6 +26,7 @@ use ipc_channel::ipc::{self, IpcReceiver, IpcSender};
 use ipc_channel::router::ROUTER;
 use ipc_channel::Error;
 use log::{debug, error, warn};
+use malloc_size_of_derive::MallocSizeOf;
 use media::WindowGLContext;
 use net::image_cache::ImageCacheImpl;
 use net_traits::image_cache::ImageCache;
@@ -49,6 +50,7 @@ use crate::sandboxing::{spawn_multiprocess, UnprivilegedContent};
 
 /// A `Pipeline` is the constellation's view of a `Window`. Each pipeline has an event loop
 /// (executed by a script thread). A script thread may be responsible for many pipelines.
+#[derive(MallocSizeOf)]
 pub struct Pipeline {
     /// The ID of the pipeline.
     pub id: PipelineId,
@@ -62,9 +64,11 @@ pub struct Pipeline {
     pub opener: Option<BrowsingContextId>,
 
     /// The event loop handling this pipeline.
+    #[ignore_malloc_size_of = ""]
     pub event_loop: Rc<EventLoop>,
 
     /// A channel to the compositor.
+    #[ignore_malloc_size_of = ""]
     pub compositor_proxy: CompositorProxy,
 
     /// The most recently loaded URL in this pipeline.
@@ -74,6 +78,7 @@ pub struct Pipeline {
 
     /// Whether this pipeline is currently running animations. Pipelines that are running
     /// animations cause composites to be continually scheduled.
+    #[ignore_malloc_size_of = ""]
     pub animation_state: AnimationState,
 
     /// The child browsing contexts of this pipeline (these are iframes in the document).
@@ -96,6 +101,7 @@ pub struct Pipeline {
 
     /// The last compositor [`Epoch`] that was laid out in this pipeline if "exit after load" is
     /// enabled.
+    #[ignore_malloc_size_of = ""]
     pub layout_epoch: Epoch,
 }
 

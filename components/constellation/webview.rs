@@ -5,9 +5,11 @@
 use std::collections::HashMap;
 
 use base::id::TopLevelBrowsingContextId;
+use malloc_size_of::MallocSizeOf as MallocSizeOfTrait;
+use malloc_size_of_derive::MallocSizeOf;
 
-#[derive(Debug)]
-pub struct WebViewManager<WebView> {
+#[derive(Debug, MallocSizeOf)]
+pub struct WebViewManager<WebView: MallocSizeOfTrait> {
     /// Our top-level browsing contexts. In the WebRender scene, their pipelines are the children of
     /// a single root pipeline that also applies any pinch zoom transformation.
     webviews: HashMap<TopLevelBrowsingContextId, WebView>,
@@ -19,7 +21,7 @@ pub struct WebViewManager<WebView> {
     is_focused: bool,
 }
 
-impl<WebView> Default for WebViewManager<WebView> {
+impl<WebView: MallocSizeOfTrait> Default for WebViewManager<WebView> {
     fn default() -> Self {
         Self {
             webviews: HashMap::default(),
@@ -29,7 +31,7 @@ impl<WebView> Default for WebViewManager<WebView> {
     }
 }
 
-impl<WebView> WebViewManager<WebView> {
+impl<WebView: MallocSizeOfTrait> WebViewManager<WebView> {
     pub fn add(
         &mut self,
         top_level_browsing_context_id: TopLevelBrowsingContextId,

@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 use log::warn;
+use malloc_size_of_derive::MallocSizeOf;
 use swapchain::WGPUImageMap;
 pub use swapchain::{ContextData, WGPUExternalImages};
 use webrender::RenderApiSender;
@@ -34,7 +35,7 @@ pub use ipc_messages::to_dom::*;
 pub use ipc_messages::to_script::*;
 pub use swapchain::PRESENTATION_BUFFER_COUNT;
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, MallocSizeOf, Serialize)]
 pub struct WebGPU(pub IpcSender<WebGPURequest>);
 
 impl WebGPU {

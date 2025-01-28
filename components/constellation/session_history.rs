@@ -8,6 +8,7 @@ use std::fmt;
 use base::id::{BrowsingContextId, HistoryStateId, PipelineId, TopLevelBrowsingContextId};
 use euclid::Size2D;
 use log::debug;
+use malloc_size_of_derive::MallocSizeOf;
 use script_traits::LoadData;
 use servo_url::ServoUrl;
 use style_traits::CSSPixel;
@@ -16,7 +17,7 @@ use crate::browsingcontext::NewBrowsingContextInfo;
 
 /// Represents the joint session history
 /// <https://html.spec.whatwg.org/multipage/#joint-session-history>
-#[derive(Debug)]
+#[derive(Debug, MallocSizeOf)]
 pub struct JointSessionHistory {
     /// Diffs used to traverse to past entries. Oldest entries are at the back,
     /// the most recent entries are at the front.
@@ -109,7 +110,7 @@ impl JointSessionHistory {
 
 /// Represents a pending change in a session history, that will be applied
 /// once the new pipeline has loaded and completed initial layout / paint.
-#[derive(Debug)]
+#[derive(Debug, MallocSizeOf)]
 pub struct SessionHistoryChange {
     /// The browsing context to change.
     pub browsing_context_id: BrowsingContextId,
@@ -134,7 +135,7 @@ pub struct SessionHistoryChange {
 /// Represents a pipeline or discarded pipeline in a history entry.
 // FIXME: https://github.com/servo/servo/issues/34591
 #[expect(clippy::large_enum_variant)]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, MallocSizeOf)]
 pub enum NeedsToReload {
     /// Represents a pipeline that has not been discarded
     No(PipelineId),
@@ -180,7 +181,7 @@ impl PartialEq for NeedsToReload {
 /// Represents a the difference between two adjacent session history entries.
 // FIXME: https://github.com/servo/servo/issues/34591
 #[expect(clippy::large_enum_variant)]
-#[derive(Debug)]
+#[derive(Debug, MallocSizeOf)]
 pub enum SessionHistoryDiff {
     /// Represents a diff where the active pipeline of an entry changed.
     BrowsingContext {

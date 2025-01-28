@@ -383,6 +383,7 @@ impl Servo {
                     clear_color,
                     upload_method,
                     workers,
+                    size_of_op: Some(servo_allocator::usable_size),
                     ..Default::default()
                 },
                 None,

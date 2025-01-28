@@ -116,7 +116,7 @@ impl UntrustedNodeAddress {
 
 /// The origin where a given load was initiated.
 /// Useful for origin checks, for example before evaluation a JS URL.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, MallocSizeOf, Serialize)]
 pub enum LoadOrigin {
     /// A load originating in the constellation.
     Constellation,
@@ -128,7 +128,7 @@ pub enum LoadOrigin {
 
 /// can be passed to `LoadUrl` to load a page with GET/POST
 /// parameters or headers
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, MallocSizeOf, Serialize)]
 pub struct LoadData {
     /// The origin where the load started.
     pub load_origin: LoadOrigin,
@@ -141,12 +141,14 @@ pub struct LoadData {
         deserialize_with = "::hyper_serde::deserialize",
         serialize_with = "::hyper_serde::serialize"
     )]
+    #[ignore_malloc_size_of = ""]
     pub method: Method,
     /// The headers.
     #[serde(
         deserialize_with = "::hyper_serde::deserialize",
         serialize_with = "::hyper_serde::serialize"
     )]
+    #[ignore_malloc_size_of = ""]
     pub headers: HeaderMap,
     /// The data that will be used as the body of the request.
     pub data: Option<RequestBody>,
@@ -167,7 +169,7 @@ pub struct LoadData {
 }
 
 /// The result of evaluating a javascript scheme url.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, MallocSizeOf, Serialize)]
 pub enum JsEvalResult {
     /// The js evaluation had a non-string result, 204 status code.
     /// <https://html.spec.whatwg.org/multipage/#navigate> 12.11
@@ -233,7 +235,7 @@ pub enum DiscardBrowsingContext {
 }
 
 /// <https://html.spec.whatwg.org/multipage/#navigation-supporting-concepts:navigationhistorybehavior>
-#[derive(Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Debug, Default, Deserialize, MallocSizeOf, PartialEq, Serialize)]
 pub enum NavigationHistoryBehavior {
     /// The default value, which will be converted very early in the navigate algorithm into "push"
     /// or "replace". Usually it becomes "push", but under certain circumstances it becomes
@@ -448,7 +450,7 @@ impl fmt::Debug for ConstellationControlMsg {
 }
 
 /// Used to determine if a script has any pending asynchronous activity.
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, MallocSizeOf, PartialEq, Serialize)]
 pub enum DocumentState {
     /// The document has been loaded and is idle.
     Idle,

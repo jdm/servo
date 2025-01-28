@@ -1043,6 +1043,7 @@ dependencies = [
  "ipc-channel",
  "keyboard-types",
  "log",
+ "malloc_size_of_derive",
  "media",
  "net",
  "net_traits",
@@ -1051,7 +1052,9 @@ dependencies = [
  "script_layout_interface",
  "script_traits",
  "serde",
+ "servo_allocator",
  "servo_config",
+ "servo_malloc_size_of",
  "servo_rand",
  "servo_url",
  "style_traits",
@@ -1061,6 +1064,7 @@ dependencies = [
  "webrender_api",
  "webrender_traits",
  "webxr-api",
+ "wr_malloc_size_of",
 ]
 
 [[package]]
@@ -4226,6 +4230,7 @@ dependencies = [
  "servo-media",
  "servo-media-dummy",
  "servo-media-gstreamer",
+ "servo_allocator",
  "servo_config",
  "servo_geometry",
  "servo_url",
@@ -8371,6 +8376,7 @@ dependencies = [
  "euclid",
  "ipc-channel",
  "log",
+ "malloc_size_of_derive",
  "serde",
  "servo_config",
  "servo_malloc_size_of",

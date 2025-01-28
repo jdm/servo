@@ -128,12 +128,14 @@ use ipc_channel::Error as IpcError;
 use keyboard_types::webdriver::Event as WebDriverInputEvent;
 use keyboard_types::{CompositionEvent, KeyboardEvent};
 use log::{debug, error, info, trace, warn};
+use malloc_size_of::{MallocSizeOfOps, MallocSizeOf as MallocSizeOfTrait};
+use malloc_size_of_derive::MallocSizeOf;
 use media::{GLPlayerThreads, WindowGLContext};
 use net_traits::pub_domains::reg_host;
 use net_traits::request::Referrer;
 use net_traits::storage_thread::{StorageThreadMsg, StorageType};
 use net_traits::{self, IpcSend, ReferrerPolicy, ResourceThreads};
-use profile_traits::{mem, time};
+use profile_traits::{mem::{self, ReportsChan, Report, ReportKind}, path, time};
 use script_layout_interface::{LayoutFactory, ScriptThreadFactory};
 use script_traits::CompositorEvent::{MouseButtonEvent, MouseMoveEvent};
 use script_traits::{
@@ -176,7 +178,7 @@ use crate::webview::WebViewManager;
 
 type PendingApprovalNavigations = HashMap<PipelineId, (LoadData, NavigationHistoryBehavior)>;
 
-#[derive(Debug)]
+#[derive(Debug, MallocSizeOf)]
 /// The state used by MessagePortInfo to represent the various states the port can be in.
 enum TransferState {
     /// The port is currently managed by a given global,
@@ -202,7 +204,7 @@ enum TransferState {
     EntangledRemoved,
 }
 
-#[derive(Debug)]
+#[derive(Debug, MallocSizeOf)]
 /// Info related to a message-port tracked by the constellation.
 struct MessagePortInfo {
     /// The current state of the messageport.
@@ -227,6 +229,7 @@ struct WebrenderWGPU {
 
 /// Servo supports multiple top-level browsing contexts or “webviews”, so `Constellation` needs to
 /// store webview-specific data for bookkeeping.
+#[derive(MallocSizeOf)]
 struct WebView {
     /// The currently focused browsing context in this webview for key events.
     /// The focused pipeline is the current entry of the focused browsing
@@ -240,7 +243,7 @@ struct WebView {
 /// A browsing context group.
 ///
 /// <https://html.spec.whatwg.org/multipage/#browsing-context-group>
-#[derive(Clone, Default)]
+#[derive(Clone, Default, MallocSizeOf)]
 struct BrowsingContextGroup {
     /// A browsing context group holds a set of top-level browsing contexts.
     top_level_browsing_context_set: HashSet<TopLevelBrowsingContextId>,
@@ -252,6 +255,7 @@ struct BrowsingContextGroup {
     /// who are part of the same browsing-context group
     /// share an event loop, since they can use `document.domain`
     /// to become same-origin, at which point they can share DOM objects.
+    #[ignore_malloc_size_of = ""]
     event_loops: HashMap<Host, Weak<EventLoop>>,
 
     /// The set of all WebGPU channels in this BrowsingContextGroup.
@@ -272,6 +276,7 @@ struct BrowsingContextGroup {
 /// `LayoutThread` in the `layout` crate, and `ScriptThread` in
 /// the `script` crate). Script and layout communicate using a `Message`
 /// type.
+#[derive(MallocSizeOf)]
 pub struct Constellation<STF, SWF> {
     /// An ipc-sender/threaded-receiver pair
     /// to facilitate installing pipeline namespaces in threads
@@ -289,6 +294,7 @@ pub struct Constellation<STF, SWF> {
 
     /// A handle to register components for hang monitoring.
     /// None when in multiprocess mode.
+    #[ignore_malloc_size_of = ""]
     background_monitor_register: Option<Box<dyn BackgroundHangMonitorRegister>>,
 
     /// Channels to control all background-hang monitors.
@@ -307,6 +313,7 @@ pub struct Constellation<STF, SWF> {
     /// A factory for creating layouts. This allows customizing the kind
     /// of layout created for a [`Constellation`] and prevents a circular crate
     /// dependency between script and layout.
+    #[ignore_malloc_size_of = ""]
     layout_factory: Arc<dyn LayoutFactory>,
 
     /// An IPC channel for layout to send messages to the constellation.
@@ -317,14 +324,19 @@ pub struct Constellation<STF, SWF> {
     /// This is the constellation's view of `layout_sender`.
     layout_receiver: Receiver<Result<FromLayoutMsg, IpcError>>,
 
+    ///
+    reports_receiver: Receiver<ReportsChan>,
+
     /// A channel for the constellation to receive messages from the compositor thread.
     compositor_receiver: Receiver<FromCompositorMsg>,
 
     /// A channel through which messages can be sent to the embedder.
+    #[ignore_malloc_size_of = ""]
     embedder_proxy: EmbedderProxy,
 
     /// A channel (the implementation of which is port-specific) for the
     /// constellation to send messages to the compositor thread.
+    #[ignore_malloc_size_of = ""]
     compositor_proxy: CompositorProxy,
 
     /// Bookkeeping data for all webviews in the constellation.
@@ -333,16 +345,19 @@ pub struct Constellation<STF, SWF> {
     /// Channels for the constellation to send messages to the public
     /// resource-related threads. There are two groups of resource threads: one
     /// for public browsing, and one for private browsing.
+    #[ignore_malloc_size_of = ""]
     public_resource_threads: ResourceThreads,
 
     /// Channels for the constellation to send messages to the private
     /// resource-related threads.  There are two groups of resource
     /// threads: one for public browsing, and one for private
     /// browsing.
+    #[ignore_malloc_size_of = ""]
     private_resource_threads: ResourceThreads,
 
     /// A channel for the constellation to send messages to the font
     /// cache thread.
+    #[ignore_malloc_size_of = ""]
     system_font_service: Arc<SystemFontServiceProxy>,
 
     /// A channel for the constellation to send messages to the
@@ -368,17 +383,21 @@ pub struct Constellation<STF, SWF> {
 
     /// A channel for the constellation to send messages to the
     /// time profiler thread.
+    #[ignore_malloc_size_of = ""]
     time_profiler_chan: time::ProfilerChan,
 
     /// A channel for the constellation to send messages to the
     /// memory profiler thread.
+    #[ignore_malloc_size_of = ""]
     mem_profiler_chan: mem::ProfilerChan,
 
     /// A single WebRender document the constellation operates on.
+    #[ignore_malloc_size_of = ""]
     webrender_document: DocumentId,
 
     /// Webrender related objects required by WebGPU threads
     #[cfg(feature = "webgpu")]
+    #[ignore_malloc_size_of = ""]
     webrender_wgpu: WebrenderWGPU,
 
     /// A map of message-port Id to info.
@@ -437,15 +456,18 @@ pub struct Constellation<STF, SWF> {
 
     /// The random number generator and probability for closing pipelines.
     /// This is for testing the hardening of the constellation.
+    #[ignore_malloc_size_of = ""]
     random_pipeline_closure: Option<(ServoRng, f32)>,
 
     /// Phantom data that keeps the Rust type system happy.
     phantom: PhantomData<(STF, SWF)>,
 
     /// Entry point to create and get channels to a WebGLThread.
+    #[ignore_malloc_size_of = ""]
     webgl_threads: Option<WebGLThreads>,
 
     /// The XR device registry
+    #[ignore_malloc_size_of = ""]
     webxr_registry: Option<webxr_api::Registry>,
 
     /// A channel through which messages can be sent to the canvas paint thread.
@@ -464,9 +486,11 @@ pub struct Constellation<STF, SWF> {
     hard_fail: bool,
 
     /// Entry point to create and get channels to a GLPlayerThread.
+    #[ignore_malloc_size_of = ""]
     glplayer_threads: Option<GLPlayerThreads>,
 
     /// Application window's GL Context for Media player
+    #[ignore_malloc_size_of = ""]
     player_context: WindowGLContext,
 
     /// Pipeline ID of the active media session.
@@ -538,6 +562,7 @@ pub struct InitialConstellationState {
 }
 
 /// Data needed for webdriver
+#[derive(MallocSizeOf)]
 struct WebDriverData {
     load_channel: Option<(PipelineId, IpcSender<webdriver_msg::LoadStatus>)>,
     resize_channel: Option<IpcSender<WindowSizeData>>,
@@ -694,6 +719,9 @@ where
 
                 let rippy_data = resources::read_bytes(Resource::RippyPNG);
 
+                let (reports_sender, reports_receiver) = ipc::channel().unwrap();
+                let reports_receiver = ROUTER.route_ipc_receiver_to_new_crossbeam_receiver(reports_receiver);
+
                 let mut constellation: Constellation<STF, SWF> = Constellation {
                     namespace_receiver,
                     namespace_ipc_sender,
@@ -707,6 +735,7 @@ where
                     compositor_receiver,
                     layout_factory,
                     layout_receiver,
+                    reports_receiver,
                     embedder_proxy: state.embedder_proxy,
                     compositor_proxy: state.compositor_proxy,
                     webviews: WebViewManager::default(),
@@ -731,7 +760,7 @@ where
                     // namespace 0 for the embedder, and 0 for the constellation
                     next_pipeline_namespace_id: PipelineNamespaceId(2),
                     time_profiler_chan: state.time_profiler_chan,
-                    mem_profiler_chan: state.mem_profiler_chan,
+                    mem_profiler_chan: state.mem_profiler_chan.clone(),
                     window_size: initial_window_size,
                     phantom: PhantomData,
                     webdriver: WebDriverData::new(),
@@ -762,7 +791,12 @@ where
                     rippy_data,
                 };
 
-                constellation.run();
+                state.mem_profiler_chan.run_with_memory_reporting(
+                    || constellation.run(),
+                    String::from("constellation-reporter"),
+                    reports_sender,
+                    |reports_sender| reports_sender,
+                );
             })
             .expect("Thread spawning failed");
 
@@ -1154,6 +1188,7 @@ where
             Compositor(FromCompositorMsg),
             Layout(FromLayoutMsg),
             FromSWManager(SWManagerMsg),
+            MemoryReporter(ReportsChan),
         }
         // Get one incoming request.
         // This is one of the few places where the compositor is
@@ -1189,6 +1224,9 @@ where
                 recv(self.swmanager_receiver) -> msg => {
                     msg.expect("Unexpected SW channel panic in constellation").map(Request::FromSWManager)
                 }
+                recv(self.reports_receiver) -> msg => {
+                    Ok(Request::MemoryReporter(msg.expect("Unexpected mem reporter panic in constellation")))
+                }
             }
         };
 
@@ -1214,7 +1252,53 @@ where
             Request::FromSWManager(message) => {
                 self.handle_request_from_swmanager(message);
             },
+            Request::MemoryReporter(reports_sender) => {
+                self.collect_reports(reports_sender);
+            },
         }
+    }
+
+    fn collect_reports(&self, reports_sender: ReportsChan) {
+        let mut ops = MallocSizeOfOps::new(servo_allocator::usable_size, None, None);
+        let mut reports = vec![];
+
+        reports.push(Report {
+            path: path!["constellation"],
+            kind: ReportKind::ExplicitJemallocHeapSize,
+            size: self.size_of(&mut ops),
+        });
+
+        let ops = wr_malloc_size_of::MallocSizeOfOps::new(servo_allocator::usable_size, None);
+        let webrender_report = self.webrender_wgpu.webrender_api.report_memory(ops);
+
+        let mut report_webrender = |value, path: &str, kind| {
+            reports.push(Report {
+                path: path!["webrender", path],
+                kind,
+                size: value,
+            });
+        };
+        let mut report_heap = |value, path| report_webrender(value, path, ReportKind::ExplicitJemallocHeapSize);
+
+        report_heap(webrender_report.clip_stores, "clip-stores");
+        report_heap(webrender_report.gpu_cache_metadata, "gpu-cache/metadata");
+        report_heap(webrender_report.gpu_cache_cpu_mirror, "gpu-cache/cpu-mirror");
+        report_heap(webrender_report.hit_testers, "hit-testers");
+        report_heap(webrender_report.fonts, "resource-cache/fonts");
+        report_heap(webrender_report.weak_fonts, "resource-cache/weak-fonts");
+        report_heap(webrender_report.images, "resource-cache/images");
+        report_heap(webrender_report.rasterized_blobs, "resource-cache/rasterized-blobs");
+        report_heap(webrender_report.texture_cache_structures, "texture-cache/structures");
+        report_heap(webrender_report.shader_cache, "shader-cache");
+        report_heap(webrender_report.display_list, "display-list");
+        report_heap(webrender_report.swgl, "swgl");
+        report_heap(webrender_report.upload_staging_memory, "upload-staging-memory");
+        report_heap(webrender_report.render_tasks, "frame-allocator/render-tasks");
+
+        //https://searchfox.org/mozilla-central/rev/a965e3c683ecc035dee1de72bd33a8d91b1203ed/gfx/thebes/gfxPlatform.cpp#703
+        //TODO: interning
+        //TODO: GPU memory
+        reports_sender.send(reports);
     }
 
     #[cfg_attr(

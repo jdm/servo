@@ -34,6 +34,8 @@ http = { workspace = true }
 ipc-channel = { workspace = true }
 keyboard-types = { workspace = true }
 log = { workspace = true }
+malloc_size_of = { workspace = true }
+malloc_size_of_derive = { workspace = true }
 media = { path = "../media" }
 net = { path = "../net" }
 net_traits = { workspace = true }
@@ -42,6 +44,7 @@ profile_traits = { workspace = true }
 script_layout_interface = { workspace = true }
 script_traits = { workspace = true }
 serde = { workspace = true }
+servo_allocator = { path = "../allocator" }
 servo_config = { path = "../config" }
 servo_rand = { path = "../rand" }
 servo_url = { path = "../url" }
@@ -52,6 +55,7 @@ webrender = { workspace = true }
 webrender_api = { workspace = true }
 webrender_traits = { workspace = true }
 webxr-api = { workspace = true, features = ["ipc"] }
+wr_malloc_size_of = { workspace = true }
 
 [target.'cfg(any(target_os="macos", all(not(target_os = "windows"), not(target_os = "ios"), not(target_os="android"), not(target_env="ohos"), not(target_arch="arm"), not(target_arch="aarch64"))))'.dependencies]
 gaol = "0.2.1"
