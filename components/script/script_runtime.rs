@@ -956,7 +956,7 @@ impl JSContext {
     }
 
     #[allow(unsafe_code)]
-    pub(crate) fn get_reports(&self, path_seg: String) -> Vec<Report> {
+    pub(crate) fn get_reports(&self, path_seg: &str) -> Vec<Report> {
         SEEN_POINTERS.with(|pointers| pointers.borrow_mut().clear());
         let stats = unsafe {
             let mut stats = ::std::mem::zeroed();
@@ -967,9 +967,9 @@ impl JSContext {
         };
 
         let mut reports = vec![];
-        let mut report = |mut path_suffix, kind, size| {
+        let mut report = |path_suffix: Vec<String>, kind, size| {
             let mut path = path![path_seg, "js"];
-            path.append(&mut path_suffix);
+            path.extend(path_suffix.iter().cloned());
             reports.push(Report { path, kind, size })
         };
 

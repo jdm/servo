@@ -59,6 +59,8 @@ use js::jsapi::{
 };
 use js::jsval::UndefinedValue;
 use js::rust::ParentRuntime;
+use malloc_size_of::{MallocSizeOf as MallocSizeOfTrait, MallocSizeOfOps};
+use malloc_size_of_derive::MallocSizeOf;
 use media::WindowGLContext;
 use metrics::{PaintTimeMetrics, MAX_TASK_NS};
 use mime::{self, Mime};
@@ -71,7 +73,8 @@ use net_traits::{
     ResourceFetchTiming, ResourceThreads, ResourceTimingType,
 };
 use percent_encoding::percent_decode;
-use profile_traits::mem::ReportsChan;
+use profile_traits::mem::{ReportsChan, Report, ReportKind};
+use profile_traits::path;
 use profile_traits::time::ProfilerCategory;
 use profile_traits::time_profile;
 use script_layout_interface::{
@@ -190,31 +193,37 @@ pub(crate) struct IncompleteParserContexts(RefCell<Vec<(PipelineId, ParserContex
 
 unsafe_no_jsmanaged_fields!(TaskQueue<MainThreadScriptMsg>);
 
-#[derive(JSTraceable)]
+#[derive(JSTraceable, MallocSizeOf)]
 // ScriptThread instances are rooted on creation, so this is okay
 #[cfg_attr(crown, allow(crown::unrooted_must_root))]
 pub struct ScriptThread {
     /// <https://html.spec.whatwg.org/multipage/#last-render-opportunity-time>
     last_render_opportunity_time: DomRefCell<Option<Instant>>,
     /// The documents for pipelines managed by this thread
+    #[ignore_malloc_size_of = ""]
     documents: DomRefCell<DocumentCollection>,
     /// The window proxies known by this thread
     /// TODO: this map grows, but never shrinks. Issue #15258.
     window_proxies: DomRefCell<HashMapTracedValues<BrowsingContextId, Dom<WindowProxy>>>,
     /// A list of data pertaining to loads that have not yet received a network response
+    #[ignore_malloc_size_of = ""]
     incomplete_loads: DomRefCell<Vec<InProgressLoad>>,
     /// A vector containing parser contexts which have not yet been fully processed
+    #[ignore_malloc_size_of = ""]
     incomplete_parser_contexts: IncompleteParserContexts,
     /// Image cache for this script thread.
     #[no_trace]
+    #[ignore_malloc_size_of = ""]
     image_cache: Arc<dyn ImageCache>,
 
     /// A [`ScriptThreadReceivers`] holding all of the incoming `Receiver`s for messages
     /// to this [`ScriptThread`].
+    #[ignore_malloc_size_of = ""]
     receivers: ScriptThreadReceivers,
 
     /// A [`ScriptThreadSenders`] that holds all outgoing sending channels necessary to communicate
     /// to other parts of Servo.
+    #[ignore_malloc_size_of = ""]
     senders: ScriptThreadSenders,
 
     /// A handle to the resource thread. This is an `Arc` to avoid running out of file descriptors if
@@ -223,12 +232,15 @@ pub struct ScriptThread {
     resource_threads: ResourceThreads,
 
     /// A queue of tasks to be executed in this script-thread.
+    #[ignore_malloc_size_of = ""]
     task_queue: TaskQueue<MainThreadScriptMsg>,
 
     /// The dedicated means of communication with the background-hang-monitor for this script-thread.
     #[no_trace]
+    #[ignore_malloc_size_of = ""]
     background_hang_monitor: Box<dyn BackgroundHangMonitor>,
     /// A flag set to `true` by the BHM on exit, and checked from within the interrupt handler.
+    #[ignore_malloc_size_of = ""]
     closing: Arc<AtomicBool>,
 
     /// A [`TimerScheduler`] used to schedule timers for this [`ScriptThread`]. Timers are handled
@@ -238,9 +250,11 @@ pub struct ScriptThread {
 
     /// A proxy to the `SystemFontService` to use for accessing system font lists.
     #[no_trace]
+    #[ignore_malloc_size_of = ""]
     system_font_service: Arc<SystemFontServiceProxy>,
 
     /// The JavaScript runtime.
+    #[ignore_malloc_size_of = ""]
     js_runtime: Rc<Runtime>,
 
     /// The topmost element over the mouse.
@@ -251,6 +265,7 @@ pub struct ScriptThread {
     closed_pipelines: DomRefCell<HashSet<PipelineId>>,
 
     /// <https://html.spec.whatwg.org/multipage/#microtask-queue>
+    #[ignore_malloc_size_of = ""]
     microtask_queue: Rc<MicrotaskQueue>,
 
     /// Microtask Queue for adding support for mutation observer microtasks
@@ -261,14 +276,17 @@ pub struct ScriptThread {
 
     /// A handle to the WebGL thread
     #[no_trace]
+    #[ignore_malloc_size_of = ""]
     webgl_chan: Option<WebGLPipeline>,
 
     /// The WebXR device registry
     #[no_trace]
     #[cfg(feature = "webxr")]
+    #[ignore_malloc_size_of = ""]
     webxr_registry: Option<webxr_api::Registry>,
 
     /// The worklet thread pool
+    #[ignore_malloc_size_of = ""]
     worklet_thread_pool: DomRefCell<Option<Rc<WorkletThreadPool>>>,
 
     /// A list of pipelines containing documents that finished loading all their blocking
@@ -280,10 +298,12 @@ pub struct ScriptThread {
 
     /// The Webrender Document ID associated with this thread.
     #[no_trace]
+    #[ignore_malloc_size_of = ""]
     webrender_document: DocumentId,
 
     /// Cross-process access to the compositor's API.
     #[no_trace]
+    #[ignore_malloc_size_of = ""]
     compositor_api: CrossProcessCompositorApi,
 
     /// Periodically print out on which events script threads spend their processing time.
@@ -324,6 +344,7 @@ pub struct ScriptThread {
 
     /// Application window's GL Context for Media player
     #[no_trace]
+    #[ignore_malloc_size_of = ""]
     player_context: WindowGLContext,
 
     /// A set of all nodes ever created in this script thread
@@ -335,6 +356,7 @@ pub struct ScriptThread {
     /// Identity manager for WebGPU resources
     #[no_trace]
     #[cfg(feature = "webgpu")]
+    #[ignore_malloc_size_of = ""]
     gpu_id_hub: Arc<IdentityHub>,
 
     // Secure context
@@ -342,6 +364,7 @@ pub struct ScriptThread {
 
     /// A factory for making new layouts. This allows layout to depend on script.
     #[no_trace]
+    #[ignore_malloc_size_of = ""]
     layout_factory: Arc<dyn LayoutFactory>,
 }
 
@@ -2432,10 +2455,18 @@ impl ScriptThread {
         let documents = self.documents.borrow();
         let urls = itertools::join(documents.iter().map(|(_, d)| d.url().to_string()), ", ");
 
-        let mut reports = self.get_cx().get_reports(format!("url({})", urls));
+        let path = format!("url({})", urls);
+        let mut reports = self.get_cx().get_reports(&path);
         for (_, document) in documents.iter() {
             document.window().layout().collect_reports(&mut reports);
         }
+
+        let mut ops = MallocSizeOfOps::new(servo_allocator::usable_size, None, None);
+        reports.push(Report {
+            path: path![path, "script-thread"],
+            kind: ReportKind::ExplicitJemallocHeapSize,
+            size: self.size_of(&mut ops),
+        });
 
         reports_chan.send(reports);
     }

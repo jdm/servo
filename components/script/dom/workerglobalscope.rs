@@ -513,7 +513,7 @@ impl WorkerGlobalScope {
             CommonScriptMsg::Task(_, task, _, _) => task.run_box(),
             CommonScriptMsg::CollectReports(reports_chan) => {
                 let cx = self.get_cx();
-                let reports = cx.get_reports(format!("url({})", self.get_url()));
+                let reports = cx.get_reports(&format!("url({})", self.get_url()));
                 reports_chan.send(reports);
             },
         }
