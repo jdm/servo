@@ -578,6 +578,8 @@ impl IOCompositor {
             CompositorMsg::WebDriverMouseButtonEvent(mouse_event_type, mouse_button, x, y) => {
                 let dppx = self.device_pixels_per_page_pixel();
                 let point = dppx.transform_point(Point2D::new(x, y));
+                self.embedder_coordinates = self.window.get_coordinates();
+                let point = point + self.embedder_coordinates.viewport_offset.to_f32() * self.embedder_coordinates.hidpi_factor;
                 self.on_mouse_window_event_class(match mouse_event_type {
                     MouseEventType::Click => MouseWindowEvent::Click(mouse_button, point),
                     MouseEventType::MouseDown => MouseWindowEvent::MouseDown(mouse_button, point),
@@ -1345,7 +1347,9 @@ impl IOCompositor {
             MouseWindowEvent::MouseUp(_, p) => p,
         };
 
+        info!("hit testing at {:?}", point);
         let Some(result) = self.hit_test_at_point(point) else {
+            warn!("hit test for {:?} unsuccessful", point);
             // TODO: Notify embedder that the event failed to hit test to any webview.
             // TODO: Also notify embedder if an event hits a webview but isn’t consumed?
             return;

@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 use std::collections::HashSet;
+use std::convert::TryFrom;
 use std::time::{Duration, Instant};
 use std::{cmp, thread};
 
@@ -83,15 +84,32 @@ fn compute_tick_duration(tick_actions: &ActionSequence) -> u64 {
     duration
 }
 
-fn u64_to_mouse_button(button: u64) -> Option<MouseButton> {
-    if embedder_traits::MouseButton::Left as u64 == button {
-        Some(MouseButton::Left)
-    } else if MouseButton::Middle as u64 == button {
-        Some(MouseButton::Middle)
-    } else if MouseButton::Right as u64 == button {
-        Some(MouseButton::Right)
-    } else {
-        None
+enum WebdriverMouseButton {
+    Left = 0,
+    Middle = 1,
+    Right = 2,
+}
+
+impl Into<MouseButton> for WebdriverMouseButton {
+    fn into(self) -> MouseButton {
+        match self {
+            WebdriverMouseButton::Left => MouseButton::Left,
+            WebdriverMouseButton::Middle => MouseButton::Middle,
+            WebdriverMouseButton::Right => MouseButton::Right,
+        }
+    }
+}
+
+impl TryFrom<u64> for WebdriverMouseButton {
+    type Error = ();
+
+    fn try_from(button: u64) -> Result<Self, ()> {
+        match button {
+            0 => Ok(WebdriverMouseButton::Left),
+            1 => Ok(WebdriverMouseButton::Middle),
+            2 => Ok(WebdriverMouseButton::Right),
+            _ => Err(()),
+        }
     }
 }
 
@@ -291,10 +309,10 @@ impl Handler {
             },
         });
 
-        if let Some(button) = u64_to_mouse_button(action.button) {
+        if let Ok(button) = WebdriverMouseButton::try_from(action.button) {
             let cmd_msg = WebDriverCommandMsg::MouseButtonAction(
                 MouseEventType::MouseDown,
-                button,
+                button.into(),
                 pointer_input_state.x as f32,
                 pointer_input_state.y as f32,
             );
@@ -338,10 +356,10 @@ impl Handler {
             },
         });
 
-        if let Some(button) = u64_to_mouse_button(action.button) {
+        if let Ok(button) = WebdriverMouseButton::try_from(action.button) {
             let cmd_msg = WebDriverCommandMsg::MouseButtonAction(
                 MouseEventType::MouseUp,
-                button,
+                button.into(),
                 pointer_input_state.x as f32,
                 pointer_input_state.y as f32,
             );
@@ -401,6 +419,7 @@ impl Handler {
                 }
             },
         };
+        log::info!("pointer coord is ({},{})", x, y);
 
         let (sender, receiver) = ipc::channel().unwrap();
         let cmd_msg = WebDriverCommandMsg::GetWindowSize(

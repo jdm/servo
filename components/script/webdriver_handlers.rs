@@ -427,16 +427,20 @@ fn get_element_in_view_center_point(element: &Element, can_gc: CanGc) -> Option<
         .GetBody()
         .map(DomRoot::upcast::<Element>)
         .and_then(|body| {
+            info!("getting center point for element with id {}", element.Id());
             // Step 1: Let rectangle be the first element of the DOMRect sequence
             // returned by calling getClientRects() on element.
             element.GetClientRects(can_gc).first().map(|rectangle| {
-                let x = rectangle.X().round() as i64;
-                let y = rectangle.Y().round() as i64;
-                let width = rectangle.Width().round() as i64;
-                let height = rectangle.Height().round() as i64;
+                let rect = Rect::new(Point2D::new(rectangle.X(), rectangle.Y()), Size2D::new(rectangle.Width(), rectangle.Height())) /* *element.owner_document().window().DevicePixelRatio()*/;
+                let x = rect.origin.x.round() as i64;
+                let y = rect.origin.y.round() as i64;
+                let width = rect.size.width.round() as i64;
+                let height = rect.size.height.round() as i64;
 
-                let client_width = body.ClientWidth(can_gc) as i64;
-                let client_height = body.ClientHeight(can_gc) as i64;
+                let doc = element.owner_document();
+                let window = doc.window();
+                let client_width = window.InnerWidth() as i64;
+                let client_height = window.InnerHeight() as i64;
 
                 // Steps 2 - 5
                 let left = cmp::max(0, cmp::min(x, x + width));

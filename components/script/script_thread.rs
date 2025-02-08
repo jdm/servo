@@ -3350,6 +3350,7 @@ impl ScriptThread {
         pressed_mouse_buttons: u16,
         can_gc: CanGc,
     ) {
+        info!("handling {:?} mouse button eventf", button);
         let Some(document) = self.documents.borrow().find_document(pipeline_id) else {
             warn!("Message sent to closed pipeline {pipeline_id}.");
             return;

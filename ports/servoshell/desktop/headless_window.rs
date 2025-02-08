@@ -146,6 +146,7 @@ impl WindowMethods for Window {
             screen_size: self.screen_size,
             available_screen_size: self.screen_size,
             hidpi_factor: self.hidpi_factor(),
+            viewport_offset: Size2D::zero(),
         }
     }
 

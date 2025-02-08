@@ -10,7 +10,7 @@ use std::env;
 use std::rc::Rc;
 use std::time::Duration;
 
-use euclid::{Angle, Length, Point2D, Rotation3D, Scale, Size2D, UnknownUnit, Vector2D, Vector3D};
+use euclid::{Angle, Length, Point2D, Rotation3D, Scale, Size2D, UnknownUnit, Vector2D, Vector3D, num::Zero};
 use keyboard_types::{Modifiers, ShortcutMatcher};
 use log::{debug, info};
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
@@ -670,6 +670,7 @@ impl WindowMethods for Window {
             // FIXME: Winit doesn't have API for available size. Fallback to screen size
             available_screen_size: screen_size,
             hidpi_factor: self.hidpi_factor(),
+            viewport_offset: Size2D::from_lengths(Length::zero(), self.toolbar_height.get()),
         }
     }
 

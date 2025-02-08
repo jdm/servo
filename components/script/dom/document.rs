@@ -86,6 +86,7 @@ use crate::dom::bindings::codegen::Bindings::BeforeUnloadEventBinding::BeforeUnl
 use crate::dom::bindings::codegen::Bindings::DocumentBinding::{
     DocumentMethods, DocumentReadyState, DocumentVisibilityState, NamedPropertyValue,
 };
+use crate::dom::bindings::codegen::Bindings::ElementBinding::Element_Binding::ElementMethods;
 use crate::dom::bindings::codegen::Bindings::EventBinding::Event_Binding::EventMethods;
 use crate::dom::bindings::codegen::Bindings::HTMLIFrameElementBinding::HTMLIFrameElement_Binding::HTMLIFrameElementMethods;
 use crate::dom::bindings::codegen::Bindings::HTMLInputElementBinding::HTMLInputElementMethods;
@@ -1279,7 +1280,7 @@ impl Document {
             MouseEventType::MouseUp => "mouseup".to_owned(),
             MouseEventType::MouseDown => "mousedown".to_owned(),
         };
-        debug!("{}: at {:?}", mouse_event_type_string, client_point);
+        debug!("{}: at {:?} ({:?})", mouse_event_type_string, client_point, point_in_node);
 
         let el = node_address.and_then(|address| {
             let node = node::from_untrusted_node_address(address);
@@ -1293,7 +1294,7 @@ impl Document {
         };
 
         let node = el.upcast::<Node>();
-        debug!("{} on {:?}", mouse_event_type_string, node.debug_str());
+        debug!("{} on {:?} ({:?})", mouse_event_type_string, node.debug_str(), el.Id());
         // Prevent click event if form control element is disabled.
         if let MouseEventType::Click = mouse_event_type {
             // The click event is filtered by the disabled state.

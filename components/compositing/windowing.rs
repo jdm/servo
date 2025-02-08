@@ -251,6 +251,8 @@ pub struct EmbedderCoordinates {
     pub framebuffer: DeviceIntSize,
     /// Coordinates of the document within the framebuffer.
     pub viewport: DeviceIntRect,
+    ///
+    pub viewport_offset: euclid::Size2D<f32, DeviceIndependentPixel>,
 }
 
 impl EmbedderCoordinates {

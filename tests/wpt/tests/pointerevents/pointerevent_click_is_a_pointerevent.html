@@ -50,13 +50,18 @@ promise_test(async test => {
   let pointerup_promise = getEvent("mouseup", target, test);
   let click_promise = getEvent("click", target, test);
 
+    let rect = target.getBoundingClientRect();
+    console.log(rect.x, rect.y, rect.width, rect.height);
   await clickInTarget(pointer_type, target);
   console.log('Target clicked');
 
   // await pointerdown_prevented;
   let pointerdown_event = await pointerdown_promise;
+console.log("got down");
   let pointerup_event = await pointerup_promise;
+console.log("got up");
   let click_event = await click_promise;
+console.log("got click");
 
   assertClickProperties(click_event, this, pointerdown_event, pointerup_event);
 }, "click using " + pointer_type + " is a PointerEvent with correct properties");
