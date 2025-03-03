@@ -3,6 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 use std::cell::Cell;
+use std::mem;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -111,14 +112,14 @@ impl Worker {
         let target = worker.upcast();
         let _ac = enter_realm(target);
         rooted!(in(*GlobalScope::get_cx()) let mut message = UndefinedValue());
-        if let Ok(ports) = structuredclone::read(&global, data, message.handle_mut()) {
+        if let Ok(mut transferred) = structuredclone::read(&global, data, message.handle_mut()) {
             MessageEvent::dispatch_jsval(
                 target,
                 &global,
                 message.handle(),
                 None,
                 None,
-                ports,
+                mem::take(&mut transferred.message_ports),
                 can_gc,
             );
         } else {

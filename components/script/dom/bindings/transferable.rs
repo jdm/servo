@@ -11,6 +11,7 @@ use crate::dom::bindings::reflector::DomObject;
 use crate::dom::bindings::root::DomRoot;
 use crate::dom::bindings::structuredclone::{StructuredDataReader, StructuredDataWriter};
 use crate::dom::globalscope::GlobalScope;
+use crate::dom::messageport::MessagePort;
 
 pub(crate) trait Transferable: DomObject {
     fn transfer(&self, sc_writer: &mut StructuredDataWriter) -> Result<u64, ()>;
@@ -19,5 +20,10 @@ pub(crate) trait Transferable: DomObject {
         sc_reader: &mut StructuredDataReader,
         extra_data: u64,
         return_object: MutableHandleObject,
-    ) -> Result<(), ()>;
+    ) -> Result<DomRoot<Self>, ()> where Self: Sized;
+}
+
+#[derive(Default)]
+pub(crate) struct TransferredTypes {
+    pub(crate) message_ports: Vec<DomRoot<MessagePort>>,
 }

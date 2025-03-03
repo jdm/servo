@@ -9,6 +9,7 @@ use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::default::Default;
 use std::io::{stderr, stdout, Write};
+use std::mem;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -2998,7 +2999,7 @@ impl Window {
             let obj = this.reflector().get_jsobject();
             let _ac = JSAutoRealm::new(*cx, obj.get());
             rooted!(in(*cx) let mut message_clone = UndefinedValue());
-            if let Ok(ports) = structuredclone::read(this.upcast(), data, message_clone.handle_mut()) {
+            if let Ok(mut transferred) = structuredclone::read(this.upcast(), data, message_clone.handle_mut()) {
                 // Step 7.6, 7.7
                 MessageEvent::dispatch_jsval(
                     this.upcast(),
@@ -3006,7 +3007,7 @@ impl Window {
                     message_clone.handle(),
                     Some(&source_origin.ascii_serialization()),
                     Some(&*source),
-                    ports,
+                    mem::take(&mut transferred.message_ports),
                     CanGc::note()
                 );
             } else {

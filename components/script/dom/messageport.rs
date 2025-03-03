@@ -204,7 +204,7 @@ impl Transferable for MessagePort {
         sc_reader: &mut StructuredDataReader,
         extra_data: u64,
         return_object: MutableHandleObject,
-    ) -> Result<(), ()> {
+    ) -> Result<DomRoot<Self>, ()> {
         println!("{:?}", sc_reader.transferred_objects);
 
         // 1. Re-build the key for the storage location
@@ -255,9 +255,9 @@ impl Transferable for MessagePort {
             let ports = vec![transferred_port];
             sc_reader.message_ports = Some(ports);
         }*/
-        sc_reader.message_ports.push(transferred_port);
+        //sc_reader.message_ports.push(transferred_port); //XXXjdm
 
-        Ok(())
+        Ok(transferred_port)
     }
 }
 

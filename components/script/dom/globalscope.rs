@@ -1192,7 +1192,7 @@ impl GlobalScope {
                                 rooted!(in(*GlobalScope::get_cx()) let mut message = UndefinedValue());
 
                                 // Step 10.3 StructuredDeserialize(serialized, targetRealm).
-                                if let Ok(ports) = structuredclone::read(&global, data, message.handle_mut()) {
+                                if let Ok(mut transferred) = structuredclone::read(&global, data, message.handle_mut()) {
                                     // Step 10.4, Fire an event named message at destination.
                                     MessageEvent::dispatch_jsval(
                                         destination.upcast(),
@@ -1200,7 +1200,7 @@ impl GlobalScope {
                                         message.handle(),
                                         Some(&origin.ascii_serialization()),
                                         None,
-                                        ports,
+                                        mem::take(&mut transferred.message_ports),
                                         CanGc::note()
                                     );
                                 } else {
@@ -1249,7 +1249,7 @@ impl GlobalScope {
         if let Some((dom_port, PortMessageTask { origin, data })) = should_dispatch {
             // Substep 3-4
             rooted!(in(*GlobalScope::get_cx()) let mut message_clone = UndefinedValue());
-            if let Ok(ports) = structuredclone::read(self, data, message_clone.handle_mut()) {
+            if let Ok(mut transferred) = structuredclone::read(self, data, message_clone.handle_mut()) {
                 // Substep 6
                 // Dispatch the event, using the dom message-port.
                 MessageEvent::dispatch_jsval(
@@ -1258,7 +1258,7 @@ impl GlobalScope {
                     message_clone.handle(),
                     Some(&origin.ascii_serialization()),
                     None,
-                    ports,
+                    mem::take(&mut transferred.message_ports),
                     can_gc,
                 );
             } else {

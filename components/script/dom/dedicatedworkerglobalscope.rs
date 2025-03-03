@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+use std::mem;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
@@ -568,7 +569,7 @@ impl DedicatedWorkerGlobalScope {
                 let target = self.upcast();
                 let _ac = enter_realm(self);
                 rooted!(in(*scope.get_cx()) let mut message = UndefinedValue());
-                if let Ok(ports) = structuredclone::read(scope.upcast(), data, message.handle_mut())
+                if let Ok(mut transferred) = structuredclone::read(scope.upcast(), data, message.handle_mut())
                 {
                     MessageEvent::dispatch_jsval(
                         target,
@@ -576,7 +577,7 @@ impl DedicatedWorkerGlobalScope {
                         message.handle(),
                         Some(&origin.ascii_serialization()),
                         None,
-                        ports,
+                        mem::take(&mut transferred.message_ports),
                         can_gc,
                     );
                 } else {

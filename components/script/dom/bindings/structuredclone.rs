@@ -10,6 +10,7 @@ use std::os::raw;
 use std::ptr;
 
 use base::id::{BlobId, MessagePortId, AnyIndex, NamespaceIndex, Index, BlobIndex};
+use js::gc::RootedVec;
 use js::glue::{
     CopyJSStructuredCloneData, DeleteJSAutoStructuredCloneBuffer, GetLengthOfJSStructuredCloneData,
     NewJSAutoStructuredCloneBuffer, WriteBytesToJSStructuredCloneData,
@@ -19,7 +20,7 @@ use js::jsapi::{
     JSStructuredCloneCallbacks, JSStructuredCloneReader, JSStructuredCloneWriter,
     JS_ClearPendingException, JS_ReadUint32Pair, JS_WriteUint32Pair,
     MutableHandleObject as RawMutableHandleObject, StructuredCloneScope, TransferableOwnership,
-    JS_STRUCTURED_CLONE_VERSION,
+    JS_STRUCTURED_CLONE_VERSION, Heap,
 };
 use js::jsval::UndefinedValue;
 use js::rust::wrappers::{JS_ReadStructuredClone, JS_WriteStructuredClone};
@@ -33,7 +34,7 @@ use crate::dom::bindings::error::{Error, Fallible};
 use crate::dom::bindings::reflector::DomObject;
 use crate::dom::bindings::root::DomRoot;
 use crate::dom::bindings::serializable::{Serializable, StorageKey};
-use crate::dom::bindings::transferable::Transferable;
+use crate::dom::bindings::transferable::{Transferable, TransferredTypes};
 use crate::dom::blob::Blob;
 use crate::dom::globalscope::GlobalScope;
 use crate::dom::messageport::MessagePort;
@@ -76,7 +77,9 @@ unsafe fn read_blob(
             return blob.reflector().get_jsobject().get();
     }*/
         let ptr = blob.reflector().get_jsobject().get();
-        sc_reader.blobs.push(blob);
+        sc_reader.roots.push(Heap::default());
+        sc_reader.roots.last().unwrap().set(ptr);
+        //sc_reader.blobs.push(blob);
         return ptr;
     }
     warn!(
@@ -173,14 +176,13 @@ unsafe extern "C" fn read_transfer_callback(
         let sc_reader = &mut *(closure as *mut StructuredDataReader);
         let in_realm_proof = AlreadyInRealm::assert_for_cx(SafeJSContext::from_ptr(cx));
         let owner = GlobalScope::from_context(cx, InRealm::Already(&in_realm_proof));
-        if <MessagePort as Transferable>::transfer_receive(
+        if let Ok(port) = <MessagePort as Transferable>::transfer_receive(
             &owner,
             sc_reader,
             extra_data,
             return_object,
-        )
-        .is_ok()
-        {
+        ) {
+            sc_reader.transferred.message_ports.push(port);
             return true;
         }
     }
@@ -259,12 +261,14 @@ static STRUCTURED_CLONE_CALLBACKS: JSStructuredCloneCallbacks = JSStructuredClon
 
 /// Reader and writer structs for results from, and inputs to, structured-data read/write operations.
 /// <https://html.spec.whatwg.org/multipage/#safe-passing-of-structured-data>
-pub(crate) struct StructuredDataReader {
-    /// A map of deserialized blobs, stored temporarily here to keep them rooted.
-    pub(crate) blobs: Vec<DomRoot<Blob>>,
-    /// A vec of transfer-received DOM ports,
+pub(crate) struct StructuredDataReader<'a> {
+    roots: RootedVec<'a, Heap<*mut JSObject>>,
+    /*/// A map of deserialized blobs, stored temporarily here to keep them rooted.
+    pub(crate) blobs: Vec<DomRoot<Blob>>,*/
+    /*/// A vec of transfer-received DOM ports,
     /// to be made available to script through a message event.
-    pub(crate) message_ports: Vec<DomRoot<MessagePort>>,
+    pub(crate) message_ports: Vec<DomRoot<MessagePort>>,*/
+    pub(crate) transferred: TransferredTypes,
     /*/// A map of port implementations,
     /// used as part of the "transfer-receiving" steps of ports,
     /// to produce the DOM ports stored in `message_ports` above.
@@ -351,12 +355,16 @@ pub(crate) fn read(
     global: &GlobalScope,
     mut data: StructuredSerializedData,
     rval: MutableHandleValue,
-) -> Result<Vec<DomRoot<MessagePort>>, ()> {
+) -> Result<TransferredTypes, ()> {
     let cx = GlobalScope::get_cx();
     let _ac = enter_realm(global);
+    //let _test = ();
+    rooted_vec!(let mut roots);
     let mut sc_reader = StructuredDataReader {
-        blobs: Default::default(),
-        message_ports: Default::default(),
+        roots: roots,
+        //blobs: Default::default(),
+        //message_ports: Default::default(),
+        transferred: Default::default(),
         serialized_objects: mem::take(&mut data.serialized_objects),
         transferred_objects: mem::take(&mut data.transferred_objects),
     };
@@ -398,7 +406,7 @@ pub(crate) fn read(
                 Some(ports) => return Ok(ports),
                 None => return Ok(Vec::with_capacity(0)),
         }*/
-            return Ok(mem::take(&mut sc_reader.message_ports));
+            return Ok(mem::take(&mut sc_reader.transferred));
         }
         Err(())
     }
