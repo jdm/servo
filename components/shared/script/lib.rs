@@ -831,7 +831,10 @@ pub trait TypeIndexable: for<'a> Deserialize<'a> + Serialize {
     type TypeTag: TypeTagMarker;
     ///
     const TYPE_TAG: Self::TypeTag;
+}
 
+///
+pub trait BroadcastClone: Sized {
     ///
     fn clone_for_broadcast(&self) -> Option<Self>;
 }
@@ -870,7 +873,7 @@ impl StructuredSerializedData {
         let serialized = self.serialized.clone();
 
         let mut serialized_objects = TypeIndexedMap::<SerializableTypes>::with_capacity(self.serialized_objects.dom_objects.len());
-        fn perform_clone<T: TypeIndexable>(serialized: &[u8]) -> Option<Vec<u8>> {
+        fn perform_clone<T: TypeIndexable + BroadcastClone>(serialized: &[u8]) -> Option<Vec<u8>> {
             let deserialized: T = bincode::deserialize(serialized).ok()?;
             let cloned = deserialized.clone_for_broadcast();
             bincode::serialize(&cloned).ok()

@@ -17,7 +17,7 @@ use net_traits::filemanager_thread::RelativePos;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::TypeIndexable;
+use crate::{TypeIndexable, BroadcastClone};
 
 /// File-based blob
 #[derive(Debug, Deserialize, MallocSizeOf, Serialize)]
@@ -156,7 +156,9 @@ impl TypeIndexable for BlobImpl {
     //type Index = BlobIndex;
     type TypeTag = crate::SerializableTypes;
     const TYPE_TAG: Self::TypeTag = crate::SerializableTypes::Blob;
+}
 
+impl BroadcastClone for BlobImpl {
     fn clone_for_broadcast(&self) -> Option<Self> {
         let type_string = self.type_string();
 

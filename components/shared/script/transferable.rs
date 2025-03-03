@@ -164,8 +164,4 @@ impl TypeIndexable for MessagePortImpl {
     //type Index = MessagePortIndex;
     type TypeTag = crate::TransferableTypes;
     const TYPE_TAG: Self::TypeTag = crate::TransferableTypes::MessagePort;
-
-    fn clone_for_broadcast(&self) -> Option<Self> {
-        None
-    }
 }
