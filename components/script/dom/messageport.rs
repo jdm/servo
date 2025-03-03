@@ -25,7 +25,7 @@ use crate::dom::bindings::reflector::{reflect_dom_object, DomGlobal, DomObject};
 use crate::dom::bindings::root::DomRoot;
 use crate::dom::bindings::structuredclone::{self, StructuredDataReader, StructuredDataWriter};
 use crate::dom::bindings::trace::RootedTraceableBox;
-use crate::dom::bindings::transferable::Transferable;
+use crate::dom::bindings::transferable::{Transferable, TransferredTypes};
 use crate::dom::eventtarget::EventTarget;
 use crate::dom::globalscope::GlobalScope;
 use crate::script_runtime::{CanGc, JSContext as SafeJSContext};
@@ -258,6 +258,10 @@ impl Transferable for MessagePort {
         //sc_reader.message_ports.push(transferred_port); //XXXjdm
 
         Ok(transferred_port)
+    }
+
+    fn destination(transferred: &mut TransferredTypes) -> &mut Vec<DomRoot<MessagePort>> {
+        &mut transferred.message_ports
     }
 }
 

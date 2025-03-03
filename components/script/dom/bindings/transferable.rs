@@ -21,6 +21,7 @@ pub(crate) trait Transferable: DomObject {
         extra_data: u64,
         return_object: MutableHandleObject,
     ) -> Result<DomRoot<Self>, ()> where Self: Sized;
+    fn destination(transferred: &mut TransferredTypes) -> &mut Vec<DomRoot<Self>> where Self: Sized;
 }
 
 #[derive(Default)]

@@ -182,7 +182,7 @@ unsafe extern "C" fn read_transfer_callback(
             extra_data,
             return_object,
         ) {
-            sc_reader.transferred.message_ports.push(port);
+            <MessagePort as Transferable>::destination(&mut sc_reader.transferred).push(port);
             return true;
         }
     }
