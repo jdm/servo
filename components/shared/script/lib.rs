@@ -757,7 +757,7 @@ impl ScriptToConstellationChan {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, MallocSizeOf, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Serialize, Deserialize, MallocSizeOf, Copy, Clone)]
 ///
 pub enum SerializableTypes {
     ///
@@ -766,7 +766,7 @@ pub enum SerializableTypes {
 
 impl TypeTagMarker for SerializableTypes {}
 
-#[derive(Debug, Serialize, Deserialize, MallocSizeOf, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Serialize, Deserialize, MallocSizeOf, Copy, Clone)]
 ///
 pub enum TransferableTypes {
     ///
@@ -794,7 +794,7 @@ pub struct StructuredSerializedData {
 #[derive(MallocSizeOf, /*Serialize, Deserialize,*/ Debug)]
 ///
 pub struct TypeIndexedMap<T: TypeTagMarker> {
-    dom_objects: HashMap<NamespaceIndex<AnyIndex>, (T, Vec<u8>)>,
+    dom_objects: HashMap<(NamespaceIndex<AnyIndex>, T), Vec<u8>>,
 }
 
 impl<T: TypeTagMarker> Serialize for TypeIndexedMap<T> {
@@ -821,7 +821,7 @@ impl<T: TypeTagMarker> std::default::Default for TypeIndexedMap<T> {
 }
 
 ///
-pub trait TypeTagMarker: Serialize + for<'a> Deserialize<'a> + malloc_size_of::MallocSizeOf + std::fmt::Debug {}
+pub trait TypeTagMarker: Serialize + for<'a> Deserialize<'a> + malloc_size_of::MallocSizeOf + std::fmt::Debug + Eq + std::hash::Hash {}
 
 ///
 pub trait TypeIndexable: for<'a> Deserialize<'a> + Serialize {
@@ -852,13 +852,13 @@ impl<TT: TypeTagMarker> TypeIndexedMap<TT> {
     pub fn insert<T: TypeIndexable<TypeTag = TT>, U>(&mut self, index: NamespaceIndex<U>, value: T) {
         let untyped_index = index.into_untyped();
         let serialized = bincode::serialize(&value).unwrap();
-        self.dom_objects.insert(untyped_index, (T::TYPE_TAG, serialized));
+        self.dom_objects.insert((untyped_index, T::TYPE_TAG), serialized);
     }
 
     ///
     pub fn remove<T: TypeIndexable<TypeTag = TT>, U>(&mut self, index: NamespaceIndex<U>) -> Option<T> {
         let untyped_index = index.into_untyped();
-        let (_type_tag, serialized) = self.dom_objects.remove(&untyped_index)?;
+        let serialized = self.dom_objects.remove(&(untyped_index, T::TYPE_TAG))?;
         let deserialized: T = bincode::deserialize(&serialized[..]).ok()?;
         Some(deserialized)
     }
@@ -876,16 +876,16 @@ impl StructuredSerializedData {
             bincode::serialize(&cloned).ok()
         }
 
-        for (original_id, (tag, obj)) in &self.serialized_objects.dom_objects {
+        for ((original_id, tag), obj) in &self.serialized_objects.dom_objects {
             let cloned = match tag {
                 SerializableTypes::Blob => perform_clone::<BlobImpl>(obj),
             };
             let Some(cloned_obj) = cloned else {
-                warn!("Couldn't clone object with id {:?}, ignoring", original_id);
+                warn!("Couldn't clone {:?} object with id {:?}, ignoring", tag, original_id);
                 continue;
             };
 
-            serialized_objects.dom_objects.insert(*original_id, (*tag, cloned_obj));
+            serialized_objects.dom_objects.insert((*original_id, *tag), cloned_obj);
         }
 
         if !self.transferred_objects.dom_objects.is_empty() {
