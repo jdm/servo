@@ -165,13 +165,14 @@ impl fmt::Debug for CommonScriptMsg {
 #[derive(Clone, JSTraceable, MallocSizeOf)]
 pub(crate) enum ScriptEventLoopSender {
     /// A sender that sends to the main `ScriptThread` event loop.
-    MainThread(Sender<MainThreadScriptMsg>),
+    MainThread(#[no_trace] Sender<MainThreadScriptMsg>),
     /// A sender that sends to a `ServiceWorker` event loop.
-    ServiceWorker(Sender<ServiceWorkerScriptMsg>),
+    ServiceWorker(#[no_trace] Sender<ServiceWorkerScriptMsg>),
     /// A sender that sends to a dedicated worker (such as a generic Web Worker) event loop.
     /// Note that this sender keeps the main thread Worker DOM object alive as long as it or
     /// or any message it sends is not dropped.
     DedicatedWorker {
+        #[no_trace]
         sender: Sender<DedicatedWorkerScriptMsg>,
         main_thread_worker: TrustedWorkerAddress,
     },
@@ -302,6 +303,7 @@ impl OpaqueSender<CommonScriptMsg> for ScriptEventLoopSender {
 pub(crate) struct ScriptThreadSenders {
     /// A channel to hand out to script thread-based entities that need to be able to enqueue
     /// events in the event queue.
+    #[no_trace]
     pub(crate) self_sender: Sender<MainThreadScriptMsg>,
 
     /// A handle to the bluetooth thread.

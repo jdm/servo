@@ -6,6 +6,14 @@ use js::jsapi::{Heap, JSObject};
 use js::rust::HandleObject;
 use malloc_size_of_derive::MallocSizeOf;
 
+use crate::DomTypes;
+use crate::JSTraceable;
+use crate::interfaces::GlobalScopeHelpers;
+use crate::iterable::{Iterable, IterableIterator};
+use crate::realms::AlreadyInRealm;
+use crate::root::{Dom, Root, DomRoot};
+use crate::script_runtime::{CanGc, JSContext};
+
 /// A struct to store a reference to the reflector of a DOM object.
 #[cfg_attr(crown, allow(crown::unrooted_must_root))]
 #[derive(MallocSizeOf)]
@@ -89,4 +97,50 @@ impl MutDomObject for Reflector {
     unsafe fn init_reflector(&self, obj: *mut JSObject) {
         self.set_jsobject(obj)
     }
+}
+
+pub trait DomGlobalGeneric<D: DomTypes>: DomObject {
+    /// Returns the [`GlobalScope`] of the realm that the [`DomObject`] was created in.  If this
+    /// object is a `Node`, this will be different from it's owning `Document` if adopted by. For
+    /// `Node`s it's almost always better to use `NodeTraits::owning_global`.
+    fn global(&self) -> DomRoot<D::GlobalScope>
+    where
+        Self: Sized,
+    {
+        let realm = AlreadyInRealm::assert_for_cx(D::GlobalScope::get_cx());
+        D::GlobalScope::from_reflector(self, &realm)
+    }
+}
+
+impl<D: DomTypes, T: DomObject> DomGlobalGeneric<D> for T {}
+
+/// A trait to provide a function pointer to wrap function for DOM objects.
+pub trait DomObjectWrap<D: DomTypes>:
+    Sized + DomObject + DomGlobalGeneric<D>
+{
+    /// Function pointer to the general wrap function type
+    #[allow(clippy::type_complexity)]
+    const WRAP: unsafe fn(
+        JSContext,
+        &D::GlobalScope,
+        Option<HandleObject>,
+        Box<Self>,
+        CanGc,
+    ) -> Root<Dom<Self>>;
+}
+
+/// A trait to provide a function pointer to wrap function for
+/// DOM iterator interfaces.
+pub trait DomObjectIteratorWrap<D: DomTypes>:
+    DomObjectWrap<D> + JSTraceable + Iterable
+{
+    /// Function pointer to the wrap function for `IterableIterator<T>`
+    #[allow(clippy::type_complexity)]
+    const ITER_WRAP: unsafe fn(
+        JSContext,
+        &D::GlobalScope,
+        Option<HandleObject>,
+        Box<IterableIterator<D, Self>>,
+        CanGc,
+    ) -> Root<Dom<IterableIterator<D, Self>>>;
 }

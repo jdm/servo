@@ -65,8 +65,12 @@ pub(crate) trait CanvasContext {
     }
 }
 
-impl HTMLCanvasElementOrOffscreenCanvas {
-    pub(crate) fn size(&self) -> Size2D<u64> {
+pub(crate) trait CanvasSize {
+    fn size(&self) -> Size2D<u64>;
+}
+
+impl CanvasSize for HTMLCanvasElementOrOffscreenCanvas {
+    fn size(&self) -> Size2D<u64> {
         match self {
             HTMLCanvasElementOrOffscreenCanvas::HTMLCanvasElement(canvas) => {
                 canvas.get_size().cast()

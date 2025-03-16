@@ -102,7 +102,7 @@ impl Tokenizer {
     }
 }
 
-#[allow(unsafe_code)]
+/*#[allow(unsafe_code)]
 unsafe impl CustomTraceable for HtmlTokenizer<TreeBuilder<Dom<Node>, Sink>> {
     unsafe fn trace(&self, trc: *mut JSTracer) {
         struct Tracer(*mut JSTracer);
@@ -122,7 +122,7 @@ unsafe impl CustomTraceable for HtmlTokenizer<TreeBuilder<Dom<Node>, Sink>> {
         tree_builder.trace_handles(&tracer);
         tree_builder.sink.trace(trc);
     }
-}
+}*/
 
 fn start_element<S: Serializer>(node: &Element, serializer: &mut S) -> io::Result<()> {
     let name = QualName::new(None, node.namespace().clone(), node.local_name().clone());

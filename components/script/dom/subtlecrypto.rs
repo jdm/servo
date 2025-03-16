@@ -38,7 +38,6 @@ use crate::dom::bindings::codegen::UnionTypes::{
     ArrayBufferViewOrArrayBuffer, ArrayBufferViewOrArrayBufferOrJsonWebKey,
 };
 use crate::dom::bindings::error::{Error, Fallible};
-use crate::dom::bindings::import::module::SafeJSContext;
 use crate::dom::bindings::refcounted::{Trusted, TrustedPromise};
 use crate::dom::bindings::reflector::{reflect_dom_object, DomGlobal, Reflector};
 use crate::dom::bindings::root::DomRoot;
@@ -246,7 +245,7 @@ impl SubtleCryptoMethods<crate::DomTypeHolder> for SubtleCrypto {
     /// <https://w3c.github.io/webcrypto/#SubtleCrypto-method-sign>
     fn Sign(
         &self,
-        cx: SafeJSContext,
+        cx: JSContext,
         algorithm: AlgorithmIdentifier,
         key: &CryptoKey,
         data: ArrayBufferViewOrArrayBuffer,
@@ -329,7 +328,7 @@ impl SubtleCryptoMethods<crate::DomTypeHolder> for SubtleCrypto {
     /// <https://w3c.github.io/webcrypto/#SubtleCrypto-method-verify>
     fn Verify(
         &self,
-        cx: SafeJSContext,
+        cx: JSContext,
         algorithm: AlgorithmIdentifier,
         key: &CryptoKey,
         signature: ArrayBufferViewOrArrayBuffer,
@@ -417,7 +416,7 @@ impl SubtleCryptoMethods<crate::DomTypeHolder> for SubtleCrypto {
     /// <https://w3c.github.io/webcrypto/#SubtleCrypto-method-digest>
     fn Digest(
         &self,
-        cx: SafeJSContext,
+        cx: JSContext,
         algorithm: AlgorithmIdentifier,
         data: ArrayBufferViewOrArrayBuffer,
         comp: InRealm,
@@ -521,7 +520,7 @@ impl SubtleCryptoMethods<crate::DomTypeHolder> for SubtleCrypto {
     /// <https://w3c.github.io/webcrypto/#SubtleCrypto-method-deriveKey>
     fn DeriveKey(
         &self,
-        cx: SafeJSContext,
+        cx: JSContext,
         algorithm: AlgorithmIdentifier,
         base_key: &CryptoKey,
         derived_key_type: AlgorithmIdentifier,
@@ -651,7 +650,7 @@ impl SubtleCryptoMethods<crate::DomTypeHolder> for SubtleCrypto {
     /// <https://w3c.github.io/webcrypto/#dfn-SubtleCrypto-method-deriveBits>
     fn DeriveBits(
         &self,
-        cx: SafeJSContext,
+        cx: JSContext,
         algorithm: AlgorithmIdentifier,
         base_key: &CryptoKey,
         length: Option<u32>,
@@ -2617,7 +2616,11 @@ fn data_to_jwk_params(alg: &str, size: &str, key: &[u8]) -> (DOMString, DOMStrin
     (jwk_alg, DOMString::from(data))
 }
 
-impl KeyAlgorithm {
+trait AlgorithmFromName {
+    fn from_name(name: DOMString, out: MutableHandleObject, cx: JSContext);
+}
+
+impl AlgorithmFromName for KeyAlgorithm {
     /// Fill the object referenced by `out` with an [KeyAlgorithm]
     /// of the specified name and size.
     #[allow(unsafe_code)]
@@ -2630,7 +2633,16 @@ impl KeyAlgorithm {
     }
 }
 
-impl HmacKeyAlgorithm {
+trait AlgorithmFromLengthAndHash {
+    fn from_length_and_hash(
+        length: u32,
+        hash: DigestAlgorithm,
+        out: MutableHandleObject,
+        cx: JSContext,
+    );
+}
+
+impl AlgorithmFromLengthAndHash for HmacKeyAlgorithm {
     #[allow(unsafe_code)]
     fn from_length_and_hash(
         length: u32,
@@ -2652,7 +2664,11 @@ impl HmacKeyAlgorithm {
     }
 }
 
-impl AesKeyAlgorithm {
+trait AlgorithmFromNameAndSize {
+    fn from_name_and_size(name: DOMString, size: u16, out: MutableHandleObject, cx: JSContext);
+}
+
+impl AlgorithmFromNameAndSize for AesKeyAlgorithm {
     /// Fill the object referenced by `out` with an [AesKeyAlgorithm]
     /// of the specified name and size.
     #[allow(unsafe_code)]

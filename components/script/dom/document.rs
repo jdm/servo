@@ -52,6 +52,7 @@ use num_traits::ToPrimitive;
 use percent_encoding::percent_decode;
 use profile_traits::ipc as profile_ipc;
 use profile_traits::time::{TimerMetadata, TimerMetadataFrameType, TimerMetadataReflowType};
+use script_bindings::interfaces::DocumentHelpers;
 use script_layout_interface::{PendingRestyle, TrustedNodeAddress};
 use script_traits::{
     AnimationState, AnimationTickType, ConstellationInputEvent, DocumentActivity, ScriptMsg,
@@ -6223,10 +6224,6 @@ fn is_named_element_with_id_attribute(elem: &Element) -> bool {
     // “exposed”, a concept that doesn’t fully make sense until embed/object
     // behaviour is actually implemented
     elem.is::<HTMLImageElement>() && elem.get_name().is_some_and(|name| !name.is_empty())
-}
-
-pub(crate) trait DocumentHelpers<D: DomTypes> {
-    fn ensure_safe_to_run_script_or_layout(&self);
 }
 
 impl DocumentHelpers<crate::DomTypeHolder> for Document {

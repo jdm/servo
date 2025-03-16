@@ -35,7 +35,7 @@ use crate::ScriptThread;
 
 /// <https://html.spec.whatwg.org/multipage/#the-slot-element>
 #[dom_struct]
-pub struct HTMLSlotElement {
+pub(crate) struct HTMLSlotElement {
     htmlelement: HTMLElement,
 
     /// <https://dom.spec.whatwg.org/#slot-assigned-nodes>

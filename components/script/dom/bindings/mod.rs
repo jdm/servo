@@ -135,26 +135,33 @@
 #![deny(non_snake_case)]
 
 pub(crate) mod buffer_source;
-pub(crate) mod callback;
+//pub(crate) mod callback;
+pub(crate) use script_bindings::callback;
 #[allow(dead_code)]
 pub(crate) mod cell;
 pub(crate) mod constructor;
 pub(crate) mod conversions;
 pub(crate) mod error;
-pub(crate) mod finalize;
+//pub(crate) mod finalize;
 pub(crate) mod frozenarray;
 pub(crate) mod function;
-pub(crate) mod guard;
+//pub(crate) mod guard;
 pub(crate) mod import;
 pub(crate) mod inheritance;
-pub(crate) mod interface;
-pub(crate) mod iterable;
+pub(crate) use script_bindings::interface;
+//pub(crate) mod interface;
+//pub(crate) use script_bindings::interface;
+//pub(crate) mod iterable;
+pub(crate) use script_bindings::iterable;
 pub(crate) mod like;
-pub(crate) mod namespace;
-pub(crate) mod num;
+//pub(crate) mod namespace;
+//pub(crate) mod num;
+pub(crate) use script_bindings::num;
 pub(crate) mod principals;
+//pub(crate) use script_bindings::principals;
 pub(crate) mod proxyhandler;
-pub(crate) mod record;
+//pub(crate) mod record;
+pub(crate) use script_bindings::record;
 pub(crate) mod refcounted;
 pub(crate) mod reflector;
 pub(crate) mod root;
@@ -174,13 +181,7 @@ pub(crate) mod codegen {
     pub(crate) mod DomTypeHolder {
         include!(concat!(env!("BINDINGS_OUT_DIR"), "/DomTypeHolder.rs"));
     }
-    pub(crate) mod DomTypes {
-        include!(concat!(env!("BINDINGS_OUT_DIR"), "/DomTypes.rs"));
-    }
-    #[allow(dead_code)]
-    pub(crate) mod GenericBindings {
-        include!(concat!(env!("BINDINGS_OUT_DIR"), "/Bindings/mod.rs"));
-    }
+    pub(crate) use script_bindings::codegen::GenericBindings;
     #[allow(dead_code)]
     pub(crate) mod Bindings {
         include!(concat!(
@@ -201,10 +202,10 @@ pub(crate) mod codegen {
         ));
     }
     pub(crate) use script_bindings::codegen::PrototypeList;
-    pub(crate) mod RegisterBindings {
+    /*pub(crate) mod RegisterBindings {
         include!(concat!(env!("BINDINGS_OUT_DIR"), "/RegisterBindings.rs"));
-    }
-    #[allow(
+    }*/
+    /*#[allow(
         non_camel_case_types,
         unused_imports,
         unused_variables,
@@ -214,7 +215,8 @@ pub(crate) mod codegen {
     )]
     pub(crate) mod GenericUnionTypes {
         include!(concat!(env!("BINDINGS_OUT_DIR"), "/GenericUnionTypes.rs"));
-    }
+}*/
+    pub(crate) use script_bindings::codegen::GenericUnionTypes;
     #[allow(dead_code)]
     pub(crate) mod UnionTypes {
         include!(concat!(env!("BINDINGS_OUT_DIR"), "/UnionTypes.rs"));

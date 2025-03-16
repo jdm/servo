@@ -9,10 +9,10 @@ use std::ptr;
 
 use js::jsapi::{JSClass, JSFunctionSpec};
 use js::rust::{HandleObject, MutableHandleObject};
-use script_bindings::constant::ConstantSpec;
 
-use crate::dom::bindings::guard::Guard;
-use crate::dom::bindings::interface::{create_object, define_on_global_object};
+use crate::constant::ConstantSpec;
+use crate::guard::Guard;
+use crate::interface::{create_object, define_on_global_object};
 use crate::script_runtime::JSContext;
 
 /// The class of a namespace object.
@@ -37,7 +37,7 @@ impl NamespaceObjectClass {
 
 /// Create a new namespace object.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn create_namespace_object(
+pub(crate) fn create_namespace_object<D: crate::DomTypes>(
     cx: JSContext,
     global: HandleObject,
     proto: HandleObject,
@@ -47,6 +47,6 @@ pub(crate) fn create_namespace_object(
     name: &CStr,
     rval: MutableHandleObject,
 ) {
-    create_object(cx, global, proto, &class.0, methods, &[], constants, rval);
+    create_object::<D>(cx, global, proto, &class.0, methods, &[], constants, rval);
     define_on_global_object(cx, global, name, rval.handle());
 }

@@ -138,6 +138,7 @@ pub(crate) struct ServiceWorkerGlobalScope {
     #[no_trace]
     task_queue: TaskQueue<ServiceWorkerScriptMsg>,
 
+    #[no_trace]
     own_sender: Sender<ServiceWorkerScriptMsg>,
 
     /// A port on which a single "time-out" message can be received,

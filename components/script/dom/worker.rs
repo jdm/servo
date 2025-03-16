@@ -49,6 +49,7 @@ pub(crate) struct Worker {
     eventtarget: EventTarget,
     /// Sender to the Receiver associated with the DedicatedWorkerGlobalScope
     /// this Worker created.
+    #[no_trace]
     sender: Sender<DedicatedWorkerScriptMsg>,
     #[ignore_malloc_size_of = "Arc"]
     closing: Arc<AtomicBool>,

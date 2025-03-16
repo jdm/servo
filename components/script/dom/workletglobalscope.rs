@@ -41,6 +41,7 @@ pub(crate) struct WorkletGlobalScope {
     #[no_trace]
     base_url: ServoUrl,
     /// Sender back to the script thread
+    #[no_trace]
     to_script_thread_sender: Sender<MainThreadScriptMsg>,
     /// Worklet task executor
     executor: WorkletExecutor,

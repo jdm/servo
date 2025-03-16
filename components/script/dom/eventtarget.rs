@@ -24,6 +24,7 @@ use libc::c_char;
 use servo_atoms::Atom;
 use servo_url::ServoUrl;
 
+use crate::conversions::Convert;
 use crate::dom::beforeunloadevent::BeforeUnloadEvent;
 use crate::dom::bindings::callback::{CallbackContainer, CallbackFunction, ExceptionHandling};
 use crate::dom::bindings::cell::DomRefCell;
@@ -370,7 +371,7 @@ impl EventListeners {
 }
 
 #[dom_struct]
-pub(crate) struct EventTarget {
+pub struct EventTarget {
     reflector_: Reflector,
     handlers: DomRefCell<HashMapTracedValues<Atom, EventListeners, BuildHasherDefault<FnvHasher>>>,
 }
@@ -879,7 +880,7 @@ impl EventTargetMethods<crate::DomTypeHolder> for EventTarget {
         listener: Option<Rc<EventListener>>,
         options: AddEventListenerOptionsOrBoolean,
     ) {
-        self.add_event_listener(ty, listener, options.into())
+        self.add_event_listener(ty, listener, options.convert())
     }
 
     // https://dom.spec.whatwg.org/#dom-eventtarget-removeeventlistener
@@ -889,7 +890,7 @@ impl EventTargetMethods<crate::DomTypeHolder> for EventTarget {
         listener: Option<Rc<EventListener>>,
         options: EventListenerOptionsOrBoolean,
     ) {
-        self.remove_event_listener(ty, listener, options.into())
+        self.remove_event_listener(ty, listener, options.convert())
     }
 
     // https://dom.spec.whatwg.org/#dom-eventtarget-dispatchevent
@@ -911,11 +912,11 @@ impl VirtualMethods for EventTarget {
     }
 }
 
-impl From<AddEventListenerOptionsOrBoolean> for AddEventListenerOptions {
-    fn from(options: AddEventListenerOptionsOrBoolean) -> Self {
-        match options {
+impl Convert<AddEventListenerOptions> for AddEventListenerOptionsOrBoolean {
+    fn convert(self) -> AddEventListenerOptions {
+        match self {
             AddEventListenerOptionsOrBoolean::AddEventListenerOptions(options) => options,
-            AddEventListenerOptionsOrBoolean::Boolean(capture) => Self {
+            AddEventListenerOptionsOrBoolean::Boolean(capture) => AddEventListenerOptions {
                 parent: EventListenerOptions { capture },
                 once: false,
             },
@@ -923,11 +924,11 @@ impl From<AddEventListenerOptionsOrBoolean> for AddEventListenerOptions {
     }
 }
 
-impl From<EventListenerOptionsOrBoolean> for EventListenerOptions {
-    fn from(options: EventListenerOptionsOrBoolean) -> Self {
-        match options {
+impl Convert<EventListenerOptions> for EventListenerOptionsOrBoolean {
+    fn convert(self) -> EventListenerOptions {
+        match self {
             EventListenerOptionsOrBoolean::EventListenerOptions(options) => options,
-            EventListenerOptionsOrBoolean::Boolean(capture) => Self { capture },
+            EventListenerOptionsOrBoolean::Boolean(capture) => EventListenerOptions { capture },
         }
     }
 }

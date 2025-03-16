@@ -6,13 +6,28 @@
 
 use std::any::type_name;
 use std::mem;
+use std::ptr;
 
 use js::glue::JS_GetReservedSlot;
 use js::jsapi::JSObject;
 use js::jsval::UndefinedValue;
+use js::rust::GCMethods;
 
-use crate::dom::bindings::utils::finalize_global as do_finalize_global;
-use crate::dom::bindings::weakref::{WeakBox, WeakReferenceable, DOM_WEAK_SLOT};
+use crate::codegen::PrototypeList::PROTO_OR_IFACE_LENGTH;
+use crate::utils::{get_proto_or_iface_array, ProtoOrIfaceArray};
+use crate::weakref::{WeakBox, WeakReferenceable, DOM_WEAK_SLOT};
+
+/// Drop the resources held by reserved slots of a global object
+pub(crate) unsafe fn do_finalize_global(obj: *mut JSObject) {
+    let protolist = get_proto_or_iface_array(obj);
+    let list = (*protolist).as_mut_ptr();
+    for idx in 0..PROTO_OR_IFACE_LENGTH as isize {
+        let entry = list.offset(idx);
+        let value = *entry;
+        <*mut JSObject>::post_barrier(entry, value, ptr::null_mut());
+    }
+    let _: Box<ProtoOrIfaceArray> = Box::from_raw(protolist);
+}
 
 pub(crate) unsafe fn finalize_common<T>(this: *const T) {
     if !this.is_null() {

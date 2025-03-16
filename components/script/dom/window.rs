@@ -52,6 +52,7 @@ use num_traits::ToPrimitive;
 use profile_traits::ipc as ProfiledIpc;
 use profile_traits::mem::ProfilerChan as MemProfilerChan;
 use profile_traits::time::ProfilerChan as TimeProfilerChan;
+use script_bindings::interfaces::WindowHelpers;
 use script_layout_interface::{
     combine_id_with_fragment_type, FragmentType, Layout, PendingImageState, QueryMsg, Reflow,
     ReflowGoal, ReflowRequest, TrustedNodeAddress,
@@ -216,6 +217,7 @@ pub(crate) struct Window {
     /// This may not be the top-level [`Window`], in the case of frames.
     #[no_trace]
     webview_id: WebViewId,
+    #[no_trace]
     script_chan: Sender<MainThreadScriptMsg>,
     #[no_trace]
     #[ignore_malloc_size_of = "TODO: Add MallocSizeOf support to layout"]
@@ -3090,4 +3092,14 @@ fn is_named_element_with_id_attribute(elem: &Element) -> bool {
 /// Helper for interactive debugging sessions in lldb/gdb.
 unsafe extern "C" fn dump_js_stack(cx: *mut RawJSContext) {
     DumpJSStack(cx, true, false, false);
+}
+
+impl WindowHelpers for Window {
+    fn create_named_properties_object(
+        cx: JSContext,
+        proto: HandleObject,
+        object: MutableHandleObject,
+    ) {
+        Window::create_named_properties_object(cx, proto, object)
+    }
 }

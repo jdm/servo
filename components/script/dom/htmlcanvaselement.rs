@@ -31,7 +31,9 @@ use style::attr::AttrValue;
 
 use crate::canvas_context::CanvasContext as _;
 pub(crate) use crate::canvas_context::*;
+use crate::conversions::Convert;
 use crate::dom::attr::Attr;
+use crate::dom::bindings::callback::ExceptionHandling;
 use crate::dom::bindings::cell::{ref_filter_map, DomRefCell, Ref};
 use crate::dom::bindings::codegen::Bindings::HTMLCanvasElementBinding::{
     BlobCallback, HTMLCanvasElementMethods, RenderingContext,
@@ -41,7 +43,6 @@ use crate::dom::bindings::codegen::Bindings::WebGLRenderingContextBinding::WebGL
 use crate::dom::bindings::codegen::UnionTypes::HTMLCanvasElementOrOffscreenCanvas;
 use crate::dom::bindings::conversions::ConversionResult;
 use crate::dom::bindings::error::{Error, Fallible};
-use crate::dom::bindings::import::module::ExceptionHandling;
 use crate::dom::bindings::inheritance::Castable;
 use crate::dom::bindings::num::Finite;
 use crate::dom::bindings::refcounted::Trusted;
@@ -365,9 +366,9 @@ impl HTMLCanvasElement {
     fn get_gl_attributes(cx: JSContext, options: HandleValue) -> Option<GLContextAttributes> {
         unsafe {
             match WebGLContextAttributes::new(cx, options) {
-                Ok(ConversionResult::Success(ref attrs)) => Some(From::from(attrs)),
-                Ok(ConversionResult::Failure(ref error)) => {
-                    throw_type_error(*cx, error);
+                Ok(ConversionResult::Success(attrs)) => Some(attrs.convert()),
+                Ok(ConversionResult::Failure(error)) => {
+                    throw_type_error(*cx, &error);
                     None
                 },
                 _ => {
@@ -739,15 +740,15 @@ impl VirtualMethods for HTMLCanvasElement {
     }
 }
 
-impl<'a> From<&'a WebGLContextAttributes> for GLContextAttributes {
-    fn from(attrs: &'a WebGLContextAttributes) -> GLContextAttributes {
+impl Convert<GLContextAttributes> for WebGLContextAttributes {
+    fn convert(self) -> GLContextAttributes {
         GLContextAttributes {
-            alpha: attrs.alpha,
-            depth: attrs.depth,
-            stencil: attrs.stencil,
-            antialias: attrs.antialias,
-            premultiplied_alpha: attrs.premultipliedAlpha,
-            preserve_drawing_buffer: attrs.preserveDrawingBuffer,
+            alpha: self.alpha,
+            depth: self.depth,
+            stencil: self.stencil,
+            antialias: self.antialias,
+            premultiplied_alpha: self.premultipliedAlpha,
+            preserve_drawing_buffer: self.preserveDrawingBuffer,
         }
     }
 }

@@ -11,7 +11,7 @@ use super::bindings::codegen::Bindings::ReadableStreamBYOBReaderBinding::Readabl
 use super::readablestreambyobreader::ReadIntoRequest;
 use super::types::ReadableStreamBYOBRequest;
 use crate::dom::bindings::codegen::Bindings::ReadableByteStreamControllerBinding::ReadableByteStreamControllerMethods;
-use crate::dom::bindings::import::module::{Error, Fallible};
+use crate::dom::bindings::error::{Error, Fallible};
 use crate::dom::bindings::reflector::Reflector;
 use crate::dom::bindings::root::{DomRoot, MutNullableDom};
 use crate::dom::readablestream::ReadableStream;

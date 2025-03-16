@@ -31,15 +31,16 @@ use js::rust::{
     define_methods, define_properties, get_object_class, is_dom_class, maybe_wrap_object,
     HandleObject, HandleValue, MutableHandleObject, RealmOptions,
 };
-use script_bindings::constant::{define_constants, ConstantSpec};
 use servo_url::MutableOrigin;
 
-use crate::dom::bindings::codegen::InterfaceObjectMap::Globals;
-use crate::dom::bindings::codegen::PrototypeList;
-use crate::dom::bindings::conversions::{get_dom_class, DOM_OBJECT_SLOT};
-use crate::dom::bindings::guard::Guard;
-use crate::dom::bindings::principals::ServoJSPrincipals;
-use crate::dom::bindings::utils::{
+use crate::DomTypes;
+use crate::codegen::Globals::Globals;
+use crate::codegen::PrototypeList;
+use crate::constant::{define_constants, ConstantSpec};
+use crate::conversions::{get_dom_class, DOM_OBJECT_SLOT};
+use crate::guard::Guard;
+use crate::principals::ServoJSPrincipals;
+use crate::utils::{
     get_proto_or_iface_array, DOMJSClass, ProtoOrIfaceArray, DOM_PROTOTYPE_SLOT, JSCLASS_DOM_GLOBAL,
 };
 use crate::script_runtime::JSContext as SafeJSContext;
@@ -133,7 +134,7 @@ impl InterfaceConstructorBehavior {
 pub(crate) type TraceHook = unsafe extern "C" fn(trc: *mut JSTracer, obj: *mut JSObject);
 
 /// Create a global object with the given class.
-pub(crate) unsafe fn create_global_object(
+pub(crate) unsafe fn create_global_object<D: DomTypes>(
     cx: SafeJSContext,
     class: &'static JSClass,
     private: *const libc::c_void,
@@ -148,7 +149,7 @@ pub(crate) unsafe fn create_global_object(
     options.creationOptions_.sharedMemoryAndAtomics_ = false;
     select_compartment(cx, &mut options);
 
-    let principal = ServoJSPrincipals::new(origin);
+    let principal = ServoJSPrincipals::new::<D>(origin);
 
     rval.set(JS_NewGlobalObject(
         *cx,
@@ -210,7 +211,7 @@ fn select_compartment(cx: SafeJSContext, options: &mut RealmOptions) {
 }
 
 /// Create and define the interface object of a callback interface.
-pub(crate) fn create_callback_interface_object(
+pub(crate) fn create_callback_interface_object<D: DomTypes>(
     cx: SafeJSContext,
     global: HandleObject,
     constants: &[Guard<&[ConstantSpec]>],
@@ -222,14 +223,14 @@ pub(crate) fn create_callback_interface_object(
         rval.set(JS_NewObject(*cx, ptr::null()));
     }
     assert!(!rval.is_null());
-    define_guarded_constants(cx, rval.handle(), constants, global);
+    define_guarded_constants::<D>(cx, rval.handle(), constants, global);
     define_name(cx, rval.handle(), name);
     define_on_global_object(cx, global, name, rval.handle());
 }
 
 /// Create the interface prototype object of a non-callback interface.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn create_interface_prototype_object(
+pub(crate) fn create_interface_prototype_object<D: DomTypes>(
     cx: SafeJSContext,
     global: HandleObject,
     proto: HandleObject,
@@ -240,7 +241,7 @@ pub(crate) fn create_interface_prototype_object(
     unscopable_names: &[&CStr],
     rval: MutableHandleObject,
 ) {
-    create_object(
+    create_object::<D>(
         cx,
         global,
         proto,
@@ -274,7 +275,7 @@ pub(crate) fn create_interface_prototype_object(
 
 /// Create and define the interface object of a non-callback interface.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn create_noncallback_interface_object(
+pub(crate) fn create_noncallback_interface_object<D: DomTypes>(
     cx: SafeJSContext,
     global: HandleObject,
     proto: HandleObject,
@@ -288,7 +289,7 @@ pub(crate) fn create_noncallback_interface_object(
     legacy_window_alias_names: &[&CStr],
     rval: MutableHandleObject,
 ) {
-    create_object(
+    create_object::<D>(
         cx,
         global,
         proto,
@@ -347,7 +348,7 @@ pub(crate) fn create_named_constructors(
 
 /// Create a new object with a unique type.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn create_object(
+pub(crate) fn create_object<D: DomTypes>(
     cx: SafeJSContext,
     global: HandleObject,
     proto: HandleObject,
@@ -361,34 +362,34 @@ pub(crate) fn create_object(
         rval.set(JS_NewObjectWithGivenProto(*cx, class, proto));
     }
     assert!(!rval.is_null());
-    define_guarded_methods(cx, rval.handle(), methods, global);
-    define_guarded_properties(cx, rval.handle(), properties, global);
-    define_guarded_constants(cx, rval.handle(), constants, global);
+    define_guarded_methods::<D>(cx, rval.handle(), methods, global);
+    define_guarded_properties::<D>(cx, rval.handle(), properties, global);
+    define_guarded_constants::<D>(cx, rval.handle(), constants, global);
 }
 
 /// Conditionally define constants on an object.
-pub(crate) fn define_guarded_constants(
+pub(crate) fn define_guarded_constants<D: DomTypes>(
     cx: SafeJSContext,
     obj: HandleObject,
     constants: &[Guard<&[ConstantSpec]>],
     global: HandleObject,
 ) {
     for guard in constants {
-        if let Some(specs) = guard.expose(cx, obj, global) {
+        if let Some(specs) = guard.expose::<D>(cx, obj, global) {
             define_constants(cx, obj, specs);
         }
     }
 }
 
 /// Conditionally define methods on an object.
-pub(crate) fn define_guarded_methods(
+pub(crate) fn define_guarded_methods<D: DomTypes>(
     cx: SafeJSContext,
     obj: HandleObject,
     methods: &[Guard<&'static [JSFunctionSpec]>],
     global: HandleObject,
 ) {
     for guard in methods {
-        if let Some(specs) = guard.expose(cx, obj, global) {
+        if let Some(specs) = guard.expose::<D>(cx, obj, global) {
             unsafe {
                 define_methods(*cx, obj, specs).unwrap();
             }
@@ -397,14 +398,14 @@ pub(crate) fn define_guarded_methods(
 }
 
 /// Conditionally define properties on an object.
-pub(crate) fn define_guarded_properties(
+pub(crate) fn define_guarded_properties<D: DomTypes>(
     cx: SafeJSContext,
     obj: HandleObject,
     properties: &[Guard<&'static [JSPropertySpec]>],
     global: HandleObject,
 ) {
     for guard in properties {
-        if let Some(specs) = guard.expose(cx, obj, global) {
+        if let Some(specs) = guard.expose::<D>(cx, obj, global) {
             unsafe {
                 define_properties(*cx, obj, specs).unwrap();
             }
@@ -597,7 +598,7 @@ fn get_proto_id_for_new_target(new_target: HandleObject) -> Option<PrototypeList
     }
 }
 
-pub(crate) fn get_desired_proto(
+pub fn get_desired_proto(
     cx: SafeJSContext,
     args: &CallArgs,
     proto_id: PrototypeList::ID,

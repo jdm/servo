@@ -5,7 +5,7 @@
 use js::jsapi::JSObject;
 use servo_config::pref;
 
-use crate::dom::bindings::codegen::RegisterBindings;
+use script_bindings::codegen::RegisterBindings;
 use crate::dom::bindings::conversions::is_dom_proxy;
 use crate::dom::bindings::proxyhandler;
 use crate::dom::bindings::utils::is_platform_object_static;
