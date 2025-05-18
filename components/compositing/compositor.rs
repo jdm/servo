@@ -35,19 +35,19 @@ use ipc_channel::ipc::{self, IpcSharedMemory};
 use libc::c_void;
 use log::{debug, info, trace, warn};
 use pixels::{CorsStatus, ImageFrame, ImageMetadata, PixelFormat, RasterImage};
-use profile_traits::mem::{ProcessReports, ProfilerRegistration, Report, ReportKind};
+use profile_traits::mem::{ProcessReports, ProfilerRegistration};
 use profile_traits::time::{self as profile_time, ProfilerCategory};
-use profile_traits::{path, time_profile};
+use profile_traits::time_profile;
 use servo_config::opts;
 use servo_geometry::DeviceIndependentPixel;
 use style_traits::CSSPixel;
-use webrender::{CaptureBits, RenderApi, Transaction};
+use webrender::Transaction;
 use webrender_api::units::{
     DeviceIntPoint, DeviceIntRect, DevicePixel, DevicePoint, DeviceRect, LayoutPoint, LayoutRect,
     LayoutSize, LayoutVector2D, WorldPoint,
 };
 use webrender_api::{
-    self, BuiltDisplayList, DirtyRect, DisplayListPayload, DocumentId, Epoch as WebRenderEpoch,
+    self, BuiltDisplayList, DirtyRect, DisplayListPayload, Epoch as WebRenderEpoch,
     FontInstanceFlags, FontInstanceKey, FontInstanceOptions, FontKey, HitTestFlags,
     PipelineId as WebRenderPipelineId, PropertyBinding, ReferenceFrameKind, RenderReasons,
     SampledScrollOffset, ScrollLocation, SpaceAndClipInfo, SpatialId, SpatialTreeItemKey,
@@ -56,6 +56,7 @@ use webrender_api::{
 
 use crate::InitialCompositorState;
 use crate::refresh_driver::RefreshDriver;
+use crate::render::WebRenderRenderer;
 use crate::webview_manager::WebViewManager;
 use crate::webview_renderer::{PinchZoomResult, UnknownWebView, WebViewRenderer};
 
@@ -110,15 +111,6 @@ pub struct ServoRenderer {
     /// The channel on which messages can be sent to the time profiler.
     time_profiler_chan: profile_time::ProfilerChan,
 
-    /// The WebRender [`RenderApi`] interface used to communicate with WebRender.
-    pub(crate) webrender_api: RenderApi,
-
-    /// The active webrender document.
-    pub(crate) webrender_document: DocumentId,
-
-    /// The GL bindings for webrender
-    webrender_gl: Rc<dyn gleam::gl::Gl>,
-
     #[cfg(feature = "webxr")]
     /// Some XR devices want to run on the main thread.
     webxr_main_thread: webxr::MainThreadRegistry,
@@ -131,6 +123,9 @@ pub struct ServoRenderer {
 
     /// Current cursor position.
     cursor_pos: DevicePoint,
+
+    ///
+    renderer: crate::render::WebRenderRenderer,
 }
 
 /// NB: Never block on the constellation, because sometimes the constellation blocks on us.
@@ -147,9 +142,6 @@ pub struct IOCompositor {
     /// Used by the logic that determines when it is safe to output an
     /// image for the reftest framework.
     ready_to_save_state: ReadyState,
-
-    /// The webrender renderer.
-    webrender: Option<webrender::Renderer>,
 
     /// The surfman instance that webrender targets
     rendering_context: Rc<dyn RenderingContext>,
@@ -310,9 +302,7 @@ impl ServoRenderer {
     ) -> Result<Vec<CompositorHitTestResult>, HitTestError> {
         // DevicePoint and WorldPoint are the same for us.
         let world_point = WorldPoint::from_untyped(point.to_untyped());
-        let results =
-            self.webrender_api
-                .hit_test(self.webrender_document, pipeline_id, world_point, flags);
+        let results = self.renderer.hit_test(pipeline_id, world_point, flags);
 
         let mut epoch_mismatch = false;
         let results = results
@@ -356,8 +346,7 @@ impl ServoRenderer {
     }
 
     pub(crate) fn send_transaction(&mut self, transaction: Transaction) {
-        self.webrender_api
-            .send_transaction(self.webrender_document, transaction);
+        self.renderer.send_transaction(transaction);
     }
 
     pub(crate) fn update_cursor_from_hittest(
@@ -419,9 +408,12 @@ impl IOCompositor {
                 compositor_receiver: state.receiver,
                 constellation_sender: state.constellation_chan,
                 time_profiler_chan: state.time_profiler_chan,
-                webrender_api: state.webrender_api,
-                webrender_document: state.webrender_document,
-                webrender_gl: state.webrender_gl,
+                renderer: WebRenderRenderer::new(
+                    state.webrender_api,
+                    state.webrender_document,
+                    state.webrender_gl,
+                    state.webrender,
+                ),
                 #[cfg(feature = "webxr")]
                 webxr_main_thread: state.webxr_main_thread,
                 convert_mouse_to_touch,
@@ -431,18 +423,15 @@ impl IOCompositor {
             webview_renderers: WebViewManager::default(),
             needs_repaint: Cell::default(),
             ready_to_save_state: ReadyState::Unknown,
-            webrender: Some(state.webrender),
             rendering_context: state.rendering_context,
             pending_frames: 0,
             _mem_profiler_registration: registration,
         };
 
-        {
-            let gl = &compositor.global.borrow().webrender_gl;
-            info!("Running on {}", gl.get_string(gleam::gl::RENDERER));
-            info!("OpenGL Version {}", gl.get_string(gleam::gl::VERSION));
-        }
-        compositor.assert_gl_framebuffer_complete();
+        let (renderer, version) = compositor.global.borrow().renderer.gl_info();
+        info!("Running on {}", renderer);
+        info!("OpenGL Version {}", version);
+        compositor.global.borrow().renderer.assert_gl_framebuffer_complete();
         compositor
     }
 
@@ -450,9 +439,7 @@ impl IOCompositor {
         if let Err(err) = self.rendering_context.make_current() {
             warn!("Failed to make the rendering context current: {:?}", err);
         }
-        if let Some(webrender) = self.webrender.take() {
-            webrender.deinit();
-        }
+        self.global.borrow_mut().renderer.deinit();
     }
 
     pub fn rendering_context_size(&self) -> Size2D<u32, DevicePixel> {
@@ -529,24 +516,7 @@ impl IOCompositor {
             CompositorMsg::CollectMemoryReport(sender) => {
                 let ops =
                     wr_malloc_size_of::MallocSizeOfOps::new(servo_allocator::usable_size, None);
-                let report = self.global.borrow().webrender_api.report_memory(ops);
-                let reports = vec![
-                    Report {
-                        path: path!["webrender", "fonts"],
-                        kind: ReportKind::ExplicitJemallocHeapSize,
-                        size: report.fonts,
-                    },
-                    Report {
-                        path: path!["webrender", "images"],
-                        kind: ReportKind::ExplicitJemallocHeapSize,
-                        size: report.images,
-                    },
-                    Report {
-                        path: path!["webrender", "display-list"],
-                        kind: ReportKind::ExplicitJemallocHeapSize,
-                        size: report.display_list,
-                    },
-                ];
+                let reports = self.global.borrow().renderer.report_memory(ops);
                 sender.send(ProcessReports::new(reports));
             },
 
@@ -866,7 +836,7 @@ impl IOCompositor {
                 // would be to listen to the TransactionNotifier for previous per-pipeline
                 // transactions, but that isn't easily compatible with the event loop wakeup
                 // mechanism from libserver.
-                self.global.borrow().webrender_api.flush_scene_builder();
+                self.global.borrow().renderer.flush_scene_builder();
 
                 let details_for_pipeline = |pipeline_id| self.details_for_pipeline(pipeline_id);
                 let result = self
@@ -883,7 +853,8 @@ impl IOCompositor {
             },
 
             CompositorMsg::GenerateImageKey(sender) => {
-                let _ = sender.send(self.global.borrow().webrender_api.generate_image_key());
+                let key = self.global.borrow().renderer.generate_image_key();
+                let _ = sender.send(key);
             },
 
             CompositorMsg::UpdateImages(updates) => {
@@ -941,13 +912,13 @@ impl IOCompositor {
                 result_sender,
             ) => {
                 let font_keys = (0..number_of_font_keys)
-                    .map(|_| self.global.borrow().webrender_api.generate_font_key())
+                    .map(|_| self.global.borrow().renderer.generate_font_key())
                     .collect();
                 let font_instance_keys = (0..number_of_font_instance_keys)
                     .map(|_| {
                         self.global
                             .borrow()
-                            .webrender_api
+                            .renderer
                             .generate_font_instance_key()
                     })
                     .collect();
@@ -1014,7 +985,7 @@ impl IOCompositor {
                 }
             },
             CompositorMsg::GenerateImageKey(sender) => {
-                let _ = sender.send(self.global.borrow().webrender_api.generate_image_key());
+                let _ = sender.send(self.global.borrow().renderer.generate_image_key());
             },
             CompositorMsg::GenerateFontKeys(
                 number_of_font_keys,
@@ -1022,13 +993,13 @@ impl IOCompositor {
                 result_sender,
             ) => {
                 let font_keys = (0..number_of_font_keys)
-                    .map(|_| self.global.borrow().webrender_api.generate_font_key())
+                    .map(|_| self.global.borrow().renderer.generate_font_key())
                     .collect();
                 let font_instance_keys = (0..number_of_font_instance_keys)
                     .map(|_| {
                         self.global
                             .borrow()
-                            .webrender_api
+                            .renderer
                             .generate_font_instance_key()
                     })
                     .collect();
@@ -1395,9 +1366,10 @@ impl IOCompositor {
                     .flat_map(WebViewRenderer::pipeline_ids)
                 {
                     if let Some(WebRenderEpoch(epoch)) = self
-                        .webrender
-                        .as_ref()
-                        .and_then(|wr| wr.current_epoch(self.webrender_document(), id.into()))
+                        .global
+                        .borrow()
+                        .renderer
+                        .current_epoch(*id)
                     {
                         let epoch = Epoch(epoch);
                         pipeline_epochs.insert(*id, epoch);
@@ -1508,9 +1480,7 @@ impl IOCompositor {
         }
         self.assert_no_gl_error();
 
-        if let Some(webrender) = self.webrender.as_mut() {
-            webrender.update();
-        }
+        self.global.borrow_mut().renderer.update();
 
         if opts::get().wait_for_stable_image {
             // The current image may be ready to output. However, if there are animations active,
@@ -1538,10 +1508,8 @@ impl IOCompositor {
                 // Paint the scene.
                 // TODO(gw): Take notice of any errors the renderer returns!
                 self.clear_background();
-                if let Some(webrender) = self.webrender.as_mut() {
-                    let size = self.rendering_context.size2d().to_i32();
-                    webrender.render(size, 0 /* buffer_age */).ok();
-                }
+                let size = self.rendering_context.size2d().to_i32();
+                self.global.borrow_mut().renderer.render(size);
             },
         );
 
@@ -1558,13 +1526,9 @@ impl IOCompositor {
     /// the list.
     fn send_pending_paint_metrics_messages_after_composite(&mut self) {
         let paint_time = CrossProcessInstant::now();
-        let document_id = self.webrender_document();
         for webview_renderer in self.webview_renderers.iter_mut() {
-            for (pipeline_id, pipeline) in webview_renderer.pipelines.iter_mut() {
-                let Some(current_epoch) = self
-                    .webrender
-                    .as_ref()
-                    .and_then(|wr| wr.current_epoch(document_id, pipeline_id.into()))
+            for (&pipeline_id, pipeline) in webview_renderer.pipelines.iter_mut() {
+                let Some(current_epoch) = self.global.borrow().renderer.current_epoch(pipeline_id.into())
                 else {
                     continue;
                 };
@@ -1578,7 +1542,7 @@ impl IOCompositor {
                         assert!(epoch <= current_epoch);
                         if let Err(error) = self.global.borrow().constellation_sender.send(
                             EmbedderToConstellationMessage::PaintMetric(
-                                *pipeline_id,
+                                pipeline_id,
                                 PaintMetricEvent::FirstPaint(paint_time, first_reflow),
                             ),
                         ) {
@@ -1595,7 +1559,7 @@ impl IOCompositor {
                     PaintMetricState::Seen(epoch, first_reflow) if epoch <= current_epoch => {
                         if let Err(error) = self.global.borrow().constellation_sender.send(
                             EmbedderToConstellationMessage::PaintMetric(
-                                *pipeline_id,
+                                pipeline_id,
                                 PaintMetricEvent::FirstContentfulPaint(paint_time, first_reflow),
                             ),
                         ) {
@@ -1612,42 +1576,13 @@ impl IOCompositor {
     }
 
     fn clear_background(&self) {
-        let gl = &self.global.borrow().webrender_gl;
-        self.assert_gl_framebuffer_complete();
-
-        // Always clear the entire RenderingContext, regardless of how many WebViews there are
-        // or where they are positioned. This is so WebView actually clears even before the
-        // first WebView is ready.
         let color = servo_config::pref!(shell_background_color_rgba);
-        gl.clear_color(
-            color[0] as f32,
-            color[1] as f32,
-            color[2] as f32,
-            color[3] as f32,
-        );
-        gl.clear(gleam::gl::COLOR_BUFFER_BIT);
+        self.global.borrow().renderer.clear_background(color);
     }
 
     #[track_caller]
     fn assert_no_gl_error(&self) {
-        debug_assert_eq!(
-            self.global.borrow().webrender_gl.get_error(),
-            gleam::gl::NO_ERROR
-        );
-    }
-
-    #[track_caller]
-    fn assert_gl_framebuffer_complete(&self) {
-        debug_assert_eq!(
-            (
-                self.global.borrow().webrender_gl.get_error(),
-                self.global
-                    .borrow()
-                    .webrender_gl
-                    .check_frame_buffer_status(gleam::gl::FRAMEBUFFER)
-            ),
-            (gleam::gl::NO_ERROR, gleam::gl::FRAMEBUFFER_COMPLETE)
-        );
+        self.global.borrow().renderer.assert_no_gl_error();
     }
 
     /// Get the message receiver for this [`IOCompositor`].
@@ -1743,22 +1678,7 @@ impl IOCompositor {
     }
 
     pub fn toggle_webrender_debug(&mut self, option: WebRenderDebugOption) {
-        let Some(webrender) = self.webrender.as_mut() else {
-            return;
-        };
-        let mut flags = webrender.get_debug_flags();
-        let flag = match option {
-            WebRenderDebugOption::Profiler => {
-                webrender::DebugFlags::PROFILER_DBG |
-                    webrender::DebugFlags::GPU_TIME_QUERIES |
-                    webrender::DebugFlags::GPU_SAMPLE_QUERIES
-            },
-            WebRenderDebugOption::TextureCacheDebug => webrender::DebugFlags::TEXTURE_CACHE_DBG,
-            WebRenderDebugOption::RenderTargetDebug => webrender::DebugFlags::RENDER_TARGET_DBG,
-        };
-        flags.toggle(flag);
-        webrender.set_debug_flags(flags);
-
+        self.global.borrow_mut().renderer.toggle_webrender_debug(option);
         let mut txn = Transaction::new();
         self.generate_frame(&mut txn, RenderReasons::TESTING);
         self.global.borrow_mut().send_transaction(txn);
@@ -1784,11 +1704,10 @@ impl IOCompositor {
             return;
         };
 
-        println!("Saving WebRender capture to {capture_path:?}");
         self.global
             .borrow()
-            .webrender_api
-            .save_capture(capture_path.clone(), CaptureBits::all());
+            .renderer
+            .save_capture(capture_path.clone());
     }
 
     fn add_font_instance(
@@ -1849,10 +1768,6 @@ impl IOCompositor {
         if let Some(webview_renderer) = self.webview_renderers.get_mut(webview_id) {
             webview_renderer.set_pinch_zoom(magnification);
         }
-    }
-
-    fn webrender_document(&self) -> DocumentId {
-        self.global.borrow().webrender_document
     }
 
     fn shutdown_state(&self) -> ShutdownState {
