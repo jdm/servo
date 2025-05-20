@@ -133,6 +133,7 @@ snapshot = { path = "./components/shared/snapshot" }
 static_assertions = "1.1"
 string_cache = "0.8"
 string_cache_codegen = "0.5"
+string_cache_malloc_size_of = { package = "malloc_size_of", version = "0.1" }
 strum = "0.26"
 strum_macros = "0.26"
 stylo = { git = "https://github.com/servo/stylo", branch = "2025-05-01" }
@@ -248,3 +249,4 @@ codegen-units = 1
 # [patch."https://github.com/servo/rust-content-security-policy"]
 # content-security-policy = { path = "../rust-content-security-policy/" }
 # content-security-policy = { git = "https://github.com/timvdlippe/rust-content-security-policy/", branch = "fix-report-checks", features = ["serde"] }
+string_cache = { path = "../string-cache" } 

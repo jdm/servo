@@ -928,6 +928,15 @@ impl JSContextHelper for JSContext {
             reports.push(Report { path, kind, size })
         };
 
+        let mut atoms_ops = string_cache_malloc_size_of::MallocSizeOfOps::new(
+            servo_allocator::usable_size, None, None,
+        );
+        report(
+            path!["atoms"],
+            ReportKind::ExplicitJemallocHeapSize,
+            string_cache::size_of_dynamic_atoms(&mut atoms_ops),
+        );
+
         // A note about possibly confusing terminology: the JS GC "heap" is allocated via
         // mmap/VirtualAlloc, which means it's not on the malloc "heap", so we use
         // `ExplicitNonHeapSize` as its kind.
