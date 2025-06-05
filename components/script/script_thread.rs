@@ -150,6 +150,7 @@ use crate::microtask::{Microtask, MicrotaskQueue};
 use crate::mime::{APPLICATION, MimeExt, TEXT, XML};
 use crate::navigation::{InProgressLoad, NavigationListener};
 use crate::realms::enter_realm;
+use crate::shared_worker_manager::SharedWorkerManager;
 use crate::script_module::ScriptFetchOptions;
 use crate::script_runtime::{
     CanGc, JSContext, JSContextHelper, Runtime, ScriptThreadEventCategory, ThreadSafeJSContext,
@@ -339,6 +340,8 @@ pub struct ScriptThread {
     /// The screen coordinates where the primary mouse button was pressed.
     #[no_trace]
     relative_mouse_down_point: Cell<Point2D<f32, DevicePixel>>,
+
+    shared_worker_manager: SharedWorkerManager,
 }
 
 struct BHMExitSignal {
@@ -966,6 +969,7 @@ impl ScriptThread {
             inherited_secure_context: state.inherited_secure_context,
             layout_factory,
             relative_mouse_down_point: Cell::new(Point2D::zero()),
+            shared_worker_manager: SharedWorkerManager::new(),
         }
     }
 

@@ -537,6 +537,8 @@ pub(crate) mod servointernals;
 #[allow(dead_code)]
 pub(crate) mod servoparser;
 pub(crate) mod shadowroot;
+pub(crate) mod sharedworkerglobalscope;
+pub(crate) mod sharedworker;
 pub(crate) mod staticrange;
 pub(crate) mod stereopannernode;
 pub(crate) mod storage;

@@ -60,6 +60,7 @@ pub(crate) mod script_runtime;
 pub(crate) mod script_thread;
 pub(crate) mod security_manager;
 pub(crate) mod serviceworker_manager;
+mod shared_worker_manager;
 mod stylesheet_loader;
 mod stylesheet_set;
 mod task_manager;

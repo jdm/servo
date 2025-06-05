@@ -2699,9 +2699,9 @@ def UnionTypes(
             continue
         for memberType in t.flatMemberTypes:
             if memberType.isDictionary() or memberType.isEnum() or memberType.isCallback():
+                memberType = memberType.callback if memberType.isCallback() else memberType.inner
                 memberModule = getModuleFromObject(memberType)
-                memberName = (memberType.callback.identifier.name
-                              if memberType.isCallback() else memberType.inner.identifier.name)
+                memberName = memberType.identifier.name
                 imports.append(f"{memberModule}::{memberName}")
                 if memberType.isEnum():
                     imports.append(f"{memberModule}::{memberName}Values")
