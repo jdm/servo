@@ -973,6 +973,18 @@ impl ScriptThread {
         }
     }
 
+    pub(crate) fn construct_shared_worker(
+        origin: ImmutableOrigin,
+        init: SharedWorkerGlobalScopeInit,
+    ) -> DomRoot<SharedWorker> {
+        with_script_thread(|script_thread| {
+            script_thread
+                .shared_worker_manager
+                .borrow_mut()
+                .create_worker(origin, init, CanGc::note())
+        })
+    }
+
     #[allow(unsafe_code)]
     pub(crate) fn get_cx(&self) -> JSContext {
         unsafe { JSContext::from_ptr(self.js_runtime.cx()) }

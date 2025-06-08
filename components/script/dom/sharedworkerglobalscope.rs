@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 use std::sync::Arc;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, AtomicU32};
 
 use constellation_traits::WorkerGlobalScopeInit;
 use crossbeam_channel::{Receiver};
@@ -31,7 +31,7 @@ pub(crate) struct SharedWorkerGlobalScopeInit {
     worker_name: DOMString,
     worker_type: WorkerType,
     worker_url: ServoUrl,
-    from_devtools_receiver: Receiver<DevtoolScriptControlMsg>,
+    from_devtools_receiver: IpcReceiver<DevtoolScriptControlMsg>,
     runtime: Runtime,
     closing: Arc<AtomicBool>,
     #[cfg(feature = "webgpu")] gpu_id_hub: Arc<IdentityHub>,
@@ -60,6 +60,7 @@ impl SharedWorkerGlobalScope {
                 init.gpu_id_hub,
                 init.insecure_requests_policy,
             ),
+            references: Arc::new(AtomicU32::new(0)),
         }
     }
 
