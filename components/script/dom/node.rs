@@ -117,6 +117,7 @@ use crate::dom::svgsvgelement::{LayoutSVGSVGElementHelpers, SVGSVGElement};
 use crate::dom::text::Text;
 use crate::dom::virtualmethods::{VirtualMethods, vtable_for};
 use crate::dom::window::Window;
+use crate::maybe_rooted_vec;
 use crate::script_runtime::CanGc;
 use crate::script_thread::ScriptThread;
 
@@ -2344,7 +2345,7 @@ impl Node {
         debug_assert!(child.is_none_or(|child| Some(parent) == child.GetParentNode().as_deref()));
 
         // Step 1. Let nodes be node’s children, if node is a DocumentFragment node; otherwise « node ».
-        rooted_vec!(let mut new_nodes);
+        maybe_rooted_vec!(let mut new_nodes);
         let new_nodes = if let NodeTypeId::DocumentFragment(_) = node.type_id() {
             new_nodes.extend(node.children().map(|node| Dom::from_ref(&*node)));
             new_nodes.r()

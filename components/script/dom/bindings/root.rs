@@ -30,6 +30,7 @@ use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 use std::{mem, ptr};
 
+use js::gc::{RootableVec, RootedVec};
 use js::jsapi::{JSObject, JSTracer};
 use malloc_size_of::{MallocSizeOf, MallocSizeOfOps};
 pub(crate) use script_bindings::root::*;
@@ -394,4 +395,50 @@ where
         let _ = mem::transmute::<Dom<T>, LayoutDom<T>>;
         &*(slice as *const [Dom<T>] as *const [LayoutDom<T>])
     }
+}
+
+pub(crate) enum MaybeRootedVec<'a, T: js::rust::Trace + 'static> {
+    Unrooted(Option<&'a mut RootableVec<T>>),
+    Rooted(RootedVec<'a, T>),
+}
+
+impl<'a, T: js::rust::Trace> MaybeRootedVec<'a, T> {
+    pub(crate) fn new(vec: &'a mut RootableVec<T>) -> MaybeRootedVec<'a, T> {
+        MaybeRootedVec::Unrooted(Some(vec))
+    }
+
+    fn as_rooted<'b>(&'b mut self) -> &'b mut RootedVec<'a, T> {
+        let &mut MaybeRootedVec::Rooted(ref mut v) = self else { panic!() };
+        v
+    }
+
+    pub(crate) fn extend<I>(&mut self, iter: I) where I: IntoIterator<Item = T> {
+        let v = {
+            let MaybeRootedVec::Unrooted(v) = self else {
+                self.as_rooted().extend(iter);
+                return;
+            };
+            v.take().unwrap()
+        };
+        *self = MaybeRootedVec::Rooted(RootedVec::new(v));
+        self.as_rooted().extend(iter);
+    }
+}
+
+impl<'a, T: script_bindings::reflector::DomObject> MaybeRootedVec<'a, Dom<T>> {
+    pub(crate) fn r<'b>(&'b self) -> &'b [&'b T] {
+        match self {
+            MaybeRootedVec::Unrooted(..) => &[],
+            MaybeRootedVec::Rooted(v) => v.r(),
+        }
+    }
+}
+
+#[macro_export]
+///
+macro_rules! maybe_rooted_vec {
+    (let mut $name:ident) => {
+        let mut __root = js::gc::RootableVec::new_unrooted();
+        let mut $name = crate::dom::bindings::root::MaybeRootedVec::new(&mut __root);
+    };
 }
