@@ -56,6 +56,7 @@ use webrender_api::{
 
 use crate::InitialCompositorState;
 use crate::refresh_driver::RefreshDriver;
+use crate::render::Renderer;
 use crate::webview_manager::WebViewManager;
 use crate::webview_renderer::{PinchZoomResult, UnknownWebView, WebViewRenderer};
 

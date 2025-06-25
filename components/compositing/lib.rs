@@ -15,7 +15,7 @@ use embedder_traits::{EventLoopWaker, ShutdownState};
 use profile_traits::{mem, time};
 
 pub use crate::compositor::{IOCompositor, WebRenderDebugOption};
-pub use crate::render::WebRenderRenderer;
+pub use crate::render::{Renderer, WebRenderRenderer};
 
 #[macro_use]
 mod tracing;

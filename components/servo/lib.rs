@@ -42,6 +42,7 @@ use bluetooth_traits::BluetoothRequest;
 use canvas::canvas_paint_thread::CanvasPaintThread;
 use canvas_traits::webgl::{GlType, WebGLThreads};
 use clipboard_delegate::StringRequest;
+pub use compositing::Renderer;
 pub use compositing::WebRenderDebugOption;
 use compositing::{IOCompositor, InitialCompositorState};
 pub use compositing_traits::rendering_context::{

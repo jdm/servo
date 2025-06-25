@@ -10,12 +10,38 @@ use compositing_traits::WebrenderExternalImageHandlers;
 use euclid::Size2D;
 use profile_traits::mem::{Report, ReportKind};
 use profile_traits::path;
-use webrender::{CaptureBits, RenderApi, Renderer, Transaction};
+use webrender::{CaptureBits, RenderApi, Renderer as WRRenderer, Transaction};
 use webrender_api::{DocumentId, FontKey, FontInstanceKey, HitTestFlags, HitTestResult, ImageKey, PipelineId as WebRenderPipelineId, Epoch as WebRenderEpoch};
 use webrender_api::units::{DevicePixel, WorldPoint};
 use wr_malloc_size_of::MallocSizeOfOps;
 
 use crate::compositor::WebRenderDebugOption;
+
+pub trait Renderer {
+    fn report_memory(&self, ops: MallocSizeOfOps) -> Vec<Report>;
+    fn gl_info(&self) -> (String, String);
+    fn save_capture(&self, capture_path: PathBuf);
+    fn toggle_webrender_debug(&mut self, option: WebRenderDebugOption);
+    fn render(&mut self, size: Size2D<i32, DevicePixel>);
+    fn update(&mut self);
+    fn generate_font_instance_key(&self) -> FontInstanceKey;
+    fn generate_font_key(&self) -> FontKey;
+    fn generate_image_key(&self) -> ImageKey;
+    fn flush_scene_builder(&self);
+    fn current_epoch(&self, id: PipelineId) -> Option<WebRenderEpoch>;
+    fn deinit(&mut self);
+    fn send_transaction(&mut self, transaction: Transaction);
+    fn hit_test(
+        &self,
+        pipeline_id: Option<WebRenderPipelineId>,
+        world_point: WorldPoint,
+        flags: HitTestFlags,
+    ) -> HitTestResult;
+    fn clear_background(&self, color: [f64; 4]);
+    fn assert_no_gl_error(&self);
+    fn assert_gl_framebuffer_complete(&self);
+    fn set_external_image_handler(&mut self, handlers: WebrenderExternalImageHandlers);
+}
 
 pub struct WebRenderRenderer {
     /// The WebRender [`RenderApi`] interface used to communicate with WebRender.
@@ -28,7 +54,7 @@ pub struct WebRenderRenderer {
     webrender_gl: Rc<dyn gleam::gl::Gl>,
 
     /// The webrender renderer.
-    webrender: Option<Renderer>,
+    webrender: Option<WRRenderer>,
 }
 
 impl WebRenderRenderer {
@@ -36,7 +62,7 @@ impl WebRenderRenderer {
         api: RenderApi,
         document: DocumentId,
         gl: Rc<dyn gleam::gl::Gl>,
-        renderer: Renderer,
+        renderer: WRRenderer,
     ) -> Self {
         Self {
             webrender_api: api,
@@ -45,8 +71,10 @@ impl WebRenderRenderer {
             webrender: Some(renderer),
         }
     }
+}
 
-    pub(crate) fn report_memory(&self, ops: MallocSizeOfOps) -> Vec<Report> {
+impl Renderer for WebRenderRenderer {
+    fn report_memory(&self, ops: MallocSizeOfOps) -> Vec<Report> {
         let report = self.webrender_api.report_memory(ops);
         vec![
             Report {
@@ -67,19 +95,19 @@ impl WebRenderRenderer {
         ]
     }
 
-    pub(crate) fn gl_info(&self) -> (String, String) {
+    fn gl_info(&self) -> (String, String) {
         (
             self.webrender_gl.get_string(gleam::gl::RENDERER),
             self.webrender_gl.get_string(gleam::gl::VERSION),
         )
     }
 
-    pub(crate) fn save_capture(&self, capture_path: PathBuf) {
+    fn save_capture(&self, capture_path: PathBuf) {
         println!("Saving WebRender capture to {capture_path:?}");
         self.webrender_api.save_capture(capture_path, CaptureBits::all());
     }
 
-    pub(crate) fn toggle_webrender_debug(&mut self, option: WebRenderDebugOption) {
+    fn toggle_webrender_debug(&mut self, option: WebRenderDebugOption) {
         let Some(webrender) = self.webrender.as_mut() else {
             return;
         };
@@ -97,50 +125,50 @@ impl WebRenderRenderer {
         webrender.set_debug_flags(flags);
     }
 
-    pub(crate) fn render(&mut self, size: Size2D<i32, DevicePixel>) {
+    fn render(&mut self, size: Size2D<i32, DevicePixel>) {
         if let Some(webrender) = self.webrender.as_mut() {
             webrender.render(size, 0 /* buffer_age */).ok();
         }
     }
 
-    pub(crate) fn update(&mut self) {
+    fn update(&mut self) {
         if let Some(webrender) = self.webrender.as_mut() {
             webrender.update();
         }
     }
 
-    pub(crate) fn generate_font_instance_key(&self) -> FontInstanceKey {
+    fn generate_font_instance_key(&self) -> FontInstanceKey {
         self.webrender_api.generate_font_instance_key()
     }
 
-    pub(crate) fn generate_font_key(&self) -> FontKey {
+    fn generate_font_key(&self) -> FontKey {
         self.webrender_api.generate_font_key()
     }
 
-    pub(crate) fn generate_image_key(&self) -> ImageKey {
+    fn generate_image_key(&self) -> ImageKey {
         self.webrender_api.generate_image_key()
     }
 
-    pub(crate) fn flush_scene_builder(&self) {
+    fn flush_scene_builder(&self) {
         self.webrender_api.flush_scene_builder();
     }
 
-    pub(crate) fn current_epoch(&self, id: PipelineId) -> Option<WebRenderEpoch> {
+    fn current_epoch(&self, id: PipelineId) -> Option<WebRenderEpoch> {
         self.webrender.as_ref().and_then(|wr| wr.current_epoch(self.webrender_document, id.into()))
     }
 
-    pub(crate) fn deinit(&mut self) {
+    fn deinit(&mut self) {
         if let Some(webrender) = self.webrender.take() {
             webrender.deinit();
         }
     }
 
-    pub(crate) fn send_transaction(&mut self, transaction: Transaction) {
+    fn send_transaction(&mut self, transaction: Transaction) {
         self.webrender_api
             .send_transaction(self.webrender_document, transaction);
     }
 
-    pub(crate) fn hit_test(
+    fn hit_test(
         &self,
         pipeline_id: Option<WebRenderPipelineId>,
         world_point: WorldPoint,
@@ -149,7 +177,7 @@ impl WebRenderRenderer {
         self.webrender_api.hit_test(self.webrender_document, pipeline_id, world_point, flags)
     }
 
-    pub(crate) fn clear_background(&self, color: [f64; 4]) {
+    fn clear_background(&self, color: [f64; 4]) {
         let gl = &self.webrender_gl;
         self.assert_gl_framebuffer_complete();
 
@@ -166,7 +194,7 @@ impl WebRenderRenderer {
     }
 
     #[track_caller]
-    pub(crate) fn assert_no_gl_error(&self) {
+    fn assert_no_gl_error(&self) {
         debug_assert_eq!(
             self.webrender_gl.get_error(),
             gleam::gl::NO_ERROR
@@ -174,7 +202,7 @@ impl WebRenderRenderer {
     }
 
     #[track_caller]
-    pub(crate) fn assert_gl_framebuffer_complete(&self) {
+    fn assert_gl_framebuffer_complete(&self) {
         debug_assert_eq!(
             (
                 self.webrender_gl.get_error(),
@@ -184,7 +212,7 @@ impl WebRenderRenderer {
         );
     }
 
-    pub fn set_external_image_handler(&mut self, handlers: WebrenderExternalImageHandlers) {
+    fn set_external_image_handler(&mut self, handlers: WebrenderExternalImageHandlers) {
         let Some(webrender) = self.webrender.as_mut() else {
             return;
         };
