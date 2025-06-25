@@ -118,7 +118,7 @@ use webview::WebViewInner;
 #[cfg(feature = "webxr")]
 pub use webxr;
 pub use {
-    background_hang_monitor, base, canvas, canvas_traits, devtools, devtools_traits, euclid, fonts,
+    background_hang_monitor, base, canvas, canvas_traits, compositing_traits, devtools, devtools_traits, euclid, fonts,
     ipc_channel, layout_api, media, net, net_traits, profile, profile_traits, script,
     script_traits, servo_config as config, servo_config, servo_geometry, servo_url, style,
     style_traits, webrender_api,
