@@ -43,7 +43,7 @@ pub struct InitialCompositorState {
     /// shutting down.
     pub shutdown_state: Rc<Cell<ShutdownState>>,
     /// Instance of webrender API
-    pub renderer: WebRenderRenderer,
+    pub renderer: Box<dyn Renderer>,
     pub rendering_context: Rc<dyn RenderingContext>,
     pub webrender_gl: Rc<dyn gleam::gl::Gl>,
     #[cfg(feature = "webxr")]

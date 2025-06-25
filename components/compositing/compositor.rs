@@ -125,7 +125,7 @@ pub struct ServoRenderer {
     cursor_pos: DevicePoint,
 
     ///
-    renderer: crate::render::WebRenderRenderer,
+    renderer: Box<dyn Renderer>,
 }
 
 /// NB: Never block on the constellation, because sometimes the constellation blocks on us.

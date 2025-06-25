@@ -316,12 +316,14 @@ impl Servo {
             None
         };
 
-        let mut renderer = setup_renderer(
-            &opts,
-            &*rendering_context,
-            compositor_proxy.clone(),
-            webrender_gl.clone(),
-        );
+        let mut renderer = builder.renderer.unwrap_or_else(|| {
+            Box::new(setup_webrender_renderer(
+                &opts,
+                &*rendering_context,
+                compositor_proxy.clone(),
+                webrender_gl.clone(),
+            ))
+        });
 
         // Important that this call is done in a single-threaded fashion, we
         // can't defer it after `create_constellation` has started.
@@ -1204,6 +1206,7 @@ struct DefaultWebXrRegistry;
 impl webxr::WebXrRegistry for DefaultWebXrRegistry {}
 
 pub struct ServoBuilder {
+    renderer: Option<Box<dyn Renderer>>,
     rendering_context: Rc<dyn RenderingContext>,
     opts: Option<Box<Opts>>,
     preferences: Option<Box<Preferences>>,
@@ -1217,6 +1220,7 @@ pub struct ServoBuilder {
 impl ServoBuilder {
     pub fn new(rendering_context: Rc<dyn RenderingContext>) -> Self {
         Self {
+            renderer: None,
             rendering_context,
             opts: None,
             preferences: None,
@@ -1262,9 +1266,14 @@ impl ServoBuilder {
         self.webxr_registry = webxr_registry;
         self
     }
+
+    pub fn renderer(mut self, renderer: Box<dyn Renderer>) -> Self {
+        self.renderer = Some(renderer);
+        self
+    }
 }
 
-fn setup_renderer(
+fn setup_webrender_renderer(
     opts: &Opts,
     rendering_context: &dyn RenderingContext,
     compositor_proxy: CompositorProxy,
