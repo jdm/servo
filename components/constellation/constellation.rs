@@ -166,9 +166,12 @@ use webgpu::swapchain::WGPUImageMap;
 use webgpu_traits::{WebGPU, WebGPURequest};
 #[cfg(feature = "webgpu")]
 use webrender::RenderApi;
+#[cfg(feature = "webgpu")]
 use webrender::RenderApiSender;
 use webrender_api::units::LayoutVector2D;
-use webrender_api::{DocumentId, ExternalScrollId, ImageKey};
+#[cfg(feature = "webgpu")]
+use webrender_api::DocumentId;
+use webrender_api::{ExternalScrollId, ImageKey};
 
 use crate::browsingcontext::{
     AllBrowsingContextsIterator, BrowsingContext, FullyActiveBrowsingContextsIterator,
@@ -498,9 +501,11 @@ pub struct InitialConstellationState {
     pub mem_profiler_chan: mem::ProfilerChan,
 
     /// Webrender document ID.
+    #[cfg(feature = "webgpu")]
     pub webrender_document: DocumentId,
 
     /// Webrender API.
+    #[cfg(feature = "webgpu")]
     pub webrender_api_sender: RenderApiSender,
 
     /// Webrender external images

@@ -7,7 +7,9 @@ use std::rc::Rc;
 
 use servo::config::pref;
 use servo::config::prefs::Preferences;
+#[cfg(feature = "webxr")]
 use servo::webxr::WebXrRegistry;
+#[cfg(feature = "webxr")]
 use servo::webxr::glwindow::GlWindowDiscovery;
 #[cfg(target_os = "windows")]
 use servo::webxr::openxr::{AppInfo, OpenXrDiscovery};
@@ -27,6 +29,7 @@ pub(crate) struct XrDiscoveryWebXrRegistry {
     xr_discovery: RefCell<Option<XrDiscovery>>,
 }
 
+#[cfg(feature = "webxr")]
 impl XrDiscoveryWebXrRegistry {
     pub(crate) fn new_boxed(
         window: Rc<dyn WindowPortsMethods>,

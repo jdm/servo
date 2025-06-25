@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use base::id::PipelineId;
+use compositing_traits::WebrenderExternalImageHandlers;
 use euclid::Size2D;
 use profile_traits::mem::{Report, ReportKind};
 use profile_traits::path;
@@ -16,7 +17,7 @@ use wr_malloc_size_of::MallocSizeOfOps;
 
 use crate::compositor::WebRenderDebugOption;
 
-pub(crate) struct WebRenderRenderer {
+pub struct WebRenderRenderer {
     /// The WebRender [`RenderApi`] interface used to communicate with WebRender.
     webrender_api: RenderApi,
 
@@ -31,7 +32,7 @@ pub(crate) struct WebRenderRenderer {
 }
 
 impl WebRenderRenderer {
-    pub(crate) fn new(
+    pub fn new(
         api: RenderApi,
         document: DocumentId,
         gl: Rc<dyn gleam::gl::Gl>,
@@ -181,5 +182,12 @@ impl WebRenderRenderer {
             ),
             (gleam::gl::NO_ERROR, gleam::gl::FRAMEBUFFER_COMPLETE)
         );
+    }
+
+    pub fn set_external_image_handler(&mut self, handlers: WebrenderExternalImageHandlers) {
+        let Some(webrender) = self.webrender.as_mut() else {
+            return;
+        };
+        webrender.set_external_image_handler(Box::new(handlers));
     }
 }

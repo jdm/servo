@@ -109,7 +109,9 @@ use webgl::WebGLComm;
 pub use webgpu;
 #[cfg(feature = "webgpu")]
 use webgpu::swapchain::WGPUImageMap;
-use webrender::{ONE_TIME_USAGE_HINT, RenderApiSender, ShaderPrecacheFlags, UploadMethod};
+#[cfg(feature = "webgpu")]
+use webrender_api::RenderApiSender;
+use webrender::{ONE_TIME_USAGE_HINT, ShaderPrecacheFlags, UploadMethod};
 use webrender_api::{ColorF, DocumentId, FramePublishId};
 use webview::WebViewInner;
 #[cfg(feature = "webxr")]
@@ -313,73 +315,12 @@ impl Servo {
             None
         };
 
-        let (mut webrender, webrender_api_sender) = {
-            let mut debug_flags = webrender::DebugFlags::empty();
-            debug_flags.set(
-                webrender::DebugFlags::PROFILER_DBG,
-                opts.debug.webrender_stats,
-            );
-
-            rendering_context.prepare_for_rendering();
-            let render_notifier = Box::new(RenderNotifier::new(compositor_proxy.clone()));
-            let clear_color = servo_config::pref!(shell_background_color_rgba);
-            let clear_color = ColorF::new(
-                clear_color[0] as f32,
-                clear_color[1] as f32,
-                clear_color[2] as f32,
-                clear_color[3] as f32,
-            );
-
-            // Use same texture upload method as Gecko with ANGLE:
-            // https://searchfox.org/mozilla-central/source/gfx/webrender_bindings/src/bindings.rs#1215-1219
-            let upload_method = if webrender_gl.get_string(RENDERER).starts_with("ANGLE") {
-                UploadMethod::Immediate
-            } else {
-                UploadMethod::PixelBuffer(ONE_TIME_USAGE_HINT)
-            };
-            let worker_threads = thread::available_parallelism()
-                .map(|i| i.get())
-                .unwrap_or(pref!(threadpools_fallback_worker_num) as usize)
-                .min(pref!(threadpools_webrender_workers_max).max(1) as usize);
-            let workers = Some(Arc::new(
-                rayon::ThreadPoolBuilder::new()
-                    .num_threads(worker_threads)
-                    .thread_name(|idx| format!("WRWorker#{}", idx))
-                    .build()
-                    .unwrap(),
-            ));
-            webrender::create_webrender_instance(
-                webrender_gl.clone(),
-                render_notifier,
-                webrender::WebRenderOptions {
-                    // We force the use of optimized shaders here because rendering is broken
-                    // on Android emulators with unoptimized shaders. This is due to a known
-                    // issue in the emulator's OpenGL emulation layer.
-                    // See: https://github.com/servo/servo/issues/31726
-                    use_optimized_shaders: true,
-                    resource_override_path: opts.shaders_dir.clone(),
-                    debug_flags,
-                    precache_flags: if pref!(gfx_precache_shaders) {
-                        ShaderPrecacheFlags::FULL_COMPILE
-                    } else {
-                        ShaderPrecacheFlags::empty()
-                    },
-                    enable_aa: pref!(gfx_text_antialiasing_enabled),
-                    enable_subpixel_aa: pref!(gfx_subpixel_text_antialiasing_enabled),
-                    allow_texture_swizzling: pref!(gfx_texture_swizzling_enabled),
-                    clear_color,
-                    upload_method,
-                    workers,
-                    size_of_op: Some(servo_allocator::usable_size),
-                    ..Default::default()
-                },
-                None,
-            )
-            .expect("Unable to initialize webrender!")
-        };
-
-        let webrender_api = webrender_api_sender.create_api();
-        let webrender_document = webrender_api.add_document(rendering_context.size2d().to_i32());
+        let mut renderer = setup_renderer(
+            &opts,
+            &*rendering_context,
+            compositor_proxy.clone(),
+            webrender_gl.clone(),
+        );
 
         // Important that this call is done in a single-threaded fashion, we
         // can't defer it after `create_constellation` has started.
@@ -389,14 +330,14 @@ impl Servo {
             None
         };
 
-        // Create the webgl thread
+        let (external_image_handlers, external_images) = WebrenderExternalImageHandlers::new();
+        let mut external_image_handlers = external_image_handlers;
+
+        /*// Create the webgl thread
         let gl_type = match webrender_gl.get_type() {
             gleam::gl::GlType::Gl => GlType::Gl,
             gleam::gl::GlType::Gles => GlType::Gles,
         };
-
-        let (external_image_handlers, external_images) = WebrenderExternalImageHandlers::new();
-        let mut external_image_handlers = Box::new(external_image_handlers);
 
         let WebGLComm {
             webgl_threads,
@@ -409,10 +350,10 @@ impl Servo {
             webrender_document,
             external_images.clone(),
             gl_type,
-        );
+        );*/
 
         // Set webrender external image handler for WebGL textures
-        external_image_handlers.set_handler(image_handler, WebrenderImageHandlerType::WebGL);
+        //external_image_handlers.set_handler(image_handler, WebrenderImageHandlerType::WebGL);
 
         // Create the WebXR main thread
         #[cfg(feature = "webxr")]
@@ -439,7 +380,7 @@ impl Servo {
             external_images.clone(),
         );
 
-        webrender.set_external_image_handler(external_image_handlers);
+        renderer.set_external_image_handler(external_image_handlers);
 
         // Create the constellation, which maintains the engine pipelines, including script and
         // layout, as well as the navigation context.
@@ -453,11 +394,13 @@ impl Servo {
             time_profiler_chan.clone(),
             mem_profiler_chan.clone(),
             devtools_sender,
+            #[cfg(feature = "webgpu")]
             webrender_document,
+            #[cfg(feature = "webgpu")]
             webrender_api_sender,
             #[cfg(feature = "webxr")]
             webxr_main_thread.registry(),
-            Some(webgl_threads),
+            None,
             external_images,
             #[cfg(feature = "webgpu")]
             wgpu_image_map,
@@ -475,9 +418,7 @@ impl Servo {
                 constellation_chan: constellation_chan.clone(),
                 time_profiler_chan,
                 mem_profiler_chan,
-                webrender,
-                webrender_document,
-                webrender_api,
+                renderer,
                 rendering_context,
                 webrender_gl,
                 #[cfg(feature = "webxr")]
@@ -1060,7 +1001,9 @@ fn create_constellation(
     time_profiler_chan: time::ProfilerChan,
     mem_profiler_chan: mem::ProfilerChan,
     devtools_sender: Option<Sender<devtools_traits::DevtoolsControlMsg>>,
+    #[cfg(feature = "webgpu")]
     webrender_document: DocumentId,
+    #[cfg(feature = "webgpu")]
     webrender_api_sender: RenderApiSender,
     #[cfg(feature = "webxr")] webxr_registry: webxr_api::Registry,
     webgl_threads: Option<WebGLThreads>,
@@ -1112,7 +1055,9 @@ fn create_constellation(
         private_resource_threads,
         time_profiler_chan,
         mem_profiler_chan,
+        #[cfg(feature = "webgpu")]
         webrender_document,
+        #[cfg(feature = "webgpu")]
         webrender_api_sender,
         #[cfg(feature = "webxr")]
         webxr_registry: Some(webxr_registry),
@@ -1316,4 +1261,86 @@ impl ServoBuilder {
         self.webxr_registry = webxr_registry;
         self
     }
+}
+
+fn setup_renderer(
+    opts: &Opts,
+    rendering_context: &dyn RenderingContext,
+    compositor_proxy: CompositorProxy,
+    webrender_gl: Rc<dyn gleam::gl::Gl>,
+) -> compositing::WebRenderRenderer {
+    let (webrender, webrender_api_sender) = {
+        let mut debug_flags = webrender::DebugFlags::empty();
+        debug_flags.set(
+            webrender::DebugFlags::PROFILER_DBG,
+            opts.debug.webrender_stats,
+        );
+
+        rendering_context.prepare_for_rendering();
+        let render_notifier = Box::new(RenderNotifier::new(compositor_proxy));
+        let clear_color = servo_config::pref!(shell_background_color_rgba);
+        let clear_color = ColorF::new(
+            clear_color[0] as f32,
+            clear_color[1] as f32,
+            clear_color[2] as f32,
+            clear_color[3] as f32,
+        );
+
+        // Use same texture upload method as Gecko with ANGLE:
+        // https://searchfox.org/mozilla-central/source/gfx/webrender_bindings/src/bindings.rs#1215-1219
+        let upload_method = if webrender_gl.get_string(RENDERER).starts_with("ANGLE") {
+            UploadMethod::Immediate
+        } else {
+            UploadMethod::PixelBuffer(ONE_TIME_USAGE_HINT)
+        };
+        let worker_threads = thread::available_parallelism()
+            .map(|i| i.get())
+            .unwrap_or(pref!(threadpools_fallback_worker_num) as usize)
+            .min(pref!(threadpools_webrender_workers_max).max(1) as usize);
+        let workers = Some(Arc::new(
+            rayon::ThreadPoolBuilder::new()
+                .num_threads(worker_threads)
+                .thread_name(|idx| format!("WRWorker#{}", idx))
+                .build()
+                .unwrap(),
+        ));
+        webrender::create_webrender_instance(
+            webrender_gl.clone(),
+            render_notifier,
+            webrender::WebRenderOptions {
+                // We force the use of optimized shaders here because rendering is broken
+                // on Android emulators with unoptimized shaders. This is due to a known
+                // issue in the emulator's OpenGL emulation layer.
+                // See: https://github.com/servo/servo/issues/31726
+                use_optimized_shaders: true,
+                resource_override_path: opts.shaders_dir.clone(),
+                debug_flags,
+                precache_flags: if pref!(gfx_precache_shaders) {
+                    ShaderPrecacheFlags::FULL_COMPILE
+                } else {
+                    ShaderPrecacheFlags::empty()
+                },
+                enable_aa: pref!(gfx_text_antialiasing_enabled),
+                enable_subpixel_aa: pref!(gfx_subpixel_text_antialiasing_enabled),
+                allow_texture_swizzling: pref!(gfx_texture_swizzling_enabled),
+                clear_color,
+                upload_method,
+                workers,
+                size_of_op: Some(servo_allocator::usable_size),
+                ..Default::default()
+            },
+            None,
+        )
+            .expect("Unable to initialize webrender!")
+    };
+
+    let webrender_api = webrender_api_sender.create_api();
+    let webrender_document = webrender_api.add_document(rendering_context.size2d().to_i32());
+
+    compositing::WebRenderRenderer::new(
+        webrender_api,
+        webrender_document,
+        webrender_gl,
+        webrender,
+    )
 }

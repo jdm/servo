@@ -681,6 +681,7 @@ impl WindowPortsMethods for Window {
         }
     }
 
+    #[cfg(feature = "webxr")]
     fn new_glwindow(
         &self,
         event_loop: &ActiveEventLoop,
@@ -792,6 +793,7 @@ struct XRWindowPose {
     xr_translation: Cell<Vector3D<f32, UnknownUnit>>,
 }
 
+#[cfg(feature = "webxr")]
 impl servo::webxr::glwindow::GlWindow for XRWindow {
     fn get_render_target(
         &self,

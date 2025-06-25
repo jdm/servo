@@ -13,10 +13,9 @@ use constellation_traits::EmbedderToConstellationMessage;
 use crossbeam_channel::{Receiver, Sender};
 use embedder_traits::{EventLoopWaker, ShutdownState};
 use profile_traits::{mem, time};
-use webrender::RenderApi;
-use webrender_api::DocumentId;
 
 pub use crate::compositor::{IOCompositor, WebRenderDebugOption};
+pub use crate::render::WebRenderRenderer;
 
 #[macro_use]
 mod tracing;
@@ -44,9 +43,7 @@ pub struct InitialCompositorState {
     /// shutting down.
     pub shutdown_state: Rc<Cell<ShutdownState>>,
     /// Instance of webrender API
-    pub webrender: webrender::Renderer,
-    pub webrender_document: DocumentId,
-    pub webrender_api: RenderApi,
+    pub renderer: WebRenderRenderer,
     pub rendering_context: Rc<dyn RenderingContext>,
     pub webrender_gl: Rc<dyn gleam::gl::Gl>,
     #[cfg(feature = "webxr")]

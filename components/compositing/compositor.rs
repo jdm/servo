@@ -56,7 +56,6 @@ use webrender_api::{
 
 use crate::InitialCompositorState;
 use crate::refresh_driver::RefreshDriver;
-use crate::render::WebRenderRenderer;
 use crate::webview_manager::WebViewManager;
 use crate::webview_renderer::{PinchZoomResult, UnknownWebView, WebViewRenderer};
 
@@ -408,12 +407,7 @@ impl IOCompositor {
                 compositor_receiver: state.receiver,
                 constellation_sender: state.constellation_chan,
                 time_profiler_chan: state.time_profiler_chan,
-                renderer: WebRenderRenderer::new(
-                    state.webrender_api,
-                    state.webrender_document,
-                    state.webrender_gl,
-                    state.webrender,
-                ),
+                renderer: state.renderer,
                 #[cfg(feature = "webxr")]
                 webxr_main_thread: state.webxr_main_thread,
                 convert_mouse_to_touch,
