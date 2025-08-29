@@ -48,7 +48,7 @@ use webrender_api::units::{
     LayoutSize, WorldPoint,
 };
 use webrender_api::{
-    self, BuiltDisplayList, DirtyRect, DisplayListPayload, DocumentId, Epoch as WebRenderEpoch,
+    self, BuiltDisplayList, BuiltDisplayListDescriptor, DirtyRect, DisplayListPayload, DocumentId, Epoch as WebRenderEpoch,
     ExternalScrollId, FontInstanceFlags, FontInstanceKey, FontInstanceOptions, FontKey,
     FontVariation, ImageKey, PipelineId as WebRenderPipelineId, PropertyBinding,
     ReferenceFrameKind, RenderReasons, SampledScrollOffset, ScrollLocation, SpaceAndClipInfo,
@@ -274,6 +274,122 @@ impl ServoRenderer {
     pub(crate) fn send_transaction(&mut self, transaction: Transaction) {
         self.webrender_api
             .send_transaction(self.webrender_document, transaction);
+    }
+}
+
+pub trait DisplayListHandler {
+    type DisplayList;
+    fn recv_display_list(
+        display_list_receiver: ipc_channel::ipc::IpcBytesReceiver,
+    ) -> Result<(Self::DisplayList, CompositorDisplayListInfo), ()>;
+    fn apply_display_list(
+        webview_id: WebViewId,
+        pipeline_id: PipelineId,
+        old_scale: Scale<f32, CSSPixel, DevicePixel>,
+        epoch: webrender_api::Epoch,
+        display_list: Self::DisplayList,
+        compositor: &mut IOCompositor,
+    );
+}
+
+struct WebRenderDisplayList;
+impl DisplayListHandler for WebRenderDisplayList {
+    type DisplayList = BuiltDisplayList;
+
+    fn recv_display_list(
+        display_list_receiver: ipc_channel::ipc::IpcBytesReceiver,
+    ) -> Result<(Self::DisplayList, CompositorDisplayListInfo), ()> {
+        // This must match the order from the sender, currently in `shared/script/lib.rs`.
+        let display_list_descriptor = match display_list_receiver.recv() {
+            Ok(display_list_descriptor) => display_list_descriptor,
+            Err(error) => {
+                return Err(warn!("Could not receive display list info: {error}"));
+            },
+        };
+        let display_list_descriptor: BuiltDisplayListDescriptor =
+            match bincode::deserialize(&display_list_descriptor) {
+                Ok(display_list_descriptor) => display_list_descriptor,
+                Err(error) => {
+                    return Err(warn!(
+                        "Could not deserialize display list descriptor: {error}"
+                    ));
+                },
+            };
+
+        let display_list_info = match display_list_receiver.recv() {
+            Ok(display_list_info) => display_list_info,
+            Err(error) => {
+                return Err(warn!("Could not receive display list info: {error}"));
+            },
+        };
+        let display_list_info: CompositorDisplayListInfo =
+            match bincode::deserialize(&display_list_info) {
+                Ok(display_list_info) => display_list_info,
+                Err(error) => {
+                    return Err(warn!("Could not deserialize display list info: {error}"));
+                },
+            };
+        let items_data = match display_list_receiver.recv() {
+            Ok(display_list_data) => display_list_data,
+            Err(error) => {
+                return Err(warn!(
+                    "Could not receive WebRender display list items data: {error}"
+                ));
+            },
+        };
+        let cache_data = match display_list_receiver.recv() {
+            Ok(display_list_data) => display_list_data,
+            Err(error) => {
+                return Err(warn!(
+                    "Could not receive WebRender display list cache data: {error}"
+                ));
+            },
+        };
+        let spatial_tree = match display_list_receiver.recv() {
+            Ok(display_list_data) => display_list_data,
+            Err(error) => {
+                return Err(warn!(
+                    "Could not receive WebRender display list spatial tree: {error}."
+                ));
+            },
+        };
+        Ok((
+            BuiltDisplayList::from_data(
+                DisplayListPayload {
+                    items_data,
+                    cache_data,
+                    spatial_tree,
+                },
+                display_list_descriptor,
+            ),
+            display_list_info,
+        ))
+    }
+
+    fn apply_display_list(
+        webview_id: WebViewId,
+        pipeline_id: PipelineId,
+        old_scale: Scale<f32, CSSPixel, DevicePixel>,
+        epoch: webrender_api::Epoch,
+        display_list: Self::DisplayList,
+        compositor: &mut IOCompositor,
+    ) {
+        let mut transaction = Transaction::new();
+
+        let Some(webview_renderer) = compositor.webview_renderers.get(webview_id) else {
+            return warn!("Could not find WebView for incoming display list");
+        };
+
+        let is_root_pipeline = Some(pipeline_id.into()) == webview_renderer.root_pipeline_id;
+        let scale_is_different = webview_renderer.device_pixels_per_page_pixel() != old_scale;
+
+        if is_root_pipeline && scale_is_different {
+            compositor.send_root_pipeline_display_list_in_transaction(&mut transaction);
+        }
+
+        transaction.set_display_list(epoch.into(), (pipeline_id.into(), display_list));
+        compositor.update_transaction_with_all_scroll_offsets(&mut transaction);
+        compositor.global.borrow_mut().send_transaction(transaction);
     }
 }
 
@@ -562,55 +678,13 @@ impl IOCompositor {
 
             CompositorMsg::SendDisplayList {
                 webview_id,
-                display_list_descriptor,
                 display_list_receiver,
             } => {
-                // This must match the order from the sender, currently in `shared/script/lib.rs`.
-                let display_list_info = match display_list_receiver.recv() {
-                    Ok(display_list_info) => display_list_info,
-                    Err(error) => {
-                        return warn!("Could not receive display list info: {error}");
-                    },
+                let Ok((built_display_list, display_list_info)) =
+                    WebRenderDisplayList::recv_display_list(display_list_receiver)
+                else {
+                    return;
                 };
-                let display_list_info: CompositorDisplayListInfo =
-                    match bincode::deserialize(&display_list_info) {
-                        Ok(display_list_info) => display_list_info,
-                        Err(error) => {
-                            return warn!("Could not deserialize display list info: {error}");
-                        },
-                    };
-                let items_data = match display_list_receiver.recv() {
-                    Ok(display_list_data) => display_list_data,
-                    Err(error) => {
-                        return warn!(
-                            "Could not receive WebRender display list items data: {error}"
-                        );
-                    },
-                };
-                let cache_data = match display_list_receiver.recv() {
-                    Ok(display_list_data) => display_list_data,
-                    Err(error) => {
-                        return warn!(
-                            "Could not receive WebRender display list cache data: {error}"
-                        );
-                    },
-                };
-                let spatial_tree = match display_list_receiver.recv() {
-                    Ok(display_list_data) => display_list_data,
-                    Err(error) => {
-                        return warn!(
-                            "Could not receive WebRender display list spatial tree: {error}."
-                        );
-                    },
-                };
-                let built_display_list = BuiltDisplayList::from_data(
-                    DisplayListPayload {
-                        items_data,
-                        cache_data,
-                        spatial_tree,
-                    },
-                    display_list_descriptor,
-                );
 
                 #[cfg(feature = "tracing")]
                 let _span = tracing::trace_span!(
@@ -643,17 +717,14 @@ impl IOCompositor {
                         PaintMetricState::Seen(epoch, first_reflow);
                 }
 
-                let mut transaction = Transaction::new();
-                let is_root_pipeline =
-                    Some(pipeline_id.into()) == webview_renderer.root_pipeline_id;
-                if is_root_pipeline && old_scale != webview_renderer.device_pixels_per_page_pixel()
-                {
-                    self.send_root_pipeline_display_list_in_transaction(&mut transaction);
-                }
-
-                transaction.set_display_list(epoch, (pipeline_id, built_display_list));
-                self.update_transaction_with_all_scroll_offsets(&mut transaction);
-                self.global.borrow_mut().send_transaction(transaction);
+                WebRenderDisplayList::apply_display_list(
+                    webview_id,
+                    display_list_info.pipeline_id.into(),
+                    old_scale,
+                    display_list_info.epoch.into(),
+                    built_display_list,
+                    self,
+                );
             },
 
             CompositorMsg::GenerateFrame => {

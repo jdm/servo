@@ -4813,6 +4813,7 @@ dependencies = [
  "app_units",
  "atomic_refcell",
  "base",
+ "bincode",
  "bitflags 2.9.4",
  "compositing_traits",
  "cssparser",

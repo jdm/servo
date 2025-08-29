@@ -25,7 +25,6 @@ use std::sync::{Arc, Mutex};
 
 use base::generic_channel::{self, GenericCallback, GenericSender};
 use bitflags::bitflags;
-use display_list::CompositorDisplayListInfo;
 use embedder_traits::ScreenGeometry;
 use euclid::default::Size2D as UntypedSize2D;
 use ipc_channel::ipc::{self, IpcSharedMemory};
@@ -34,10 +33,9 @@ use serde::{Deserialize, Serialize};
 pub use webrender_api::ExternalImageSource;
 use webrender_api::units::{LayoutVector2D, TexelRect};
 use webrender_api::{
-    BuiltDisplayList, BuiltDisplayListDescriptor, ExternalImage, ExternalImageData,
-    ExternalImageHandler, ExternalImageId, ExternalScrollId, FontInstanceFlags, FontInstanceKey,
-    FontKey, ImageData, ImageDescriptor, ImageKey, NativeFontHandle,
-    PipelineId as WebRenderPipelineId,
+    ExternalImage, ExternalImageData, ExternalImageHandler, ExternalImageId, ExternalScrollId,
+    FontInstanceFlags, FontInstanceKey, FontKey, ImageData, ImageDescriptor, ImageKey,
+    NativeFontHandle, PipelineId as WebRenderPipelineId,
 };
 
 use crate::viewport_description::ViewportDescription;
@@ -118,8 +116,6 @@ pub enum CompositorMsg {
     SendDisplayList {
         /// The [`WebViewId`] that this display list belongs to.
         webview_id: WebViewId,
-        /// A descriptor of this display list used to construct this display list from raw data.
-        display_list_descriptor: BuiltDisplayListDescriptor,
         /// An [ipc::IpcBytesReceiver] used to send the raw data of the display list.
         display_list_receiver: ipc::IpcBytesReceiver,
     },
@@ -265,37 +261,20 @@ impl CrossProcessCompositorApi {
     }
 
     /// Inform WebRender of a new display list for the given pipeline.
-    pub fn send_display_list(
+    pub fn send_display_list<F: FnOnce(ipc_channel::ipc::IpcBytesSender) -> ()>(
         &self,
         webview_id: WebViewId,
-        display_list_info: &CompositorDisplayListInfo,
-        list: BuiltDisplayList,
+        send_impl: F,
     ) {
-        let (display_list_data, display_list_descriptor) = list.into_data();
         let (display_list_sender, display_list_receiver) = ipc::bytes_channel().unwrap();
         if let Err(e) = self.0.send(CompositorMsg::SendDisplayList {
             webview_id,
-            display_list_descriptor,
             display_list_receiver,
         }) {
             warn!("Error sending display list: {}", e);
         }
 
-        let display_list_info_serialized =
-            bincode::serialize(&display_list_info).unwrap_or_default();
-        if let Err(error) = display_list_sender.send(&display_list_info_serialized) {
-            warn!("Error sending display list info: {error}");
-        }
-
-        if let Err(error) = display_list_sender.send(&display_list_data.items_data) {
-            warn!("Error sending display list items: {error}");
-        }
-        if let Err(error) = display_list_sender.send(&display_list_data.cache_data) {
-            warn!("Error sending display list cache data: {error}");
-        }
-        if let Err(error) = display_list_sender.send(&display_list_data.spatial_tree) {
-            warn!("Error sending display spatial tree: {error}");
-        }
+        send_impl(display_list_sender);
     }
 
     /// Ask the Servo renderer to generate a new frame after having new display lists.

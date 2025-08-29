@@ -97,6 +97,67 @@ use crate::query::{
 use crate::traversal::{RecalcStyle, compute_damage_and_repair_style};
 use crate::{BoxTree, FragmentTree};
 
+pub trait DisplayListCreator {
+    fn build_and_send_display_list(
+        stacking_context_tree: &mut StackingContextTree,
+        fragment_tree: &FragmentTree,
+        image_resolver: Arc<ImageResolver>,
+        device_pixel_ratio: Scale<f32, style_traits::CSSPixel, style_traits::DevicePixel>,
+        inspector_highlight: Option<OpaqueNode>,
+        debug: &DebugOptions,
+        compositor_api: &CrossProcessCompositorApi,
+        webview_id: WebViewId,
+    );
+}
+
+struct WebRenderDisplayListCreator;
+
+impl DisplayListCreator for WebRenderDisplayListCreator {
+    fn build_and_send_display_list(
+        stacking_context_tree: &mut StackingContextTree,
+        fragment_tree: &FragmentTree,
+        image_resolver: Arc<ImageResolver>,
+        device_pixel_ratio: Scale<f32, style_traits::CSSPixel, style_traits::DevicePixel>,
+        highlighted_dom_node: Option<OpaqueNode>,
+        debug: &DebugOptions,
+        compositor_api: &CrossProcessCompositorApi,
+        webview_id: WebViewId,
+    ) {
+        let built_display_list = DisplayListBuilder::build(
+            stacking_context_tree,
+            fragment_tree,
+            image_resolver,
+            device_pixel_ratio,
+            highlighted_dom_node,
+            debug,
+        );
+        let (display_list_data, display_list_descriptor) = built_display_list.into_data();
+        compositor_api.send_display_list(webview_id, move |display_list_sender| {
+            let display_list_descriptor_serialized =
+                bincode::serialize(&display_list_descriptor).unwrap();
+            if let Err(error) = display_list_sender.send(&display_list_descriptor_serialized) {
+                warn!("Error sending display list info: {error}");
+            }
+
+            let display_list_info_serialized =
+                bincode::serialize(&stacking_context_tree.compositor_info).unwrap_or_default();
+            if let Err(error) = display_list_sender.send(&display_list_info_serialized) {
+                warn!("Error sending display list info: {error}");
+            }
+
+            if let Err(error) = display_list_sender.send(&display_list_data.items_data) {
+                warn!("Error sending display list items: {error}");
+            }
+            if let Err(error) = display_list_sender.send(&display_list_data.cache_data) {
+                warn!("Error sending display list cache data: {error}");
+            }
+            if let Err(error) = display_list_sender.send(&display_list_data.spatial_tree) {
+                warn!("Error sending display spatial tree: {error}");
+            }
+        });
+    }
+}
+
 // This mutex is necessary due to syncronisation issues between two different types of thread-local storage
 // which manifest themselves when the layout thread tries to layout iframes in parallel with the main page
 //
@@ -1226,18 +1287,15 @@ impl LayoutThread {
         // ensuring that the Epoch is passed to any method that can creates `StackingContextTree`.
         stacking_context_tree.compositor_info.epoch = reflow_request.epoch;
 
-        let built_display_list = DisplayListBuilder::build(
+        WebRenderDisplayListCreator::build_and_send_display_list(
             stacking_context_tree,
             fragment_tree,
             image_resolver.clone(),
             self.device().device_pixel_ratio(),
             reflow_request.highlighted_dom_node,
             &self.debug,
-        );
-        self.compositor_api.send_display_list(
+            &self.compositor_api,
             self.webview_id,
-            &stacking_context_tree.compositor_info,
-            built_display_list,
         );
 
         let (keys, instance_keys) = self
