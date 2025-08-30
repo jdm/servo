@@ -99,6 +99,7 @@ use crate::{BoxTree, FragmentTree};
 
 pub trait DisplayListCreator {
     fn build_and_send_display_list(
+        &self,
         stacking_context_tree: &mut StackingContextTree,
         fragment_tree: &FragmentTree,
         image_resolver: Arc<ImageResolver>,
@@ -110,10 +111,11 @@ pub trait DisplayListCreator {
     );
 }
 
-struct WebRenderDisplayListCreator;
+pub struct WebRenderDisplayListCreator;
 
 impl DisplayListCreator for WebRenderDisplayListCreator {
     fn build_and_send_display_list(
+        &self,
         stacking_context_tree: &mut StackingContextTree,
         fragment_tree: &FragmentTree,
         image_resolver: Arc<ImageResolver>,
@@ -254,6 +256,9 @@ pub struct LayoutThread {
     ///
     /// If this changed, then we need to create a new display list.
     previously_highlighted_dom_node: Cell<Option<OpaqueNode>>,
+
+    ///
+    display_list_creator: Box<dyn DisplayListCreator>,
 }
 
 pub struct LayoutFactoryImpl();
@@ -743,6 +748,7 @@ impl LayoutThread {
             resolved_images_cache: Default::default(),
             debug: opts::get().debug.clone(),
             previously_highlighted_dom_node: Cell::new(None),
+            display_list_creator: config.display_list_creator,
         }
     }
 
@@ -1287,7 +1293,7 @@ impl LayoutThread {
         // ensuring that the Epoch is passed to any method that can creates `StackingContextTree`.
         stacking_context_tree.compositor_info.epoch = reflow_request.epoch;
 
-        WebRenderDisplayListCreator::build_and_send_display_list(
+        self.display_list_creator.build_and_send_display_list(
             stacking_context_tree,
             fragment_tree,
             image_resolver.clone(),
