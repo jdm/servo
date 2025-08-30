@@ -17,7 +17,9 @@ use profile_traits::{mem, time};
 use webrender::RenderApi;
 use webrender_api::DocumentId;
 
-pub use crate::compositor::{IOCompositor, WebRenderDebugOption};
+pub use crate::compositor::{
+    DisplayListHandler, IOCompositor, WebRenderDebugOption, WebRenderDisplayList,
+};
 
 #[macro_use]
 mod tracing;

@@ -292,7 +292,7 @@ pub trait DisplayListHandler {
     );
 }
 
-struct WebRenderDisplayList;
+pub struct WebRenderDisplayList;
 impl DisplayListHandler for WebRenderDisplayList {
     type DisplayList = BuiltDisplayList;
 
@@ -508,7 +508,7 @@ impl IOCompositor {
         }
     }
 
-    fn handle_browser_message(&mut self, msg: CompositorMsg) {
+    fn handle_browser_message<T: DisplayListHandler>(&mut self, msg: CompositorMsg) {
         trace_msg_from_constellation!(msg, "{msg:?}");
 
         match self.shutdown_state() {
@@ -681,7 +681,7 @@ impl IOCompositor {
                 display_list_receiver,
             } => {
                 let Ok((built_display_list, display_list_info)) =
-                    WebRenderDisplayList::recv_display_list(display_list_receiver)
+                    T::recv_display_list(display_list_receiver)
                 else {
                     return;
                 };
@@ -717,7 +717,7 @@ impl IOCompositor {
                         PaintMetricState::Seen(epoch, first_reflow);
                 }
 
-                WebRenderDisplayList::apply_display_list(
+                T::apply_display_list(
                     webview_id,
                     display_list_info.pipeline_id.into(),
                     old_scale,
@@ -1392,7 +1392,7 @@ impl IOCompositor {
     }
 
     #[servo_tracing::instrument(skip_all)]
-    pub fn handle_messages(&mut self, mut messages: Vec<CompositorMsg>) {
+    pub fn handle_messages<T: DisplayListHandler>(&mut self, mut messages: Vec<CompositorMsg>) {
         // Pull out the `NewWebRenderFrameReady` messages from the list of messages and handle them
         // at the end of this function. This prevents overdraw when more than a single message of
         // this type of received. In addition, if any of these frames need a repaint, that reflected
@@ -1412,7 +1412,7 @@ impl IOCompositor {
         });
 
         for message in messages {
-            self.handle_browser_message(message);
+            self.handle_browser_message::<T>(message);
             if self.global.borrow().shutdown_state() == ShutdownState::FinishedShuttingDown {
                 return;
             }

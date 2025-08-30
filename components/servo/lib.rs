@@ -42,7 +42,7 @@ use bluetooth_traits::BluetoothRequest;
 use canvas_traits::webgl::{GlType, WebGLThreads};
 use clipboard_delegate::StringRequest;
 pub use compositing::WebRenderDebugOption;
-use compositing::{IOCompositor, InitialCompositorState};
+use compositing::{DisplayListHandler, IOCompositor, InitialCompositorState, WebRenderDisplayList};
 pub use compositing_traits::rendering_context::{
     OffscreenRenderingContext, RenderingContext, SoftwareRenderingContext, WindowRenderingContext,
 };
@@ -531,6 +531,11 @@ impl Servo {
     /// The return value of this method indicates whether or not Servo, false indicates that Servo
     /// has finished shutting down and you should not spin the event loop any longer.
     pub fn spin_event_loop(&self) -> bool {
+        self.spin_event_loop_with_handler::<WebRenderDisplayList>()
+    }
+
+    ///
+    pub fn spin_event_loop_with_handler<T: DisplayListHandler>(&self) -> bool {
         if self.shutdown_state.get() == ShutdownState::FinishedShuttingDown {
             return false;
         }
@@ -546,7 +551,7 @@ impl Servo {
                     },
                 }
             }
-            compositor.handle_messages(messages);
+            compositor.handle_messages::<T>(messages);
         }
 
         // Only handle incoming embedder messages if the compositor hasn't already started shutting down.
@@ -1379,8 +1384,8 @@ pub struct ServoBuilder {
 }
 
 impl ServoBuilder {
-    pub fn new(rendering_context: Rc<dyn RenderingContext>) -> Self {
-        Self {
+    pub fn new(rendering_context: Rc<dyn RenderingContext>) -> ServoBuilder {
+        ServoBuilder {
             rendering_context,
             opts: None,
             preferences: None,
