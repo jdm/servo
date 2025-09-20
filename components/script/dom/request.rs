@@ -118,7 +118,7 @@ impl Request {
             // Step 5. If input is a string, then:
             RequestInfo::USVString(USVString(ref usv_string)) => {
                 // Step 5.1. Let parsedURL be the result of parsing input with baseURL.
-                let parsed_url = base_url.join(usv_string);
+                let parsed_url = crate::url::parse_url(usv_string, crate::url::RelativeTo::Global(&global));
                 // Step 5.2. If parsedURL is failure, then throw a TypeError.
                 if parsed_url.is_err() {
                     return Err(Error::Type("Url could not be parsed".to_string()));

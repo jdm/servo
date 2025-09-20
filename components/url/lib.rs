@@ -22,6 +22,7 @@ use serde::{Deserialize, Serialize};
 use servo_arc::Arc;
 pub use url::Host;
 use url::{Position, Url};
+use uuid::Uuid;
 
 pub use crate::origin::{ImmutableOrigin, MutableOrigin, OpaqueOrigin};
 
@@ -36,12 +37,56 @@ pub enum UrlError {
     FromFilePath,
 }
 
+pub trait BlobStorage {
+    fn acquire_blob_token(&self, url: &ServoUrl) -> Result<Option<BlobToken>, ()>;
+}
+
+#[derive(Deserialize, MallocSizeOf, Serialize)]
+pub struct BlobToken(pub Uuid, pub Uuid, pub ipc_channel::ipc::IpcSender<(Uuid, Uuid)>);
+
+impl Drop for BlobToken {
+    fn drop(&mut self) {
+        let _ = self.2.send((self.0.clone(), self.1.clone()));
+    }
+}
+
+impl Eq for BlobToken {}
+impl std::hash::Hash for BlobToken {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
+    }
+}
+impl Ord for BlobToken {
+    fn cmp(&self, other: &BlobToken) -> std::cmp::Ordering {
+        self.0.cmp(&other.0)
+    }
+}
+impl PartialOrd for BlobToken {
+    fn partial_cmp(&self, other: &BlobToken) -> Option<std::cmp::Ordering> {
+        self.0.partial_cmp(&other.0)
+    }
+}
+impl PartialEq for BlobToken {
+    fn eq(&self, other: &BlobToken) -> bool {
+        self.0 == other.0
+    }
+}
+
 #[derive(Clone, Deserialize, Eq, Hash, MallocSizeOf, Ord, PartialEq, PartialOrd, Serialize)]
-pub struct ServoUrl(#[conditional_malloc_size_of] Arc<Url>);
+pub struct ServoUrl(#[conditional_malloc_size_of] Arc<Url>, #[conditional_malloc_size_of] Option<Arc<BlobToken>>);
 
 impl ServoUrl {
     pub fn from_url(url: Url) -> Self {
-        ServoUrl(Arc::new(url))
+        ServoUrl(Arc::new(url), None)
+    }
+
+    pub fn parse_with_base_and_blob_store(base: Option<&Self>, input: &str, blob_store: &dyn BlobStorage) -> Result<Self, url::ParseError> {
+        let mut parsed = Self::parse_with_base(base, input)?;
+        let Ok(token) = blob_store.acquire_blob_token(&parsed) else {
+            return Ok(parsed);
+        };
+        parsed.1 = token.map(Arc::new);
+        Ok(parsed)
     }
 
     pub fn parse_with_base(base: Option<&Self>, input: &str) -> Result<Self, url::ParseError> {
@@ -332,7 +377,7 @@ impl From<Url> for ServoUrl {
 
 impl From<Arc<Url>> for ServoUrl {
     fn from(url: Arc<Url>) -> Self {
-        ServoUrl(url)
+        ServoUrl(url, None)
     }
 }
 

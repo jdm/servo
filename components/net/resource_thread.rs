@@ -22,7 +22,7 @@ use hyper_serde::Serde;
 use ipc_channel::ipc::{self, IpcReceiver, IpcReceiverSet, IpcSender};
 use log::{debug, warn};
 use net_traits::blob_url_store::parse_blob_url;
-use net_traits::filemanager_thread::FileTokenCheck;
+use net_traits::filemanager_thread::{FileTokenCheck, FileManagerThreadMsg};
 use net_traits::pub_domains::public_suffix_list_size_of;
 use net_traits::request::{Destination, RequestBuilder, RequestId};
 use net_traits::response::{Response, ResponseInit};
@@ -129,6 +129,7 @@ pub fn new_core_resource_thread(
     let (public_setup_chan, public_setup_port) = ipc::channel().unwrap();
     let (private_setup_chan, private_setup_port) = ipc::channel().unwrap();
     let (report_chan, report_port) = ipc::channel().unwrap();
+    let (revoke_sender, revoke_receiver) = ipc::channel().unwrap();
 
     thread::Builder::new()
         .name("ResourceManager".to_owned())
@@ -139,6 +140,7 @@ pub fn new_core_resource_thread(
                 embedder_proxy.clone(),
                 ca_certificates.clone(),
                 ignore_certificate_errors,
+                revoke_sender,
             );
 
             let mut channel_manager = ResourceChannelManager {
@@ -158,6 +160,7 @@ pub fn new_core_resource_thread(
                         report_port,
                         protocols,
                         embedder_proxy,
+                        revoke_receiver,
                     )
                 },
                 String::from("network-cache-reporter"),
@@ -240,6 +243,7 @@ impl ResourceChannelManager {
         memory_reporter: IpcReceiver<ReportsChan>,
         protocols: Arc<ProtocolRegistry>,
         embedder_proxy: EmbedderProxy,
+        revoke_receiver: IpcReceiver<(uuid::Uuid, uuid::Uuid)>,
     ) {
         let (public_http_state, private_http_state) = create_http_states(
             self.config_dir.as_deref(),
@@ -252,6 +256,7 @@ impl ResourceChannelManager {
         let private_id = rx_set.add(private_receiver).unwrap();
         let public_id = rx_set.add(public_receiver).unwrap();
         let reporter_id = rx_set.add(memory_reporter).unwrap();
+        let revoker_id = rx_set.add(revoke_receiver).unwrap();
 
         loop {
             for receiver in rx_set.select().unwrap().into_iter() {
@@ -260,8 +265,15 @@ impl ResourceChannelManager {
                     continue;
                 }
                 let (id, data) = receiver.unwrap();
+                if id == revoker_id {
+                    if let Ok((token, file_id)) = data.to() {
+                        self.resource_manager.filemanager.handle(
+                            FileManagerThreadMsg::RevokeTokenForFile(token, file_id)
+                        );
+                    }
+                }
                 // If message is memory report, get the size_of of public and private http caches
-                if id == reporter_id {
+                else if id == reporter_id {
                     if let Ok(msg) = data.to() {
                         self.process_report(msg, &public_http_state, &private_http_state);
                         continue;
@@ -583,6 +595,7 @@ impl CoreResourceManager {
         embedder_proxy: EmbedderProxy,
         ca_certificates: CACertificates,
         ignore_certificate_errors: bool,
+        revoke_sender: IpcSender<(uuid::Uuid, uuid::Uuid)>,
     ) -> CoreResourceManager {
         let num_threads = thread::available_parallelism()
             .map(|i| i.get())
@@ -593,7 +606,7 @@ impl CoreResourceManager {
         CoreResourceManager {
             devtools_sender,
             sw_managers: Default::default(),
-            filemanager: FileManager::new(embedder_proxy.clone(), Arc::downgrade(&pool_handle)),
+            filemanager: FileManager::new(embedder_proxy.clone(), Arc::downgrade(&pool_handle), revoke_sender),
             request_interceptor: RequestInterceptor::new(embedder_proxy),
             thread_pool: pool_handle,
             ca_certificates,

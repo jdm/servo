@@ -370,13 +370,18 @@ impl XMLHttpRequestMethods<crate::DomTypeHolder> for XMLHttpRequest {
                 }
 
                 // Step 2
-                let base = self.global().api_base_url();
+                let global = self.global();
+                let Ok(mut parsed_url) = crate::url::parse_url(&url.0, crate::url::RelativeTo::Global(&global)) else {
+                    return Err(Error::Syntax(None));
+                };
+                /*let base = self.global().api_base_url();
                 // Step 6
                 let mut parsed_url = match base.join(&url.0) {
                     Ok(parsed) => parsed,
                     // Step 7
                     Err(_) => return Err(Error::Syntax(None)),
-                };
+            };*/
+                
 
                 // Step 9
                 if parsed_url.host().is_some() {

@@ -79,14 +79,20 @@ pub struct FileManager {
     embedder_proxy: EmbedderProxy,
     store: Arc<FileManagerStore>,
     thread_pool: Weak<ThreadPool>,
+    revoke_sender: IpcSender<(Uuid, Uuid)>,
 }
 
 impl FileManager {
-    pub fn new(embedder_proxy: EmbedderProxy, pool_handle: Weak<ThreadPool>) -> FileManager {
+    pub fn new(
+        embedder_proxy: EmbedderProxy,
+        pool_handle: Weak<ThreadPool>,
+        revoke_sender: IpcSender<(Uuid, Uuid)>,
+    ) -> FileManager {
         FileManager {
             embedder_proxy,
             store: Arc::new(FileManagerStore::new()),
             thread_pool: pool_handle,
+            revoke_sender,
         }
     }
 
@@ -206,6 +212,16 @@ impl FileManager {
             },
             FileManagerThreadMsg::ActivateBlobURL(id, sender, origin) => {
                 let _ = sender.send(self.store.set_blob_url_validity(true, &id, &origin));
+            },
+            FileManagerThreadMsg::GetTokenForFile(id, _origin, sender) => {
+                let token = match self.get_token_for_file(&id) {
+                    FileTokenCheck::Required(token) => Some(token),
+                    _ => None,
+                };
+                let _ = sender.send((token, self.revoke_sender.clone()));
+            },
+            FileManagerThreadMsg::RevokeTokenForFile(token, id) => {
+                self.invalidate_token(&FileTokenCheck::Required(token), &id);
             },
         }
     }

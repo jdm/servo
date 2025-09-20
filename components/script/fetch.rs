@@ -13,6 +13,7 @@ use js::jsapi::{ExceptionStackBehavior, JS_IsExceptionPending};
 use js::jsval::UndefinedValue;
 use js::rust::HandleValue;
 use js::rust::wrappers::JS_SetPendingException;
+use net_traits::filemanager_thread::FileManagerThreadMsg;
 use net_traits::policy_container::{PolicyContainer, RequestPolicyContainer};
 use net_traits::request::{
     CorsSettings, CredentialsMode, Destination, InsecureRequestsPolicy, Referrer,
@@ -797,3 +798,27 @@ pub(crate) fn create_a_potential_cors_request(
         .has_trustworthy_ancestor_origin(has_trustworthy_ancestor_origin)
         .policy_container(policy_container)
 }
+
+pub(crate) struct BlobResolver<'a>(pub &'a ipc_channel::ipc::IpcSender<CoreResourceMsg>);
+
+impl servo_url::BlobStorage for BlobResolver<'_> {
+    fn acquire_blob_token(&self, url: &ServoUrl) -> Result<Option<servo_url::BlobToken>, ()> {
+        if url.scheme() != "blob" {
+            return Ok(None);
+        }
+        let Ok((file_id, origin)) = net_traits::blob_url_store::parse_blob_url(&url) else {
+            return Ok(None)
+        };
+        let (sender, receiver) = ipc_channel::ipc::channel().unwrap();
+        self.0.send(
+            CoreResourceMsg::ToFileManager(
+                FileManagerThreadMsg::GetTokenForFile(file_id, origin, sender)
+            ))
+            .map_err(|_| ())?;
+        let Ok((id, sender)) = receiver.recv() else {
+            return Err(());
+        };
+        Ok(id.map(|id| servo_url::BlobToken(id, file_id, sender)))
+    }
+}
+

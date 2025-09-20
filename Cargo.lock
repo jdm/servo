@@ -4634,7 +4634,7 @@ checksum = "e04d7f318608d35d4b61ddd75cbdaee86b023ebe2bd5a66ee0915f0bf93095a9"
 dependencies = [
  "hermit-abi",
  "libc",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -7145,7 +7145,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.4.15",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -7940,6 +7940,7 @@ name = "servo_url"
 version = "0.0.1"
 dependencies = [
  "encoding_rs",
+ "ipc-channel",
  "malloc_size_of_derive",
  "serde",
  "servo_arc",

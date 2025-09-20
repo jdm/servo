@@ -179,6 +179,10 @@ pub enum FileManagerThreadMsg {
 
     /// Revoke Blob URL and send back the acknowledgement
     RevokeBlobURL(Uuid, FileOrigin, IpcSender<Result<(), BlobURLStoreError>>),
+
+    ///
+    GetTokenForFile(Uuid, FileOrigin, IpcSender<(Option<Uuid>, IpcSender<(Uuid, Uuid)>)>),
+    RevokeTokenForFile(Uuid, Uuid),
 }
 
 #[derive(Debug, Deserialize, Serialize)]
