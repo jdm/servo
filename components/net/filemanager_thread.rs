@@ -80,6 +80,7 @@ pub struct FileManager {
     store: Arc<FileManagerStore>,
     thread_pool: Weak<ThreadPool>,
     revoke_sender: IpcSender<(Uuid, Uuid)>,
+    refresh_sender: IpcSender<(Uuid, IpcSender<Uuid>)>,
 }
 
 impl FileManager {
@@ -87,12 +88,14 @@ impl FileManager {
         embedder_proxy: EmbedderProxy,
         pool_handle: Weak<ThreadPool>,
         revoke_sender: IpcSender<(Uuid, Uuid)>,
+        refresh_sender: IpcSender<(Uuid, IpcSender<Uuid>)>,
     ) -> FileManager {
         FileManager {
             embedder_proxy,
             store: Arc::new(FileManagerStore::new()),
             thread_pool: pool_handle,
             revoke_sender,
+            refresh_sender,
         }
     }
 
@@ -117,8 +120,8 @@ impl FileManager {
             });
     }
 
-    pub fn get_token_for_file(&self, file_id: &Uuid) -> FileTokenCheck {
-        self.store.get_token_for_file(file_id)
+    pub fn get_token_for_file(&self, file_id: &Uuid, allow_revoked: bool) -> FileTokenCheck {
+        self.store.get_token_for_file(file_id, allow_revoked)
     }
 
     pub fn invalidate_token(&self, token: &FileTokenCheck, file_id: &Uuid) {
@@ -156,6 +159,7 @@ impl FileManager {
 
     /// Message handler
     pub fn handle(&self, msg: FileManagerThreadMsg) {
+        println!("handling {msg:?}");
         match msg {
             FileManagerThreadMsg::SelectFile(control_id, filter, sender, origin, opt_test_path) => {
                 let store = self.store.clone();
@@ -214,11 +218,11 @@ impl FileManager {
                 let _ = sender.send(self.store.set_blob_url_validity(true, &id, &origin));
             },
             FileManagerThreadMsg::GetTokenForFile(id, _origin, sender) => {
-                let token = match self.get_token_for_file(&id) {
+                let token = match self.get_token_for_file(&id, false) {
                     FileTokenCheck::Required(token) => Some(token),
                     _ => None,
                 };
-                let _ = sender.send((token, self.revoke_sender.clone()));
+                let _ = sender.send((token, self.revoke_sender.clone(), self.refresh_sender.clone()));
             },
             FileManagerThreadMsg::RevokeTokenForFile(token, id) => {
                 self.invalidate_token(&FileTokenCheck::Required(token), &id);
@@ -484,6 +488,11 @@ impl FileManagerStore {
     }
 
     pub fn invalidate_token(&self, token: &FileTokenCheck, file_id: &Uuid) {
+        println!("invalidating {} for {file_id:?}", match token {
+            FileTokenCheck::Required(id) => id.to_string(),
+            FileTokenCheck::NotRequired => "not required".to_string(),
+            FileTokenCheck::ShouldFail => "should fail".to_string(),
+        });
         if let FileTokenCheck::Required(token) = token {
             let mut entries = self.entries.write().unwrap();
             if let Some(entry) = entries.get_mut(file_id) {
@@ -508,7 +517,7 @@ impl FileManagerStore {
         }
     }
 
-    pub fn get_token_for_file(&self, file_id: &Uuid) -> FileTokenCheck {
+    pub fn get_token_for_file(&self, file_id: &Uuid, allow_revoked: bool) -> FileTokenCheck {
         let mut entries = self.entries.write().unwrap();
         let parent_id = match entries.get(file_id) {
             Some(entry) => {
@@ -525,7 +534,7 @@ impl FileManagerStore {
             None => file_id,
         };
         if let Some(entry) = entries.get_mut(file_id) {
-            if !entry.is_valid_url.load(Ordering::Acquire) {
+            if !allow_revoked && !entry.is_valid_url.load(Ordering::Acquire) {
                 return FileTokenCheck::ShouldFail;
             }
             let token = Uuid::new_v4();

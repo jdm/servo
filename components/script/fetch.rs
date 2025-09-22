@@ -802,7 +802,7 @@ pub(crate) fn create_a_potential_cors_request(
 pub(crate) struct BlobResolver<'a>(pub &'a ipc_channel::ipc::IpcSender<CoreResourceMsg>);
 
 impl servo_url::BlobStorage for BlobResolver<'_> {
-    fn acquire_blob_token(&self, url: &ServoUrl) -> Result<Option<servo_url::BlobToken>, ()> {
+    fn acquire_blob_token(&self, url: &ServoUrl) -> Result<Option<servo_url::SerializableBlobToken>, ()> {
         if url.scheme() != "blob" {
             return Ok(None);
         }
@@ -815,10 +815,16 @@ impl servo_url::BlobStorage for BlobResolver<'_> {
                 FileManagerThreadMsg::GetTokenForFile(file_id, origin, sender)
             ))
             .map_err(|_| ())?;
-        let Ok((id, sender)) = receiver.recv() else {
+        let Ok((id, sender, sender2)) = receiver.recv() else {
             return Err(());
         };
-        Ok(id.map(|id| servo_url::BlobToken(id, file_id, sender)))
+        Ok(id.map(|id| servo_url::SerializableBlobToken(servo_arc::Arc::new(servo_url::BlobToken {
+            token: id,
+            file_id,
+            revoke_sender: sender,
+            refresh_token_sender: sender2,
+            neutered: false,
+        }))))
     }
 }
 

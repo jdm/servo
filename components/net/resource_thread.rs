@@ -130,6 +130,7 @@ pub fn new_core_resource_thread(
     let (private_setup_chan, private_setup_port) = ipc::channel().unwrap();
     let (report_chan, report_port) = ipc::channel().unwrap();
     let (revoke_sender, revoke_receiver) = ipc::channel().unwrap();
+    let (refresh_sender, refresh_receiver) = ipc::channel().unwrap();
 
     thread::Builder::new()
         .name("ResourceManager".to_owned())
@@ -141,6 +142,7 @@ pub fn new_core_resource_thread(
                 ca_certificates.clone(),
                 ignore_certificate_errors,
                 revoke_sender,
+                refresh_sender,
             );
 
             let mut channel_manager = ResourceChannelManager {
@@ -161,6 +163,7 @@ pub fn new_core_resource_thread(
                         protocols,
                         embedder_proxy,
                         revoke_receiver,
+                        refresh_receiver,
                     )
                 },
                 String::from("network-cache-reporter"),
@@ -244,6 +247,7 @@ impl ResourceChannelManager {
         protocols: Arc<ProtocolRegistry>,
         embedder_proxy: EmbedderProxy,
         revoke_receiver: IpcReceiver<(uuid::Uuid, uuid::Uuid)>,
+        refresh_receiver: IpcReceiver<(uuid::Uuid, IpcSender<uuid::Uuid>)>,
     ) {
         let (public_http_state, private_http_state) = create_http_states(
             self.config_dir.as_deref(),
@@ -257,6 +261,7 @@ impl ResourceChannelManager {
         let public_id = rx_set.add(public_receiver).unwrap();
         let reporter_id = rx_set.add(memory_reporter).unwrap();
         let revoker_id = rx_set.add(revoke_receiver).unwrap();
+        let refresh_id = rx_set.add(refresh_receiver).unwrap();
 
         loop {
             for receiver in rx_set.select().unwrap().into_iter() {
@@ -265,8 +270,28 @@ impl ResourceChannelManager {
                     continue;
                 }
                 let (id, data) = receiver.unwrap();
-                if id == revoker_id {
+                if id == refresh_id {
+                    if let Ok((file_id, sender)) = data.to::<(uuid::Uuid, IpcSender<uuid::Uuid>)>() {
+                        let id = match self.resource_manager.filemanager.get_token_for_file(&file_id, true) {
+                            FileTokenCheck::Required(id) => id,
+                            FileTokenCheck::NotRequired => {
+                                println!("attempted refresh for file {file_id:?}, but not required");
+                                continue;
+                            },
+                            FileTokenCheck::ShouldFail => {
+                                println!("attempted refresh for file {file_id:?}, but already revoked");
+                                continue;
+                            },
+                        };
+                        /*let FileTokenCheck::Required(id) =  else {
+                            continue;
+                        };*/
+                        println!("refreshing with {id:?} for file {file_id:?}");
+                        let _ = sender.send(id);
+                    }
+                } else if id == revoker_id {
                     if let Ok((token, file_id)) = data.to() {
+                        println!("revoking {token:?} for file {file_id:?}");
                         self.resource_manager.filemanager.handle(
                             FileManagerThreadMsg::RevokeTokenForFile(token, file_id)
                         );
@@ -596,6 +621,7 @@ impl CoreResourceManager {
         ca_certificates: CACertificates,
         ignore_certificate_errors: bool,
         revoke_sender: IpcSender<(uuid::Uuid, uuid::Uuid)>,
+        refresh_sender: IpcSender<(uuid::Uuid, IpcSender<uuid::Uuid>)>,
     ) -> CoreResourceManager {
         let num_threads = thread::available_parallelism()
             .map(|i| i.get())
@@ -606,7 +632,7 @@ impl CoreResourceManager {
         CoreResourceManager {
             devtools_sender,
             sw_managers: Default::default(),
-            filemanager: FileManager::new(embedder_proxy.clone(), Arc::downgrade(&pool_handle), revoke_sender),
+            filemanager: FileManager::new(embedder_proxy.clone(), Arc::downgrade(&pool_handle), revoke_sender, refresh_sender),
             request_interceptor: RequestInterceptor::new(embedder_proxy),
             thread_pool: pool_handle,
             ca_certificates,
@@ -669,15 +695,20 @@ impl CoreResourceManager {
         // but could instead be contained in the actual CoreResourceMsg::Fetch message.
         //
         // See https://github.com/servo/servo/issues/25226
-        let (file_token, blob_url_file_id) = match url.scheme() {
-            "blob" => {
-                if let Ok((id, _)) = parse_blob_url(&url) {
-                    (self.filemanager.get_token_for_file(&id), Some(id))
-                } else {
-                    (FileTokenCheck::ShouldFail, None)
-                }
+        let (file_token, blob_url_file_id) = match url.blob_token() {
+            Some(servo_url::SerializableBlobToken(token)) => {
+                (net_traits::filemanager_thread::FileTokenCheck::Required(token.token.clone()), Some(token.file_id.clone()))
             },
-            _ => (FileTokenCheck::NotRequired, None),
+            None => match url.scheme() {
+                "blob" => {
+                    if let Ok((id, _)) = parse_blob_url(&url) {
+                        (self.filemanager.get_token_for_file(&id, false), Some(id))
+                    } else {
+                        (FileTokenCheck::ShouldFail, None)
+                    }
+                },
+                _ => (FileTokenCheck::NotRequired, None),
+            }
         };
 
         spawn_task(async move {
