@@ -29,52 +29,6 @@ use crate::style_ext::ComputedValuesExt;
 use crate::table::SpecificTableGridInfo;
 use crate::taffy::SpecificTaffyGridInfo;
 
-/// Describes how a [`BoxFragment`] paints its background.
-#[derive(MallocSizeOf)]
-pub(crate) enum BackgroundMode {
-    /// Draw the normal [`BoxFragment`] background as well as the extra backgrounds
-    /// based on the style and positioning rectangles in this data structure.
-    Extra(Vec<ExtraBackground>),
-    /// Do not draw a background for this Fragment. This is used for elements like
-    /// table tracks and table track groups, which rely on cells to paint their
-    /// backgrounds.
-    None,
-    /// Draw the background normally, getting information from the Fragment style.
-    Normal,
-}
-#[derive(MallocSizeOf)]
-pub(crate) struct ExtraBackground {
-    pub style: SharedStyle,
-    pub rect: PhysicalRect<Au>,
-}
-
-#[derive(Clone, Debug, MallocSizeOf)]
-pub(crate) enum SpecificLayoutInfo {
-    Grid(Box<SpecificTaffyGridInfo>),
-    TableCellWithCollapsedBorders,
-    TableGridWithCollapsedBorders(Box<SpecificTableGridInfo>),
-    TableWrapper,
-}
-
-#[derive(MallocSizeOf)]
-pub(crate) struct BlockLevelLayoutInfo {
-    /// When the `clear` property is not set to `none`, it may introduce clearance.
-    /// Clearance is some extra spacing that is added above the top margin,
-    /// so that the element doesn't overlap earlier floats in the same BFC.
-    /// The presence of clearance prevents the top margin from collapsing with
-    /// earlier margins or with the bottom margin of the parent block.
-    /// <https://drafts.csswg.org/css2/#clearance>
-    pub clearance: Option<Au>,
-
-    pub block_margins_collapsed_with_children: CollapsedBlockMargins,
-}
-
-#[derive(MallocSizeOf)]
-pub(crate) struct BoxFragmentRareData {
-    /// Information that is specific to a layout system (e.g., grid, table, etc.).
-    pub specific_layout_info: Option<SpecificLayoutInfo>,
-}
-
 impl BoxFragmentRareData {
     /// Create a new rare data based on information given to the fragment. Ideally, We should
     /// avoid creating rare data as much as possible to reduce the memory cost.
@@ -85,56 +39,6 @@ impl BoxFragmentRareData {
             })
         })
     }
-}
-
-#[derive(MallocSizeOf)]
-pub(crate) struct BoxFragment {
-    pub base: BaseFragment,
-
-    pub style: ServoArc<ComputedValues>,
-    pub children: Vec<Fragment>,
-
-    /// The content rect of this fragment in the parent fragment's content rectangle. This
-    /// does not include padding, border, or margin -- it only includes content.
-    pub content_rect: PhysicalRect<Au>,
-
-    /// This [`BoxFragment`]'s containing block rectangle in coordinates relative to
-    /// the initial containing block, but not taking into account any transforms.
-    pub cumulative_containing_block_rect: PhysicalRect<Au>,
-
-    pub padding: PhysicalSides<Au>,
-    pub border: PhysicalSides<Au>,
-    pub margin: PhysicalSides<Au>,
-
-    /// When this [`BoxFragment`] is for content that has a baseline, this tracks
-    /// the first and last baselines of that content. This is used to propagate baselines
-    /// to things such as tables and inline formatting contexts.
-    baselines: Baselines,
-
-    /// The scrollable overflow of this box fragment in the same coordiante system as
-    /// [`Self::content_rect`] ie a rectangle within the parent fragment's content
-    /// rectangle. This does not take into account any transforms this fragment applies.
-    /// This is handled when calling [`Self::scrollable_overflow_for_parent`].
-    scrollable_overflow: Option<PhysicalRect<Au>>,
-
-    /// The resolved box insets if this box is `position: sticky`. These are calculated
-    /// during `StackingContextTree` construction because they rely on the size of the
-    /// scroll container.
-    pub(crate) resolved_sticky_insets: AtomicRefCell<Option<PhysicalSides<AuOrAuto>>>,
-
-    pub background_mode: BackgroundMode,
-
-    /// Rare data that not all kinds of [`BoxFragment`] would have.
-    pub rare_data: Option<Box<BoxFragmentRareData>>,
-
-    /// Additional information for block-level boxes.
-    pub block_level_layout_info: Option<Box<BlockLevelLayoutInfo>>,
-
-    /// The containing spatial tree node of this [`BoxFragment`]. This is assigned during
-    /// `StackingContextTree` construction, so isn't available before that time. This is
-    /// used to for determining final viewport size and position of this node and will
-    /// also be used in the future for hit testing.
-    pub spatial_tree_node: AtomicRefCell<Option<ScrollTreeNodeId>>,
 }
 
 impl BoxFragment {

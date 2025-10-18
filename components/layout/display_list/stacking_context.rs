@@ -93,31 +93,6 @@ impl ContainingBlock {
 
 pub(crate) type ContainingBlockInfo<'a> = ContainingBlockManager<'a, ContainingBlock>;
 
-#[derive(Clone, Copy, Debug, Eq, Ord, MallocSizeOf, PartialEq, PartialOrd)]
-pub(crate) enum StackingContextSection {
-    OwnBackgroundsAndBorders,
-    DescendantBackgroundsAndBorders,
-    Foreground,
-    Outline,
-}
-
-#[derive(MallocSizeOf)]
-pub(crate) struct StackingContextTree {
-    /// The root stacking context of this [`StackingContextTree`].
-    pub root_stacking_context: StackingContext,
-
-    /// The information about the WebRender display list that the compositor
-    /// consumes. This curerntly contains the out-of-band hit testing information
-    /// data structure that the compositor uses to map hit tests to information
-    /// about the item hit.
-    pub compositor_info: CompositorDisplayListInfo,
-
-    /// All of the clips collected for this [`StackingContextTree`]. These are added
-    /// for things like `overflow`. More clips may be created later during WebRender
-    /// display list construction, but they are never added here.
-    pub clip_store: StackingContextTreeClipStore,
-}
-
 impl StackingContextTree {
     /// Create a new [DisplayList] given the dimensions of the layout and the WebRender
     /// pipeline id.
@@ -262,40 +237,6 @@ impl StackingContextTree {
     }
 }
 
-/// The text decorations for a Fragment, collecting during [`StackingContextTree`] construction.
-#[derive(Clone, Debug, MallocSizeOf)]
-pub(crate) struct FragmentTextDecoration {
-    pub line: TextDecorationLine,
-    pub color: AbsoluteColor,
-    pub style: TextDecorationStyle,
-}
-
-/// A piece of content that directly belongs to a section of a stacking context.
-///
-/// This is generally part of a fragment, like its borders or foreground, but it
-/// can also be a stacking container that needs to be painted in fragment order.
-#[derive(MallocSizeOf)]
-pub(crate) enum StackingContextContent {
-    /// A fragment that does not generate a stacking context or stacking container.
-    Fragment {
-        scroll_node_id: ScrollTreeNodeId,
-        reference_frame_scroll_node_id: ScrollTreeNodeId,
-        clip_id: ClipId,
-        section: StackingContextSection,
-        containing_block: PhysicalRect<Au>,
-        fragment: Fragment,
-        is_hit_test_for_scrollable_overflow: bool,
-        is_collapsed_table_borders: bool,
-        #[conditional_malloc_size_of]
-        text_decorations: Arc<Vec<FragmentTextDecoration>>,
-    },
-
-    /// An index into [StackingContext::atomic_inline_stacking_containers].
-    ///
-    /// There is no section field, because these are always in [StackingContextSection::Foreground].
-    AtomicInlineStackingContainer { index: usize },
-}
-
 impl StackingContextContent {
     pub(crate) fn section(&self) -> StackingContextSection {
         match self {
@@ -338,83 +279,6 @@ impl StackingContextContent {
             },
         }
     }
-}
-
-#[derive(Clone, Copy, Debug, Eq, MallocSizeOf, PartialEq)]
-pub(crate) enum StackingContextType {
-    RealStackingContext,
-    PositionedStackingContainer,
-    FloatStackingContainer,
-    AtomicInlineStackingContainer,
-}
-
-/// Either a stacking context or a stacking container, per the definitions in
-/// <https://drafts.csswg.org/css-position-4/#painting-order>.
-///
-/// We use the term “real stacking context” in situations that call for a
-/// stacking context but not a stacking container.
-#[derive(MallocSizeOf)]
-pub struct StackingContext {
-    /// The spatial id of this fragment. This is used to properly handle
-    /// things like preserve-3d.
-    scroll_tree_node_id: ScrollTreeNodeId,
-
-    /// The clip chain id of this stacking context if it has one. Used for filter clipping.
-    clip_id: Option<ClipId>,
-
-    /// The [`BoxFragment`] that established this stacking context. We store the fragment here
-    /// rather than just the style, so that incremental layout can automatically update the style.
-    initializing_fragment: Option<ArcRefCell<BoxFragment>>,
-
-    /// The type of this stacking context. Used for collecting and sorting.
-    context_type: StackingContextType,
-
-    /// The contents that need to be painted in fragment order.
-    pub(super) contents: Vec<StackingContextContent>,
-
-    /// Stacking contexts that need to be stolen by the parent stacking context
-    /// if this is a stacking container, that is, real stacking contexts and
-    /// positioned stacking containers (where ‘z-index’ is auto).
-    /// <https://drafts.csswg.org/css-position-4/#paint-a-stacking-container>
-    /// > To paint a stacking container, given a box root and a canvas canvas:
-    /// >  1. Paint a stacking context given root and canvas, treating root as
-    /// >     if it created a new stacking context, but omitting any positioned
-    /// >     descendants or descendants that actually create a stacking context
-    /// >     (letting the parent stacking context paint them, instead).
-    pub(super) real_stacking_contexts_and_positioned_stacking_containers: Vec<StackingContext>,
-
-    /// Float stacking containers.
-    /// Separate from real_stacking_contexts_or_positioned_stacking_containers
-    /// because they should never be stolen by the parent stacking context.
-    /// <https://drafts.csswg.org/css-position-4/#paint-a-stacking-container>
-    pub(super) float_stacking_containers: Vec<StackingContext>,
-
-    /// Atomic inline stacking containers.
-    /// Separate from real_stacking_contexts_or_positioned_stacking_containers
-    /// because they should never be stolen by the parent stacking context, and
-    /// separate from float_stacking_containers so that [StackingContextContent]
-    /// can index into this vec to paint them in fragment order.
-    /// <https://drafts.csswg.org/css-position-4/#paint-a-stacking-container>
-    /// <https://drafts.csswg.org/css-position-4/#paint-a-box-in-a-line-box>
-    pub(super) atomic_inline_stacking_containers: Vec<StackingContext>,
-
-    /// Information gathered about the painting order, for [Self::debug_print].
-    debug_print_items: Option<RefCell<Vec<DebugPrintItem>>>,
-}
-
-/// Refers to one of the child contents or stacking contexts of a [StackingContext].
-#[derive(Clone, Copy, MallocSizeOf)]
-pub struct DebugPrintItem {
-    field: DebugPrintField,
-    index: usize,
-}
-
-/// Refers to one of the vecs of a [StackingContext].
-#[derive(Clone, Copy, MallocSizeOf)]
-pub enum DebugPrintField {
-    Contents,
-    RealStackingContextsAndPositionedStackingContainers,
-    FloatStackingContainers,
 }
 
 impl StackingContext {

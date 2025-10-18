@@ -67,7 +67,7 @@ use js::jsapi::{
 };
 use js::jsval::UndefinedValue;
 use js::rust::ParentRuntime;
-use layout_api::{LayoutConfig, LayoutFactory, RestyleReason, ScriptThreadFactory};
+use layout_api::{DisplayListCreator, LayoutConfig, LayoutFactory, RestyleReason, ScriptThreadFactory};
 use media::WindowGLContext;
 use metrics::MAX_TASK_NS;
 use net_traits::image_cache::{ImageCache, ImageCacheResponseMessage};
@@ -367,6 +367,9 @@ pub struct ScriptThread {
     /// A list of URLs that can access privileged internal APIs.
     #[no_trace]
     privileged_urls: Vec<ServoUrl>,
+
+    #[no_trace]
+    display_list_creator: Box<dyn DisplayListCreator>,
 }
 
 struct BHMExitSignal {
@@ -423,6 +426,7 @@ impl ScriptThreadFactory for ScriptThread {
     fn create(
         state: InitialScriptState,
         layout_factory: Arc<dyn LayoutFactory>,
+        display_list_creator: Box<dyn DisplayListCreator>,
         system_font_service: Arc<SystemFontServiceProxy>,
         load_data: LoadData,
     ) -> JoinHandle<()> {
@@ -446,7 +450,7 @@ impl ScriptThreadFactory for ScriptThread {
                     load_data,
                 );
                 let reporter_name = format!("script-reporter-{:?}", state.id);
-                let script_thread = ScriptThread::new(state, layout_factory, system_font_service);
+                let script_thread = ScriptThread::new(state, layout_factory, display_list_creator, system_font_service);
 
                 SCRIPT_THREAD_ROOT.with(|root| {
                     root.set(Some(&script_thread as *const _));
@@ -845,6 +849,7 @@ impl ScriptThread {
     pub(crate) fn new(
         state: InitialScriptState,
         layout_factory: Arc<dyn LayoutFactory>,
+        display_list_creator: Box<dyn DisplayListCreator>,
         system_font_service: Arc<SystemFontServiceProxy>,
     ) -> ScriptThread {
         let (self_sender, self_receiver) = unbounded();
@@ -990,6 +995,7 @@ impl ScriptThread {
             needs_rendering_update: Arc::new(AtomicBool::new(false)),
             debugger_global: debugger_global.as_traced(),
             privileged_urls: state.privileged_urls,
+            display_list_creator,
         }
     }
 
@@ -3177,6 +3183,7 @@ impl ScriptThread {
             compositor_api: self.compositor_api.clone(),
             viewport_details: incomplete.viewport_details,
             theme: incomplete.theme,
+            display_list_creator: self.display_list_creator.clone_box(),
         };
 
         // Create the window and document objects.

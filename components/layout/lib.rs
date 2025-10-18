@@ -46,16 +46,6 @@ use crate::geom::LogicalVec2;
 use crate::sizing::SizeConstraint;
 use crate::style_ext::AspectRatio;
 
-/// At times, a style is "owned" by more than one layout object. For example, text
-/// fragments need a handle on their parent inline box's style. In order to make
-/// incremental layout easier to implement, another layer of shared ownership is added via
-/// [`SharedStyle`]. This allows updating the style in originating layout object and
-/// having all "depdendent" objects update automatically.
-///
-///  Note that this is not a cost-free data structure, so should only be
-/// used when necessary.
-pub(crate) type SharedStyle = ArcRefCell<ServoArc<ComputedValues>>;
-
 /// Represents the set of constraints that we use when computing the min-content
 /// and max-content inline sizes of an element.
 pub(crate) struct ConstraintSpace<'a> {

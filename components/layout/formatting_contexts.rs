@@ -50,14 +50,6 @@ pub(crate) enum IndependentFormattingContextContents {
     // Other layout modes go here
 }
 
-/// The baselines of a layout or a [`crate::fragment_tree::BoxFragment`]. Some layout
-/// uses the first and some layout uses the last.
-#[derive(Clone, Copy, Debug, Default, MallocSizeOf)]
-pub(crate) struct Baselines {
-    pub first: Option<Au>,
-    pub last: Option<Au>,
-}
-
 impl Baselines {
     pub(crate) fn offset(&self, block_offset: Au) -> Baselines {
         Self {

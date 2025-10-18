@@ -175,16 +175,6 @@ pub(crate) struct InlineFormattingContext {
     pub(super) has_right_to_left_content: bool,
 }
 
-/// [`TextRun`] and `TextFragment`s need a handle on their parent inline box (or inline
-/// formatting context root)'s style. In order to implement incremental layout, these are
-/// wrapped in [`SharedStyle`]. This allows updating the parent box tree element without
-/// updating every single descendant box tree node and fragment.
-#[derive(Clone, Debug, MallocSizeOf)]
-pub(crate) struct SharedInlineStyles {
-    pub style: SharedStyle,
-    pub selected: SharedStyle,
-}
-
 impl From<&NodeAndStyleInfo<'_>> for SharedInlineStyles {
     fn from(info: &NodeAndStyleInfo) -> Self {
         Self {

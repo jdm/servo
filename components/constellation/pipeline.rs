@@ -33,7 +33,7 @@ use fonts::{SystemFontServiceProxy, SystemFontServiceProxySender};
 use ipc_channel::Error;
 use ipc_channel::ipc::{self, IpcReceiver, IpcSender};
 use ipc_channel::router::ROUTER;
-use layout_api::{LayoutFactory, ScriptThreadFactory};
+use layout_api::{DisplayListCreator, LayoutFactory, ScriptThreadFactory};
 use log::{debug, error, warn};
 use media::WindowGLContext;
 use net::image_cache::ImageCacheImpl;
@@ -110,7 +110,7 @@ pub struct Pipeline {
 ///
 /// *DO NOT* add any Senders to this unless you absolutely know what you're doing, or pcwalton will
 /// have to rewrite your code. Use IPC senders instead.
-pub struct InitialPipelineState {
+pub(crate) struct InitialPipelineState {
     /// The ID of the pipeline to create.
     pub id: PipelineId,
 
@@ -214,6 +214,9 @@ pub struct InitialPipelineState {
 
     /// The image cache for the single-process mode
     pub image_cache: Arc<dyn ImageCache>,
+
+    ///
+    pub display_list_creator: Box<dyn DisplayListCreator>,
 }
 
 pub struct NewPipeline {
@@ -225,7 +228,7 @@ pub struct NewPipeline {
 
 impl Pipeline {
     /// Possibly starts a script thread, in a new process if requested.
-    pub fn spawn<STF: ScriptThreadFactory>(
+    pub fn spawn<STF: ScriptThreadFactory, DLC: DisplayListCreator>(
         state: InitialPipelineState,
     ) -> Result<NewPipeline, Error> {
         // Note: we allow channel creation to panic, since recovering from this
@@ -318,6 +321,7 @@ impl Pipeline {
                     user_content_manager: state.user_content_manager,
                     lifeline_sender: None,
                     privileged_urls: state.privileged_urls,
+                    display_list_creator_data: state.display_list_creator.serialize(),
                 };
 
                 // Spawn the child process.
@@ -337,9 +341,10 @@ impl Pipeline {
                     let register = state
                         .background_monitor_register
                         .expect("Couldn't start content, no background monitor has been initiated");
-                    let join_handle = unprivileged_pipeline_content.start_all::<STF>(
+                    let join_handle = unprivileged_pipeline_content.start_all::<STF, DLC>(
                         false,
                         state.layout_factory,
+                        Some(state.display_list_creator),
                         register,
                         Some(state.image_cache),
                     );
@@ -513,13 +518,15 @@ pub struct UnprivilegedPipelineContent {
     user_content_manager: UserContentManager,
     lifeline_sender: Option<IpcSender<()>>,
     privileged_urls: Vec<ServoUrl>,
+    display_list_creator_data: Vec<u8>,
 }
 
 impl UnprivilegedPipelineContent {
-    pub fn start_all<STF: ScriptThreadFactory>(
+    pub fn start_all<STF: ScriptThreadFactory, DLC: DisplayListCreator>(
         self,
         wait_for_completion: bool,
         layout_factory: Arc<dyn LayoutFactory>,
+        display_list_creator: Option<Box<dyn DisplayListCreator>>,
         background_hang_monitor_register: Box<dyn BackgroundHangMonitorRegister>,
         image_cache: Option<Arc<dyn ImageCache>>,
     ) -> JoinHandle<()> {
@@ -569,6 +576,7 @@ impl UnprivilegedPipelineContent {
                 privileged_urls: self.privileged_urls,
             },
             layout_factory,
+            dlc.unwrap_or_else(|| DLC::deserialize(self.display_list_creator_data).unwrap()),
             Arc::new(self.system_font_service.to_proxy()),
             self.load_data.clone(),
         );

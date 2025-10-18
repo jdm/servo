@@ -146,7 +146,7 @@ use ipc_channel::Error as IpcError;
 use ipc_channel::ipc::{self, IpcReceiver, IpcSender};
 use ipc_channel::router::ROUTER;
 use keyboard_types::{Key, KeyState, Modifiers, NamedKey};
-use layout_api::{LayoutFactory, ScriptThreadFactory};
+use layout_api::{DisplayListCreator, LayoutFactory, ScriptThreadFactory};
 use log::{debug, error, info, trace, warn};
 use media::WindowGLContext;
 use net::image_cache::ImageCacheImpl;
@@ -286,7 +286,7 @@ impl prefs::Observer for PreferenceForwarder {
 /// `LayoutThread` in the `layout` crate, and `ScriptThread` in
 /// the `script` crate). Script and layout communicate using a `Message`
 /// type.
-pub struct Constellation<STF, SWF> {
+pub struct Constellation<STF, SWF, DLC> {
     /// An ipc-sender/threaded-receiver pair
     /// to facilitate installing pipeline namespaces in threads
     /// via a per-process installer.
@@ -510,6 +510,9 @@ pub struct Constellation<STF, SWF> {
     /// ready to take place, at which point the Constellation informs the renderer that it
     /// can start the process of taking the screenshot.
     screenshot_readiness_requests: Vec<ScreenshotReadinessRequest>,
+
+    ///
+    display_list_creator: DLC,
 }
 
 /// State needed to construct a constellation.
@@ -606,10 +609,11 @@ where
     crossbeam_receiver
 }
 
-impl<STF, SWF> Constellation<STF, SWF>
+impl<STF, SWF, DLC> Constellation<STF, SWF, DLC>
 where
     STF: ScriptThreadFactory,
     SWF: ServiceWorkerManagerFactory,
+    DLC: DisplayListCreator + Clone + 'static,
 {
     /// Create a new constellation thread.
     #[allow(clippy::too_many_arguments)]
@@ -617,6 +621,7 @@ where
     pub fn start(
         state: InitialConstellationState,
         layout_factory: Arc<dyn LayoutFactory>,
+        display_list_creator: DLC,
         random_pipeline_closure_probability: Option<f32>,
         random_pipeline_closure_seed: Option<usize>,
         hard_fail: bool,
@@ -687,7 +692,7 @@ where
                     prefs::add_observer(Box::new(PreferenceForwarder(compositor_sender_self)));
                 }
 
-                let mut constellation: Constellation<STF, SWF> = Constellation {
+                let mut constellation: Constellation<STF, SWF, DLC> = Constellation {
                     namespace_receiver,
                     namespace_ipc_sender,
                     script_sender: script_ipc_sender,
@@ -760,6 +765,7 @@ where
                     )),
                     pending_viewport_changes: Default::default(),
                     screenshot_readiness_requests: Vec::new(),
+                    display_list_creator,
                 };
 
                 constellation.run();
@@ -1000,7 +1006,7 @@ where
         let eventloop_waker = self.embedder_proxy.event_loop_waker.clone();
         let script_to_embedder_chan = ScriptToEmbedderChan::new(embedder_chan, eventloop_waker);
 
-        let result = Pipeline::spawn::<STF>(InitialPipelineState {
+        let result = Pipeline::spawn::<STF, DLC>(InitialPipelineState {
             id: pipeline_id,
             browsing_context_id,
             webview_id,
@@ -1046,6 +1052,7 @@ where
                 Some(pipeline_id),
                 self.compositor_proxy.cross_process_compositor_api.clone(),
             ),
+            display_list_creator: self.display_list_creator.clone_box(),
         });
 
         let pipeline = match result {

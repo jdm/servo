@@ -4891,6 +4891,7 @@ dependencies = [
  "selectors",
  "serde",
  "servo_arc",
+ "servo_config",
  "servo_malloc_size_of",
  "servo_url",
  "stylo",

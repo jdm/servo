@@ -15,34 +15,6 @@ use webrender_api::units::{LayoutRect, LayoutSideOffsets, LayoutSize};
 
 use super::{BuilderForBoxFragment, compute_margin_box_radius, normalize_radii};
 
-/// An identifier for a clip used during StackingContextTree construction. This is a simple index in
-/// a [`ClipStore`]s vector of clips.
-#[derive(Clone, Copy, Debug, Eq, Hash, MallocSizeOf, PartialEq)]
-pub(crate) struct ClipId(pub usize);
-
-impl ClipId {
-    /// Equivalent to [`ClipChainId::INVALID`]. This means "no clip."
-    pub(crate) const INVALID: ClipId = ClipId(usize::MAX);
-}
-
-/// All the information needed to create a clip on a WebRender display list. These are created at
-/// two times: during `StackingContextTree` creation and during WebRender display list construction.
-/// Only the former are stored in a [`ClipStore`].
-#[derive(Clone, MallocSizeOf)]
-pub(crate) struct Clip {
-    pub id: ClipId,
-    pub radii: BorderRadius,
-    pub rect: LayoutRect,
-    pub parent_scroll_node_id: ScrollTreeNodeId,
-    pub parent_clip_id: ClipId,
-}
-
-/// A simple vector of [`Clip`] that is built during `StackingContextTree` construction.
-/// These are later turned into WebRender clips and clip chains during WebRender display
-/// list construction.
-#[derive(Clone, Default, MallocSizeOf)]
-pub(crate) struct StackingContextTreeClipStore(pub Vec<Clip>);
-
 impl StackingContextTreeClipStore {
     pub(super) fn get(&self, clip_id: ClipId) -> &Clip {
         &self.0[clip_id.0]

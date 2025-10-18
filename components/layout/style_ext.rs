@@ -234,12 +234,6 @@ pub(crate) struct ContentBoxSizesAndPBM {
     pub preferred_size_computes_to_auto: LogicalVec2<bool>,
 }
 
-#[derive(Clone, Debug, MallocSizeOf, PartialEq)]
-pub(crate) struct BorderStyleColor {
-    pub style: BorderStyle,
-    pub color: AbsoluteColor,
-}
-
 impl BorderStyleColor {
     pub(crate) fn new(style: BorderStyle, color: AbsoluteColor) -> Self {
         Self { style, color }
@@ -266,12 +260,6 @@ impl BorderStyleColor {
 
     pub(crate) fn hidden() -> Self {
         Self::new(BorderStyle::Hidden, AbsoluteColor::TRANSPARENT_BLACK)
-    }
-}
-
-impl Default for BorderStyleColor {
-    fn default() -> Self {
-        Self::new(BorderStyle::None, AbsoluteColor::TRANSPARENT_BLACK)
     }
 }
 

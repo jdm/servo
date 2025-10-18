@@ -97,20 +97,6 @@ use crate::query::{
 use crate::traversal::{RecalcStyle, compute_damage_and_repair_style};
 use crate::{BoxTree, FragmentTree};
 
-pub trait DisplayListCreator {
-    fn build_and_send_display_list(
-        &self,
-        stacking_context_tree: &mut StackingContextTree,
-        fragment_tree: &FragmentTree,
-        image_resolver: Arc<ImageResolver>,
-        device_pixel_ratio: Scale<f32, style_traits::CSSPixel, style_traits::DevicePixel>,
-        inspector_highlight: Option<OpaqueNode>,
-        debug: &DebugOptions,
-        compositor_api: &CrossProcessCompositorApi,
-        webview_id: WebViewId,
-    );
-}
-
 pub struct WebRenderDisplayListCreator;
 
 impl DisplayListCreator for WebRenderDisplayListCreator {

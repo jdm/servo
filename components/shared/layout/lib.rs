@@ -8,10 +8,13 @@
 
 #![deny(unsafe_code)]
 
+mod cell;
+mod geom;
 mod layout_damage;
 pub mod wrapper_traits;
 
 use std::any::Any;
+use std::cell::{Cell, RefCell};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicIsize, AtomicU64, Ordering};
 use std::thread::JoinHandle;
@@ -21,14 +24,14 @@ use app_units::Au;
 use atomic_refcell::AtomicRefCell;
 use base::Epoch;
 use base::generic_channel::GenericSender;
-use base::id::{BrowsingContextId, PipelineId, WebViewId};
+use base::id::{BrowsingContextId, PipelineId, ScrollTreeNodeId, WebViewId};
 use bitflags::bitflags;
-use compositing_traits::CrossProcessCompositorApi;
+use compositing_traits::{display_list::{AxesScrollSensitivity, CompositorDisplayListInfo}, CrossProcessCompositorApi};
 use constellation_traits::LoadData;
 use embedder_traits::{Cursor, Theme, UntrustedNodeAddress, ViewportDetails};
-use euclid::Point2D;
+use euclid::{Point2D, Scale};
 use euclid::default::{Point2D as UntypedPoint2D, Rect};
-use fonts::{FontContext, SystemFontServiceProxy};
+use fonts::{ByteIndex, FontContext, FontMetrics, GlyphStore, SystemFontServiceProxy};
 pub use layout_damage::LayoutDamage;
 use libc::c_void;
 use malloc_size_of::{MallocSizeOf as MallocSizeOfTrait, MallocSizeOfOps, malloc_size_of_is_0};
@@ -38,13 +41,17 @@ use parking_lot::RwLock;
 use pixels::RasterImage;
 use profile_traits::mem::Report;
 use profile_traits::time;
+use range::Range as ServoRange;
 use rustc_hash::FxHashMap;
 use script_traits::{InitialScriptState, Painter, ScriptThreadMessage};
 use serde::{Deserialize, Serialize};
 use servo_arc::Arc as ServoArc;
+use servo_config::opts::DebugOptions;
 use servo_url::{ImmutableOrigin, ServoUrl};
 use style::Atom;
 use style::animation::DocumentAnimationSet;
+use style::color::AbsoluteColor;
+use style::computed_values::text_decoration_style::T as TextDecorationStyle;
 use style::context::QuirksMode;
 use style::data::ElementData;
 use style::dom::OpaqueNode;
@@ -54,10 +61,15 @@ use style::properties::style_structs::Font;
 use style::properties::{ComputedValues, PropertyId};
 use style::selector_parser::{PseudoElement, RestyleDamage, Snapshot};
 use style::stylesheets::{Stylesheet, UrlExtraData};
-use style::values::computed::Overflow;
+use style::values::computed::{BorderStyle, Overflow};
+use style::values::specified::TextDecorationLine;
 use style_traits::CSSPixel;
-use webrender_api::units::{DeviceIntSize, LayoutPoint, LayoutVector2D};
-use webrender_api::{ExternalScrollId, ImageKey};
+use webrender_api::units::{DeviceIntSize, LayoutPoint, LayoutRect, LayoutVector2D};
+use webrender_api::{BorderRadius, ExternalScrollId, FontInstanceKey, ImageKey};
+
+use crate::cell::ArcRefCell;
+use crate::geom::{AuOrAuto, PhysicalRect, PhysicalSides, PhysicalVec};
+use crate::wrapper_traits::PseudoElementChain;
 
 pub trait GenericLayoutDataTrait: Any + MallocSizeOfTrait {
     fn as_any(&self) -> &dyn Any;
@@ -200,6 +212,558 @@ pub struct HTMLMediaData {
     pub metadata: Option<MediaMetadata>,
 }
 
+#[derive(MallocSizeOf)]
+pub(crate) struct StackingContextTree {
+    /// The root stacking context of this [`StackingContextTree`].
+    pub root_stacking_context: StackingContext,
+
+    /// The information about the WebRender display list that the compositor
+    /// consumes. This curerntly contains the out-of-band hit testing information
+    /// data structure that the compositor uses to map hit tests to information
+    /// about the item hit.
+    pub compositor_info: CompositorDisplayListInfo,
+
+    /// All of the clips collected for this [`StackingContextTree`]. These are added
+    /// for things like `overflow`. More clips may be created later during WebRender
+    /// display list construction, but they are never added here.
+    pub clip_store: StackingContextTreeClipStore,
+}
+
+#[derive(Clone, Copy, Debug, Eq, MallocSizeOf, PartialEq)]
+pub(crate) enum StackingContextType {
+    RealStackingContext,
+    PositionedStackingContainer,
+    FloatStackingContainer,
+    AtomicInlineStackingContainer,
+}
+
+/// The text decorations for a Fragment, collecting during [`StackingContextTree`] construction.
+#[derive(Clone, Debug, MallocSizeOf)]
+pub(crate) struct FragmentTextDecoration {
+    pub line: TextDecorationLine,
+    pub color: AbsoluteColor,
+    pub style: TextDecorationStyle,
+}
+
+/// A piece of content that directly belongs to a section of a stacking context.
+///
+/// This is generally part of a fragment, like its borders or foreground, but it
+/// can also be a stacking container that needs to be painted in fragment order.
+#[derive(MallocSizeOf)]
+pub(crate) enum StackingContextContent {
+    /// A fragment that does not generate a stacking context or stacking container.
+    Fragment {
+        scroll_node_id: ScrollTreeNodeId,
+        reference_frame_scroll_node_id: ScrollTreeNodeId,
+        clip_id: ClipId,
+        section: StackingContextSection,
+        containing_block: PhysicalRect<Au>,
+        fragment: Fragment,
+        is_hit_test_for_scrollable_overflow: bool,
+        is_collapsed_table_borders: bool,
+        #[conditional_malloc_size_of]
+        text_decorations: Arc<Vec<FragmentTextDecoration>>,
+    },
+
+    /// An index into [StackingContext::atomic_inline_stacking_containers].
+    ///
+    /// There is no section field, because these are always in [StackingContextSection::Foreground].
+    AtomicInlineStackingContainer { index: usize },
+}
+
+#[derive(Clone, Copy, Debug, Eq, Ord, MallocSizeOf, PartialEq, PartialOrd)]
+pub(crate) enum StackingContextSection {
+    OwnBackgroundsAndBorders,
+    DescendantBackgroundsAndBorders,
+    Foreground,
+    Outline,
+}
+
+/// Either a stacking context or a stacking container, per the definitions in
+/// <https://drafts.csswg.org/css-position-4/#painting-order>.
+///
+/// We use the term “real stacking context” in situations that call for a
+/// stacking context but not a stacking container.
+#[derive(MallocSizeOf)]
+pub struct StackingContext {
+    /// The spatial id of this fragment. This is used to properly handle
+    /// things like preserve-3d.
+    scroll_tree_node_id: ScrollTreeNodeId,
+
+    /// The clip chain id of this stacking context if it has one. Used for filter clipping.
+    clip_id: Option<ClipId>,
+
+    /// The [`BoxFragment`] that established this stacking context. We store the fragment here
+    /// rather than just the style, so that incremental layout can automatically update the style.
+    initializing_fragment: Option<ArcRefCell<BoxFragment>>,
+
+    /// The type of this stacking context. Used for collecting and sorting.
+    context_type: StackingContextType,
+
+    /// The contents that need to be painted in fragment order.
+    pub contents: Vec<StackingContextContent>,
+
+    /// Stacking contexts that need to be stolen by the parent stacking context
+    /// if this is a stacking container, that is, real stacking contexts and
+    /// positioned stacking containers (where ‘z-index’ is auto).
+    /// <https://drafts.csswg.org/css-position-4/#paint-a-stacking-container>
+    /// > To paint a stacking container, given a box root and a canvas canvas:
+    /// >  1. Paint a stacking context given root and canvas, treating root as
+    /// >     if it created a new stacking context, but omitting any positioned
+    /// >     descendants or descendants that actually create a stacking context
+    /// >     (letting the parent stacking context paint them, instead).
+    pub real_stacking_contexts_and_positioned_stacking_containers: Vec<StackingContext>,
+
+    /// Float stacking containers.
+    /// Separate from real_stacking_contexts_or_positioned_stacking_containers
+    /// because they should never be stolen by the parent stacking context.
+    /// <https://drafts.csswg.org/css-position-4/#paint-a-stacking-container>
+    pub float_stacking_containers: Vec<StackingContext>,
+
+    /// Atomic inline stacking containers.
+    /// Separate from real_stacking_contexts_or_positioned_stacking_containers
+    /// because they should never be stolen by the parent stacking context, and
+    /// separate from float_stacking_containers so that [StackingContextContent]
+    /// can index into this vec to paint them in fragment order.
+    /// <https://drafts.csswg.org/css-position-4/#paint-a-stacking-container>
+    /// <https://drafts.csswg.org/css-position-4/#paint-a-box-in-a-line-box>
+    pub atomic_inline_stacking_containers: Vec<StackingContext>,
+
+    /// Information gathered about the painting order, for [Self::debug_print].
+    debug_print_items: Option<RefCell<Vec<DebugPrintItem>>>,
+}
+
+/// Refers to one of the child contents or stacking contexts of a [StackingContext].
+#[derive(Clone, Copy, MallocSizeOf)]
+pub struct DebugPrintItem {
+    field: DebugPrintField,
+    index: usize,
+}
+
+/// Refers to one of the vecs of a [StackingContext].
+#[derive(Clone, Copy, MallocSizeOf)]
+pub enum DebugPrintField {
+    Contents,
+    RealStackingContextsAndPositionedStackingContainers,
+    FloatStackingContainers,
+}
+
+/// An identifier for a clip used during StackingContextTree construction. This is a simple index in
+/// a [`ClipStore`]s vector of clips.
+#[derive(Clone, Copy, Debug, Eq, Hash, MallocSizeOf, PartialEq)]
+pub(crate) struct ClipId(pub usize);
+
+impl ClipId {
+    /// Equivalent to [`ClipChainId::INVALID`]. This means "no clip."
+    pub(crate) const INVALID: ClipId = ClipId(usize::MAX);
+}
+
+/// A data structure used to hold DOM and pseudo-element information about
+/// a particular layout object.
+#[derive(Clone, Copy, Debug, Eq, MallocSizeOf, PartialEq)]
+pub(crate) struct Tag {
+    pub(crate) node: OpaqueNode,
+    pub(crate) pseudo_element_chain: PseudoElementChain,
+}
+
+#[derive(MallocSizeOf)]
+pub(crate) struct BlockLevelLayoutInfo {
+    /// When the `clear` property is not set to `none`, it may introduce clearance.
+    /// Clearance is some extra spacing that is added above the top margin,
+    /// so that the element doesn't overlap earlier floats in the same BFC.
+    /// The presence of clearance prevents the top margin from collapsing with
+    /// earlier margins or with the bottom margin of the parent block.
+    /// <https://drafts.csswg.org/css2/#clearance>
+    pub clearance: Option<Au>,
+
+    pub block_margins_collapsed_with_children: CollapsedBlockMargins,
+}
+
+#[derive(MallocSizeOf)]
+pub(crate) struct BoxFragmentRareData {
+    /// Information that is specific to a layout system (e.g., grid, table, etc.).
+    pub specific_layout_info: Option<SpecificLayoutInfo>,
+}
+
+#[derive(Clone, MallocSizeOf)]
+pub(crate) struct CollapsedBlockMargins {
+    pub collapsed_through: bool,
+    pub start: CollapsedMargin,
+    pub end: CollapsedMargin,
+}
+
+#[derive(Clone, Copy, Debug, MallocSizeOf)]
+pub(crate) struct CollapsedMargin {
+    max_positive: Au,
+    min_negative: Au,
+}
+
+/// At times, a style is "owned" by more than one layout object. For example, text
+/// fragments need a handle on their parent inline box's style. In order to make
+/// incremental layout easier to implement, another layer of shared ownership is added via
+/// [`SharedStyle`]. This allows updating the style in originating layout object and
+/// having all "depdendent" objects update automatically.
+///
+///  Note that this is not a cost-free data structure, so should only be
+/// used when necessary.
+pub(crate) type SharedStyle = ArcRefCell<ServoArc<ComputedValues>>;
+
+/// Describes how a [`BoxFragment`] paints its background.
+#[derive(MallocSizeOf)]
+pub(crate) enum BackgroundMode {
+    /// Draw the normal [`BoxFragment`] background as well as the extra backgrounds
+    /// based on the style and positioning rectangles in this data structure.
+    Extra(Vec<ExtraBackground>),
+    /// Do not draw a background for this Fragment. This is used for elements like
+    /// table tracks and table track groups, which rely on cells to paint their
+    /// backgrounds.
+    None,
+    /// Draw the background normally, getting information from the Fragment style.
+    Normal,
+}
+#[derive(MallocSizeOf)]
+pub(crate) struct ExtraBackground {
+    pub style: SharedStyle,
+    pub rect: PhysicalRect<Au>,
+}
+
+#[derive(Clone, Debug, MallocSizeOf)]
+pub(crate) enum SpecificLayoutInfo {
+    Grid(Box<SpecificTaffyGridInfo>),
+    TableCellWithCollapsedBorders,
+    TableGridWithCollapsedBorders(Box<SpecificTableGridInfo>),
+    TableWrapper,
+}
+
+/// All the information needed to create a clip on a WebRender display list. These are created at
+/// two times: during `StackingContextTree` creation and during WebRender display list construction.
+/// Only the former are stored in a [`ClipStore`].
+#[derive(Clone, MallocSizeOf)]
+pub(crate) struct Clip {
+    pub id: ClipId,
+    pub radii: BorderRadius,
+    pub rect: LayoutRect,
+    pub parent_scroll_node_id: ScrollTreeNodeId,
+    pub parent_clip_id: ClipId,
+}
+
+bitflags! {
+    /// Flags used to track various information about a DOM node during layout.
+    #[derive(Clone, Copy, Debug)]
+    pub(crate) struct FragmentFlags: u16 {
+        /// Whether or not the node that created this fragment is a `<body>` element on an HTML document.
+        const IS_BODY_ELEMENT_OF_HTML_ELEMENT_ROOT = 1 << 0;
+        /// Whether or not the node that created this Fragment is a `<br>` element.
+        const IS_BR_ELEMENT = 1 << 1;
+        /// Whether or not the node that created this Fragment is a widget. Widgets behave similarly to
+        /// replaced elements, e.g. they are atomic when inline-level, and their automatic inline size
+        /// doesn't stretch when block-level.
+        /// <https://drafts.csswg.org/css-ui/#widget>
+        const IS_WIDGET = 1 << 2;
+        /// Whether or not this Fragment is a flex item or a grid item.
+        const IS_FLEX_OR_GRID_ITEM = 1 << 3;
+        /// Whether or not this Fragment was created to contain a replaced element or is
+        /// a replaced element.
+        const IS_REPLACED = 1 << 4;
+        /// Whether or not the node that created was a `<table>`, `<th>` or
+        /// `<td>` element. Note that this does *not* include elements with
+        /// `display: table` or `display: table-cell`.
+        const IS_TABLE_TH_OR_TD_ELEMENT = 1 << 5;
+        /// Whether or not this Fragment was created to contain a list item marker
+        /// with a used value of `list-style-position: outside`.
+        const IS_OUTSIDE_LIST_ITEM_MARKER = 1 << 6;
+        /// Avoid painting the borders, backgrounds, and drop shadow for this fragment, this is used
+        /// for empty table cells when 'empty-cells' is 'hide' and also table wrappers.  This flag
+        /// doesn't avoid hit-testing nor does it prevent the painting outlines.
+        const DO_NOT_PAINT = 1 << 7;
+        /// Whether or not the size of this fragment depends on the block size of its container
+        /// and the fragment can be a flex item. This flag is used to cache items during flex
+        /// layout.
+        const SIZE_DEPENDS_ON_BLOCK_CONSTRAINTS_AND_CAN_BE_CHILD_OF_FLEX_ITEM = 1 << 8;
+        /// Whether or not the node that created this fragment is the root element.
+        const IS_ROOT_ELEMENT = 1 << 9;
+        /// If element has propagated the overflow value to viewport.
+        const PROPAGATED_OVERFLOW_TO_VIEWPORT = 1 << 10;
+        /// Whether or not this is a table cell that is part of a collapsed row or column.
+        /// In that case it should not be painted.
+        const IS_COLLAPSED = 1 << 11;
+
+    }
+}
+
+malloc_size_of_is_0!(FragmentFlags);
+
+/// A simple vector of [`Clip`] that is built during `StackingContextTree` construction.
+/// These are later turned into WebRender clips and clip chains during WebRender display
+/// list construction.
+#[derive(Clone, Default, MallocSizeOf)]
+pub(crate) struct StackingContextTreeClipStore(pub Vec<Clip>);
+
+pub trait ImageResolver {}
+
+#[derive(Clone, MallocSizeOf)]
+pub(crate) enum Fragment {
+    Box(ArcRefCell<BoxFragment>),
+    /// Floating content. A floated fragment is very similar to a normal
+    /// [BoxFragment] but it isn't positioned using normal in block flow
+    /// positioning rules (margin collapse, etc). Instead, they are laid
+    /// out by the [crate::flow::float::SequentialLayoutState] of their
+    /// float containing block formatting context.
+    Float(ArcRefCell<BoxFragment>),
+    Positioning(ArcRefCell<PositioningFragment>),
+    /// Absolute and fixed position fragments are hoisted up so that they
+    /// are children of the BoxFragment that establishes their containing
+    /// blocks, so that they can be laid out properly. When this happens
+    /// an `AbsoluteOrFixedPositioned` fragment is left at the original tree
+    /// position. This allows these hoisted fragments to be painted with
+    /// regard to their original tree order during stacking context tree /
+    /// display list construction.
+    AbsoluteOrFixedPositioned(ArcRefCell<HoistedSharedFragment>),
+    Text(ArcRefCell<TextFragment>),
+    Image(ArcRefCell<ImageFragment>),
+    IFrame(ArcRefCell<IFrameFragment>),
+}
+
+/// [`TextRun`] and `TextFragment`s need a handle on their parent inline box (or inline
+/// formatting context root)'s style. In order to implement incremental layout, these are
+/// wrapped in [`SharedStyle`]. This allows updating the parent box tree element without
+/// updating every single descendant box tree node and fragment.
+#[derive(Clone, Debug, MallocSizeOf)]
+pub(crate) struct SharedInlineStyles {
+    pub style: SharedStyle,
+    pub selected: SharedStyle,
+}
+
+#[derive(MallocSizeOf)]
+pub(crate) struct TextFragment {
+    pub base: BaseFragment,
+    pub inline_styles: SharedInlineStyles,
+    pub rect: PhysicalRect<Au>,
+    pub font_metrics: FontMetrics,
+    pub font_key: FontInstanceKey,
+    #[conditional_malloc_size_of]
+    pub glyphs: Vec<Arc<GlyphStore>>,
+
+    /// Extra space to add for each justification opportunity.
+    pub justification_adjustment: Au,
+    pub selection_range: Option<ServoRange<ByteIndex>>,
+}
+
+#[derive(MallocSizeOf)]
+pub(crate) struct ImageFragment {
+    pub base: BaseFragment,
+    pub style: ServoArc<ComputedValues>,
+    pub rect: PhysicalRect<Au>,
+    pub clip: PhysicalRect<Au>,
+    pub image_key: Option<ImageKey>,
+}
+
+#[derive(MallocSizeOf)]
+pub(crate) struct IFrameFragment {
+    pub base: BaseFragment,
+    pub pipeline_id: PipelineId,
+    pub rect: PhysicalRect<Au>,
+    pub style: ServoArc<ComputedValues>,
+}
+
+/// Details from Taffy grid layout that will be stored
+#[derive(Clone, Debug, MallocSizeOf)]
+pub(crate) struct SpecificTaffyGridInfo {
+    pub rows: SpecificTaffyGridTrackInfo,
+    pub columns: SpecificTaffyGridTrackInfo,
+}
+
+
+#[derive(Clone, Debug, MallocSizeOf)]
+pub(crate) struct SpecificTaffyGridTrackInfo {
+    pub sizes: Box<[Au]>,
+}
+/// The baselines of a layout or a [`crate::fragment_tree::BoxFragment`]. Some layout
+/// uses the first and some layout uses the last.
+#[derive(Clone, Copy, Debug, Default, MallocSizeOf)]
+pub(crate) struct Baselines {
+    pub first: Option<Au>,
+    pub last: Option<Au>,
+}
+
+#[derive(Clone, Debug, MallocSizeOf)]
+pub(crate) struct SpecificTableGridInfo {
+    pub collapsed_borders: PhysicalVec<Vec<CollapsedBorderLine>>,
+    pub track_sizes: PhysicalVec<Vec<Au>>,
+}
+
+/// Represents a piecewise sequence of collapsed borders along a line.
+pub(crate) type CollapsedBorderLine = Vec<CollapsedBorder>;
+
+/// A calculated collapsed border.
+#[derive(Clone, Debug, Default, MallocSizeOf, PartialEq)]
+pub(crate) struct CollapsedBorder {
+    pub style_color: BorderStyleColor,
+    pub width: Au,
+}
+
+#[derive(Clone, Debug, MallocSizeOf, PartialEq)]
+pub(crate) struct BorderStyleColor {
+    pub style: BorderStyle,
+    pub color: AbsoluteColor,
+}
+
+impl BorderStyleColor {
+    pub(crate) fn new(style: BorderStyle, color: AbsoluteColor) -> Self {
+        Self { style, color }
+    }
+}
+
+impl Default for BorderStyleColor {
+    fn default() -> Self {
+        Self::new(BorderStyle::None, AbsoluteColor::TRANSPARENT_BLACK)
+    }
+}
+
+#[derive(MallocSizeOf)]
+pub(crate) struct BoxFragment {
+    pub base: BaseFragment,
+
+    pub style: ServoArc<ComputedValues>,
+    pub children: Vec<Fragment>,
+
+    /// The content rect of this fragment in the parent fragment's content rectangle. This
+    /// does not include padding, border, or margin -- it only includes content.
+    pub content_rect: PhysicalRect<Au>,
+
+    /// This [`BoxFragment`]'s containing block rectangle in coordinates relative to
+    /// the initial containing block, but not taking into account any transforms.
+    pub cumulative_containing_block_rect: PhysicalRect<Au>,
+
+    pub padding: PhysicalSides<Au>,
+    pub border: PhysicalSides<Au>,
+    pub margin: PhysicalSides<Au>,
+
+    /// When this [`BoxFragment`] is for content that has a baseline, this tracks
+    /// the first and last baselines of that content. This is used to propagate baselines
+    /// to things such as tables and inline formatting contexts.
+    baselines: Baselines,
+
+    /// The scrollable overflow of this box fragment in the same coordiante system as
+    /// [`Self::content_rect`] ie a rectangle within the parent fragment's content
+    /// rectangle. This does not take into account any transforms this fragment applies.
+    /// This is handled when calling [`Self::scrollable_overflow_for_parent`].
+    scrollable_overflow: Option<PhysicalRect<Au>>,
+
+    /// The resolved box insets if this box is `position: sticky`. These are calculated
+    /// during `StackingContextTree` construction because they rely on the size of the
+    /// scroll container.
+    pub(crate) resolved_sticky_insets: AtomicRefCell<Option<PhysicalSides<AuOrAuto>>>,
+
+    pub background_mode: BackgroundMode,
+
+    /// Rare data that not all kinds of [`BoxFragment`] would have.
+    pub rare_data: Option<Box<BoxFragmentRareData>>,
+
+    /// Additional information for block-level boxes.
+    pub block_level_layout_info: Option<Box<BlockLevelLayoutInfo>>,
+
+    /// The containing spatial tree node of this [`BoxFragment`]. This is assigned during
+    /// `StackingContextTree` construction, so isn't available before that time. This is
+    /// used to for determining final viewport size and position of this node and will
+    /// also be used in the future for hit testing.
+    pub spatial_tree_node: AtomicRefCell<Option<ScrollTreeNodeId>>,
+}
+
+/// Can contain child fragments with relative coordinates, but does not contribute to painting
+/// itself. [`PositioningFragment`]s may be completely anonymous, or just non-painting Fragments
+/// generated by boxes.
+#[derive(MallocSizeOf)]
+pub(crate) struct PositioningFragment {
+    pub base: BaseFragment,
+    pub rect: PhysicalRect<Au>,
+    pub children: Vec<Fragment>,
+
+    /// The scrollable overflow of this anonymous fragment's children.
+    scrollable_overflow: Option<PhysicalRect<Au>>,
+
+    /// The style of the fragment.
+    pub style: ServoArc<ComputedValues>,
+
+    /// This [`PositioningFragment`]'s containing block rectangle in coordinates relative to
+    /// the initial containing block, but not taking into account any transforms.
+    pub cumulative_containing_block_rect: PhysicalRect<Au>,
+}
+
+/// A reference to a Fragment which is shared between `HoistedAbsolutelyPositionedBox`
+/// and its placeholder `AbsoluteOrFixedPositionedFragment` in the original tree position.
+/// This will be used later in order to paint this hoisted box in tree order.
+#[derive(Default, MallocSizeOf)]
+pub(crate) struct HoistedSharedFragment {
+    pub fragment: Option<Fragment>,
+    /// The original "static-position rect" of this absolutely positioned box. This is
+    /// defined by the layout mode from which the box originates. As this fragment is
+    /// hoisted up the tree this rectangle will be adjusted by the offsets of all
+    /// ancestors between the tree position of the absolute and the containing block for
+    /// absolutes that it is laid out in.
+    ///
+    /// See <https://drafts.csswg.org/css-position-3/#staticpos-rect>
+    pub original_static_position_rect: PhysicalRect<Au>,
+}
+
+/// This data structure stores fields that are common to all non-base
+/// Fragment types and should generally be the first member of all
+/// concrete fragments.
+#[derive(Clone, Debug, MallocSizeOf)]
+pub(crate) struct BaseFragment {
+    /// A tag which identifies the DOM node and pseudo element of this
+    /// Fragment's content. If this fragment is for an anonymous box,
+    /// the tag will be None.
+    pub tag: Option<Tag>,
+
+    /// Flags which various information about this fragment used during
+    /// layout.
+    pub flags: FragmentFlags,
+}
+
+#[derive(MallocSizeOf)]
+pub struct FragmentTree {
+    /// Fragments at the top-level of the tree.
+    ///
+    /// If the root element has `display: none`, there are zero fragments.
+    /// Otherwise, there is at least one:
+    ///
+    /// * The first fragment is generated by the root element.
+    /// * There may be additional fragments generated by positioned boxes
+    ///   that have the initial containing block.
+    pub(crate) root_fragments: Vec<Fragment>,
+
+    /// The scrollable overflow rectangle for the entire tree
+    /// <https://drafts.csswg.org/css-overflow/#scrollable>
+    scrollable_overflow: Cell<Option<PhysicalRect<Au>>>,
+
+    /// The containing block used in the layout of this fragment tree.
+    pub(crate) initial_containing_block: PhysicalRect<Au>,
+
+    /// Whether or not the viewport is sensitive to scroll input events.
+    pub viewport_scroll_sensitivity: AxesScrollSensitivity,
+}
+
+pub trait DisplayListCreator: Send {
+    fn build_and_send_display_list(
+        &self,
+        stacking_context_tree: &mut StackingContextTree,
+        fragment_tree: &FragmentTree,
+        image_resolver: Arc<dyn ImageResolver>,
+        device_pixel_ratio: Scale<f32, style_traits::CSSPixel, style_traits::DevicePixel>,
+        inspector_highlight: Option<OpaqueNode>,
+        debug: &DebugOptions,
+        compositor_api: &CrossProcessCompositorApi,
+        webview_id: WebViewId,
+    );
+
+    fn clone_box(&self) -> Box<dyn DisplayListCreator>;
+
+    fn serialize(&self) -> Vec<u8>;
+    fn deserialize(serialized: Vec<u8>) -> Result<Box<dyn DisplayListCreator>, ()> where Self: Sized;
+    //fn clone(&self) -> Box<Self>;
+}
+
 pub struct LayoutConfig {
     pub id: PipelineId,
     pub webview_id: WebViewId,
@@ -212,6 +776,7 @@ pub struct LayoutConfig {
     pub compositor_api: CrossProcessCompositorApi,
     pub viewport_details: ViewportDetails,
     pub theme: Theme,
+    pub display_list_creator: Box<dyn DisplayListCreator>,
 }
 
 pub struct PropertyRegistration {
@@ -346,6 +911,7 @@ pub trait ScriptThreadFactory {
     fn create(
         state: InitialScriptState,
         layout_factory: Arc<dyn LayoutFactory>,
+        display_list_creator: Box<dyn DisplayListCreator>,
         system_font_service: Arc<SystemFontServiceProxy>,
         load_data: LoadData,
     ) -> JoinHandle<()>;

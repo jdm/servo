@@ -16,21 +16,6 @@ use style::selector_parser::PseudoElement;
 
 use crate::dom_traversal::NodeAndStyleInfo;
 
-/// This data structure stores fields that are common to all non-base
-/// Fragment types and should generally be the first member of all
-/// concrete fragments.
-#[derive(Clone, Debug, MallocSizeOf)]
-pub(crate) struct BaseFragment {
-    /// A tag which identifies the DOM node and pseudo element of this
-    /// Fragment's content. If this fragment is for an anonymous box,
-    /// the tag will be None.
-    pub tag: Option<Tag>,
-
-    /// Flags which various information about this fragment used during
-    /// layout.
-    pub flags: FragmentFlags,
-}
-
 impl BaseFragment {
     pub(crate) fn anonymous() -> Self {
         BaseFragment {
@@ -133,60 +118,6 @@ impl From<BaseFragmentInfo> for BaseFragment {
             flags: info.flags,
         }
     }
-}
-
-bitflags! {
-    /// Flags used to track various information about a DOM node during layout.
-    #[derive(Clone, Copy, Debug)]
-    pub(crate) struct FragmentFlags: u16 {
-        /// Whether or not the node that created this fragment is a `<body>` element on an HTML document.
-        const IS_BODY_ELEMENT_OF_HTML_ELEMENT_ROOT = 1 << 0;
-        /// Whether or not the node that created this Fragment is a `<br>` element.
-        const IS_BR_ELEMENT = 1 << 1;
-        /// Whether or not the node that created this Fragment is a widget. Widgets behave similarly to
-        /// replaced elements, e.g. they are atomic when inline-level, and their automatic inline size
-        /// doesn't stretch when block-level.
-        /// <https://drafts.csswg.org/css-ui/#widget>
-        const IS_WIDGET = 1 << 2;
-        /// Whether or not this Fragment is a flex item or a grid item.
-        const IS_FLEX_OR_GRID_ITEM = 1 << 3;
-        /// Whether or not this Fragment was created to contain a replaced element or is
-        /// a replaced element.
-        const IS_REPLACED = 1 << 4;
-        /// Whether or not the node that created was a `<table>`, `<th>` or
-        /// `<td>` element. Note that this does *not* include elements with
-        /// `display: table` or `display: table-cell`.
-        const IS_TABLE_TH_OR_TD_ELEMENT = 1 << 5;
-        /// Whether or not this Fragment was created to contain a list item marker
-        /// with a used value of `list-style-position: outside`.
-        const IS_OUTSIDE_LIST_ITEM_MARKER = 1 << 6;
-        /// Avoid painting the borders, backgrounds, and drop shadow for this fragment, this is used
-        /// for empty table cells when 'empty-cells' is 'hide' and also table wrappers.  This flag
-        /// doesn't avoid hit-testing nor does it prevent the painting outlines.
-        const DO_NOT_PAINT = 1 << 7;
-        /// Whether or not the size of this fragment depends on the block size of its container
-        /// and the fragment can be a flex item. This flag is used to cache items during flex
-        /// layout.
-        const SIZE_DEPENDS_ON_BLOCK_CONSTRAINTS_AND_CAN_BE_CHILD_OF_FLEX_ITEM = 1 << 8;
-        /// Whether or not the node that created this fragment is the root element.
-        const IS_ROOT_ELEMENT = 1 << 9;
-        /// If element has propagated the overflow value to viewport.
-        const PROPAGATED_OVERFLOW_TO_VIEWPORT = 1 << 10;
-        /// Whether or not this is a table cell that is part of a collapsed row or column.
-        /// In that case it should not be painted.
-        const IS_COLLAPSED = 1 << 11;
-
-    }
-}
-
-malloc_size_of_is_0!(FragmentFlags);
-
-/// A data structure used to hold DOM and pseudo-element information about
-/// a particular layout object.
-#[derive(Clone, Copy, Debug, Eq, MallocSizeOf, PartialEq)]
-pub(crate) struct Tag {
-    pub(crate) node: OpaqueNode,
-    pub(crate) pseudo_element_chain: PseudoElementChain,
 }
 
 impl Tag {
