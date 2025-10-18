@@ -10,6 +10,7 @@ use base::print_tree::PrintTree;
 use euclid::{Point2D, Rect, Size2D, UnknownUnit};
 use fonts::{ByteIndex, FontMetrics, GlyphStore};
 use layout_api::BoxAreaType;
+pub use layout_api::{Fragment, CollapsedBlockMargins, CollapsedMargin, IFrameFragment, ImageFragment, TextFragment};
 use malloc_size_of_derive::MallocSizeOf;
 use range::Range as ServoRange;
 use servo_arc::Arc as ServoArc;

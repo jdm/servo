@@ -576,7 +576,7 @@ impl UnprivilegedPipelineContent {
                 privileged_urls: self.privileged_urls,
             },
             layout_factory,
-            dlc.unwrap_or_else(|| DLC::deserialize(self.display_list_creator_data).unwrap()),
+            display_list_creator.unwrap_or_else(|| DLC::deserialize(self.display_list_creator_data).unwrap()),
             Arc::new(self.system_font_service.to_proxy()),
             self.load_data.clone(),
         );

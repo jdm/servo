@@ -37,6 +37,7 @@ pub use cell::ArcRefCell;
 pub(crate) use flow::BoxTree;
 pub(crate) use fragment_tree::FragmentTree;
 pub use layout_impl::LayoutFactoryImpl;
+pub use layout_api::SharedStyle;
 use malloc_size_of_derive::MallocSizeOf;
 use servo_arc::Arc as ServoArc;
 use style::logical_geometry::WritingMode;

@@ -75,6 +75,7 @@ use atomic_refcell::AtomicRef;
 pub(crate) use construct::AnonymousTableContent;
 pub use construct::TableBuilder;
 use euclid::{Point2D, Size2D, UnknownUnit, Vector2D};
+pub use layout_api::{CollapsedBorder, CollapsedBorderLine, SpecificTableGridInfo};
 use malloc_size_of_derive::MallocSizeOf;
 use script::layout_dom::{ServoLayoutElement, ServoThreadSafeLayoutNode};
 use servo_arc::Arc;

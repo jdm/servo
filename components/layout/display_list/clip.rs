@@ -4,6 +4,7 @@
 
 use app_units::Au;
 use base::id::ScrollTreeNodeId;
+pub use layout_api::{Clip, ClipId, StackingContextTreeClipStore};
 use malloc_size_of_derive::MallocSizeOf;
 use style::values::computed::basic_shape::{BasicShape, ClipPath};
 use style::values::computed::length_percentage::NonNegativeLengthPercentage;

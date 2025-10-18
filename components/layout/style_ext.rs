@@ -4,6 +4,7 @@
 
 use app_units::Au;
 use layout_api::AxesOverflow;
+pub use layout_api::BorderStyleColor;
 use malloc_size_of_derive::MallocSizeOf;
 use style::Zero;
 use style::color::AbsoluteColor;

@@ -7,6 +7,7 @@ use std::cell::Cell;
 use app_units::Au;
 use base::print_tree::PrintTree;
 use compositing_traits::display_list::AxesScrollSensitivity;
+pub use layout_api::{BackgroundMode, BlockLevelLayoutInfo, CollapsedBlockMargins, CollapsedMargin, ExtraBackground, FragmentFlags, FragmentTree, IFrameFragment, ImageFragment, SpecificLayoutInfo, Tag, TextFragment, PositioningFragment};
 use malloc_size_of_derive::MallocSizeOf;
 use rustc_hash::FxHashSet;
 use style::animation::AnimationSetKey;

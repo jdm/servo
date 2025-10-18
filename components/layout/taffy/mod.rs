@@ -6,6 +6,7 @@ mod stylo_taffy;
 use std::fmt;
 
 use app_units::Au;
+pub use layout_api::{SpecificTaffyGridInfo, SpecificTaffyGridTrackInfo};
 use malloc_size_of_derive::MallocSizeOf;
 use script::layout_dom::ServoThreadSafeLayoutNode;
 use servo_arc::Arc;

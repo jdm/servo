@@ -7,6 +7,7 @@ use atomic_refcell::AtomicRefCell;
 use base::id::ScrollTreeNodeId;
 use base::print_tree::PrintTree;
 use euclid::Rect;
+pub use layout_api::{BackgroundMode, BoxFragment, BoxFragmentRareData, BlockLevelLayoutInfo, ExtraBackground, SpecificLayoutInfo};
 use malloc_size_of_derive::MallocSizeOf;
 use servo_arc::Arc as ServoArc;
 use servo_geometry::f32_rect_to_au_rect;

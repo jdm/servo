@@ -4,6 +4,7 @@
 
 use app_units::Au;
 use base::print_tree::PrintTree;
+pub use layout_api::PositioningFragment;
 use malloc_size_of_derive::MallocSizeOf;
 use servo_arc::Arc as ServoArc;
 use style::properties::ComputedValues;

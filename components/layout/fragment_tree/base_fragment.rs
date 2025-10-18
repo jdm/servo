@@ -4,6 +4,7 @@
 
 use bitflags::bitflags;
 use html5ever::local_name;
+pub use layout_api::{BaseFragment, FragmentFlags, Tag};
 use layout_api::combine_id_with_fragment_type;
 use layout_api::wrapper_traits::{
     PseudoElementChain, ThreadSafeLayoutElement, ThreadSafeLayoutNode,

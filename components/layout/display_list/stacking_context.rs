@@ -17,6 +17,7 @@ use compositing_traits::display_list::{
 use embedder_traits::ViewportDetails;
 use euclid::SideOffsets2D;
 use euclid::default::{Point2D, Rect, Size2D};
+pub use layout_api::{DebugPrintField, DebugPrintItem, FragmentTextDecoration, StackingContextSection, StackingContext, StackingContextContent, StackingContextTree, StackingContextType};
 use log::warn;
 use malloc_size_of_derive::MallocSizeOf;
 use servo_config::opts::DebugOptions;

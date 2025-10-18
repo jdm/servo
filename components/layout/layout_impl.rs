@@ -25,7 +25,7 @@ use fonts::{FontContext, FontContextWebFontMethods};
 use fonts_traits::StylesheetWebFontLoadFinishedCallback;
 use layout_api::wrapper_traits::LayoutNode;
 use layout_api::{
-    BoxAreaType, IFrameSizes, Layout, LayoutConfig, LayoutDamage, LayoutFactory,
+    BoxAreaType, DisplayListCreator, IFrameSizes, Layout, LayoutConfig, LayoutDamage, LayoutFactory,
     OffsetParentResponse, PropertyRegistration, QueryMsg, ReflowGoal, ReflowPhasesRun,
     ReflowRequest, ReflowRequestRestyle, ReflowResult, RegisterPropertyError,
     ScrollContainerQueryFlags, ScrollContainerResponse, TrustedNodeAddress,
