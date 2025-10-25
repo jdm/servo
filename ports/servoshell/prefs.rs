@@ -84,6 +84,8 @@ pub(crate) struct ServoShellPreferences {
     /// `None` to disable WebDriver or `Some` with a port number to start a server to listen to
     /// remote WebDriver commands.
     pub webdriver_port: Option<u16>,
+    ///
+    pub devtools_port: Option<u16>,
     /// Whether the CLI option to enable experimental prefs was present at startup.
     pub experimental_prefs_enabled: bool,
     /// Log filter given in the `log_filter` spec as a String, if any.
@@ -113,6 +115,7 @@ impl Default for ServoShellPreferences {
             exit_after_stable_image: false,
             userscripts_directory: None,
             webdriver_port: None,
+            devtools_port: None,
             #[cfg(target_env = "ohos")]
             log_filter: None,
             #[cfg(target_env = "ohos")]
@@ -683,6 +686,7 @@ pub(crate) fn parse_command_line_arguments(args: Vec<String>) -> ArgumentParsing
         screen_size_override: cmd_args.screen_size_override,
         simulate_touch_events: cmd_args.simulate_touch_events,
         webdriver_port: cmd_args.webdriver_port,
+        devtools_port: cmd_args.devtools,
         output_image_path: cmd_args.output.map(|p| p.to_string_lossy().into_owned()),
         exit_after_stable_image: cmd_args.exit,
         userscripts_directory: cmd_args.userscripts,

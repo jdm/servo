@@ -7984,6 +7984,7 @@ dependencies = [
  "ohos-window-manager-sys",
  "raw-window-handle",
  "rustls",
+ "serde",
  "serde_json",
  "servo_allocator",
  "sig",

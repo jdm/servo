@@ -8,7 +8,7 @@ use std::collections::hash_map::Entry;
 use std::mem;
 use std::rc::Rc;
 
-use crossbeam_channel::{Receiver, Sender};
+use crossbeam_channel::{Receiver, Sender, TryRecvError};
 use image::{DynamicImage, ImageFormat};
 use log::{error, info};
 use servo::base::generic_channel::GenericSender;
@@ -29,6 +29,7 @@ use super::app::PumpResult;
 use super::dialog::Dialog;
 use super::gamepad::GamepadSupport;
 use super::window_trait::WindowPortsMethods;
+use crate::devtools::{self, DevtoolClient, DevtoolUpdate, ConsoleLog, Level};
 use crate::prefs::ServoShellPreferences;
 
 pub(crate) enum AppState {
@@ -100,7 +101,15 @@ pub struct RunningAppStateInner {
 
     /// A list of showing [`InputMethod`] interfaces.
     visible_input_methods: Vec<EmbedderControlId>,
+
+    ///
+    devtool_client_init: Option<Receiver<Result<DevtoolClient, ()>>>,
+    ///
+    devtool_client: Option<DevtoolClient>,
+    ///
+    devtool_buffer: Option<Vec<ConsoleLog>>,
 }
+
 
 impl Drop for RunningAppState {
     fn drop(&mut self) {
@@ -140,6 +149,9 @@ impl RunningAppState {
                 achieved_stable_image: Default::default(),
                 pending_webdriver_events: Default::default(),
                 visible_input_methods: Default::default(),
+                devtool_client_init: None,
+                devtool_client: None,
+                devtool_buffer: None,
             }),
         }
     }
@@ -203,6 +215,72 @@ impl RunningAppState {
         inner_mut.need_repaint = false;
     }
 
+    fn handle_devtool_events(&self) {
+        let mut inner = self.inner.borrow_mut();
+        let mut done_init = false;
+        if let Some(ref mut receiver) = inner.devtool_client_init {
+            match receiver.try_recv() {
+                Ok(Ok(client)) => {
+println!("got client");
+                    inner.devtool_client = Some(client);
+                    inner.devtool_buffer = Some(vec![
+                        /*ConsoleLog {
+                            message: "this is a test".to_owned(),
+                            level: Level::Info,
+                            filename: "".to_owned(),
+                            column: 0,
+                            line_number: 0,
+                        }, 
+                        ConsoleLog {
+                            message: "warning oh no".to_owned(),
+                            level: Level::Warn,
+                            filename: "".to_owned(),
+                            column: 0,
+                            line_number: 0,
+                        },
+                        ConsoleLog {
+                            message: "big bad error!!".to_owned(),
+                            level: Level::Error,
+                            filename: "".to_owned(),
+                            column: 0,
+                            line_number: 0,
+                        },*/
+                    ]);
+                    done_init = true;
+                }
+                Ok(Err(())) => done_init = true,
+                Err(TryRecvError::Empty) => {},
+                Err(TryRecvError::Disconnected) => done_init = true,
+            }
+        }
+        if done_init {
+println!("cleaning up client init");
+            inner.devtool_client_init = None;
+        }
+        let mut client_error = false;
+        if let Some(ref mut client) = inner.devtool_client {
+            let updates = match client.receive_updates() {
+                Ok(updates) => updates,
+                Err(_) => {
+                    client_error = true;
+                    vec![]
+                }
+            };
+            for update in updates {
+                println!("processing {update:?}");
+                match update {
+                    DevtoolUpdate::Navigate => inner.devtool_buffer = Some(vec![]),
+                    DevtoolUpdate::ConsoleLog(log) => inner.devtool_buffer.as_mut().unwrap().push(log),
+                }
+            }
+        }
+        if client_error {
+println!("client error");
+            inner.devtool_client = None;
+            inner.devtool_buffer = None;
+        }
+    }
+
     /// Spins the internal application event loop.
     ///
     /// - Notifies Servo about incoming gamepad events
@@ -211,6 +289,8 @@ impl RunningAppState {
         if pref!(dom_gamepad_enabled) {
             self.handle_gamepad_events();
         }
+
+        self.handle_devtool_events();
 
         if !self.servo().spin_event_loop() {
             return PumpResult::Shutdown;
@@ -299,6 +379,23 @@ impl RunningAppState {
                 // https://github.com/servo/servo/issues/37408
             },
         }
+    }
+
+    pub fn toggle_devtools_for_focused_webview(&self) {
+        let mut inner = self.inner.borrow_mut();
+        if let Some(_client) = inner.devtool_client.take() {
+            inner.devtool_buffer = None;
+            return;
+        }
+        if let Some(_client_init) = inner.devtool_client_init.take() {
+            return;
+        }
+        let Some(port) = self.servoshell_preferences.devtools_port else {
+println!("no port");
+            return;
+        };
+        let client_init = devtools::connect(port);
+        inner.devtool_client_init = Some(client_init);
     }
 
     pub fn focused_webview(&self) -> Option<WebView> {
@@ -543,6 +640,10 @@ impl RunningAppState {
                 .pending_webdriver_events
                 .insert(event_id, response_sender);
         }
+    }
+
+    pub(crate) fn devtools_contents(&self) -> Ref<'_, Option<Vec<ConsoleLog>>> {
+        Ref::map(self.inner.borrow(), |inner| &inner.devtool_buffer)
     }
 }
 

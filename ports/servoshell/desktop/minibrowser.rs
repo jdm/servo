@@ -11,7 +11,7 @@ use dpi::PhysicalSize;
 use egui::text::{CCursor, CCursorRange};
 use egui::text_edit::TextEditState;
 use egui::{
-    Button, CentralPanel, Frame, Key, Label, Modifiers, PaintCallback, TopBottomPanel, Vec2, pos2,
+    Button, CentralPanel, Color32, Frame, Key, Label, Modifiers, PaintCallback, RichText, ScrollArea, TopBottomPanel, Vec2, pos2,
 };
 use egui_glow::{CallbackFn, EguiGlow};
 use egui_winit::EventResponse;
@@ -34,6 +34,7 @@ use super::geometry::winit_position_to_euclid_point;
 use super::headed_window::Window as ServoWindow;
 use crate::desktop::headed_window::INITIAL_WINDOW_TITLE;
 use crate::desktop::window_trait::WindowPortsMethods;
+use crate::devtools::{ConsoleLog, Level};
 use crate::prefs::{EXPERIMENTAL_PREFS, ServoShellPreferences};
 
 pub struct Minibrowser {
@@ -212,6 +213,20 @@ impl Minibrowser {
         egui::Button::new(text)
             .frame(false)
             .min_size(Vec2 { x: 20.0, y: 20.0 })
+    }
+
+    fn console_entry(
+        ui: &mut egui::Ui,
+        log: &ConsoleLog,
+    ) {
+        ui.horizontal_wrapped(|ui| {
+            let color = match log.level {
+                Level::Info => Color32::WHITE,
+                Level::Warn => Color32::ORANGE,
+                Level::Error => Color32::RED,
+            };
+            ui.label(RichText::new(&log.message).monospace().color(color));
+        });
     }
 
     /// Draws a browser tab, checking for clicks and queues appropriate `MinibrowserEvent`s.
@@ -440,6 +455,28 @@ impl Minibrowser {
                     },
                 );
             });
+
+            if let Some(buffer) = state.devtools_contents().as_deref() {
+                TopBottomPanel::bottom("console")
+                    .resizable(true)
+                    .max_height(ctx.available_rect().size().y / 4.)
+                    .show(ctx, |ui| {
+                        ScrollArea::vertical().show(ui, |ui| {
+                            ui.allocate_ui_with_layout(
+                                ui.available_size(),
+                                egui::Layout::left_to_right(egui::Align::Center),
+                                |ui| {
+                                    ui.take_available_space();
+                                    ui.vertical(|ui| {
+                                        for entry in buffer {
+                                            Self::console_entry(ui, entry);
+                                        }
+                                    });
+                                },
+                            );
+                        });
+                    });
+            }
 
             // The toolbar height is where the Context’s available rect starts.
             // For reasons that are unclear, the TopBottomPanel’s ui cursor exceeds this by one egui

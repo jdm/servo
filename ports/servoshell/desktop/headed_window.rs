@@ -411,6 +411,10 @@ impl Window {
                 );
             })
             .shortcut(CMD_OR_CONTROL, 'Q', || state.servo().start_shutting_down())
+            .shortcut(Modifiers::empty(), Key::Named(NamedKey::F12), || {
+                println!("toggling");
+                state.toggle_devtools_for_focused_webview();
+            })
             .otherwise(|| handled = false);
         handled
     }
