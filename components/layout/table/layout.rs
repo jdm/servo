@@ -161,40 +161,6 @@ impl CollapsedBorder {
     }
 }
 
-/// <https://drafts.csswg.org/css-tables/#border-specificity>
-/// > Given two borders styles, the border style having the most specificity is the border style which…
-/// > 1. … has the value "hidden" as border-style, if only one does
-/// > 2. … has the biggest border-width, once converted into css pixels
-/// > 3. … has the border-style which comes first in the following list:
-/// >    double, solid, dashed, dotted, ridge, outset, groove, inset, none
-impl PartialOrd for CollapsedBorder {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        let is_hidden = |border: &Self| border.style_color.style == BorderStyle::Hidden;
-        let style_specificity = |border: &Self| match border.style_color.style {
-            BorderStyle::None => 0,
-            BorderStyle::Inset => 1,
-            BorderStyle::Groove => 2,
-            BorderStyle::Outset => 3,
-            BorderStyle::Ridge => 4,
-            BorderStyle::Dotted => 5,
-            BorderStyle::Dashed => 6,
-            BorderStyle::Solid => 7,
-            BorderStyle::Double => 8,
-            BorderStyle::Hidden => 9,
-        };
-        let candidate = (is_hidden(self).cmp(&is_hidden(other)))
-            .then_with(|| self.width.cmp(&other.width))
-            .then_with(|| style_specificity(self).cmp(&style_specificity(other)));
-        if !candidate.is_eq() || self.style_color.color == other.style_color.color {
-            Some(candidate)
-        } else {
-            None
-        }
-    }
-}
-
-impl Eq for CollapsedBorder {}
-
 type CollapsedBorders = LogicalVec2<Vec<CollapsedBorderLine>>;
 
 /// A helper struct that performs the layout of the box tree version
