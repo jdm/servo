@@ -875,8 +875,10 @@ impl Fragment {
         // TODO: This caret/text selection implementation currently does not account for vertical text
         // and RTL text properly.
         if let Some(range) = fragment.selection_range {
+            println!("found a selection range!");
             let baseline_origin = rect.origin;
             if !range.is_empty() {
+                println!("nonempty selection range");
                 let start = glyphs_advance_by_index(
                     &fragment.glyphs,
                     range.begin(),
@@ -902,14 +904,19 @@ impl Fragment {
                     .clone_background_color()
                     .as_absolute()
                 {
+                    println!("selection rect: {:?} {:?}", selection_rect, selection_color);
                     let selection_common = builder.common_properties(selection_rect, &parent_style);
                     builder.wr().push_rect(
                         &selection_common,
                         selection_rect,
                         rgba(*selection_color),
                     );
+                } else {
+                    println!("no selected style");
                 }
             } else {
+                println!("empty selection range");
+
                 let insertion_point = glyphs_advance_by_index(
                     &fragment.glyphs,
                     range.begin(),

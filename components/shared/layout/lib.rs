@@ -587,6 +587,14 @@ pub struct ReflowRequest {
     pub theme: Theme,
     /// The node highlighted by the devtools, if any
     pub highlighted_dom_node: Option<OpaqueNode>,
+    ///
+    pub selection: Option<Selection>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Selection {
+    pub start: (OpaqueNode, u32),
+    pub end: (OpaqueNode, u32),
 }
 
 impl ReflowRequest {

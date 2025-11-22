@@ -12,7 +12,7 @@ use fonts::FontContext;
 use layout_api::wrapper_traits::ThreadSafeLayoutNode;
 use layout_api::{
     AnimatingImages, IFrameSizes, LayoutImageDestination, PendingImage, PendingImageState,
-    PendingRasterizationImage,
+    PendingRasterizationImage, Selection,
 };
 use net_traits::image_cache::{
     Image as CachedImage, ImageCache, ImageCacheResult, ImageOrMetadataAvailable, PendingImageId,
@@ -47,6 +47,8 @@ pub(crate) struct LayoutContext<'a> {
 
     /// The [`PainterId`] that identifies which `RenderingContext` that this layout targets.
     pub painter_id: PainterId,
+
+    pub selection: Option<Selection>,
 }
 
 pub enum ResolvedImage<'a> {

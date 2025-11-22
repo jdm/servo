@@ -72,6 +72,8 @@ pub trait LayoutNode<'dom>: Copy + Debug + TNode + Send + Sync {
 
     /// Returns whether the node is connected.
     fn is_connected(&self) -> bool;
+
+    fn is_selected(&self) -> bool;
 }
 
 pub struct ReverseChildrenIterator<ConcreteNode> {

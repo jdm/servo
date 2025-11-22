@@ -1023,6 +1023,7 @@ impl LayoutThread {
             use_rayon: rayon_pool.is_some(),
             image_resolver: image_resolver.clone(),
             painter_id: self.webview_id.into(),
+            selection: reflow_request.selection.clone(),
         };
 
         let restyle = reflow_request

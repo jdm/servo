@@ -326,6 +326,12 @@ impl InlineFormattingContextBuilder {
     }
 
     pub(crate) fn push_text<'dom>(&mut self, text: Cow<'dom, str>, info: &NodeAndStyleInfo<'dom>) {
+        use layout_api::wrapper_traits::{LayoutNode, ThreadSafeLayoutNode};
+        println!(
+            "pushing \"{text}\" with {:?} from {:?}",
+            info.get_selection_range(),
+            info.node.unsafe_get().type_id()
+        );
         let white_space_collapse = info.style.clone_white_space_collapse();
         let collapsed = WhitespaceCollapse::new(
             text.chars(),
@@ -376,6 +382,9 @@ impl InlineFormattingContextBuilder {
         }
 
         let selection_range = info.get_selection_range();
+        if selection_range.is_some() {
+            println!("\"{new_text}\" is selected with {selection_range:?}");
+        }
         if let Some(last_character) = new_text.chars().next_back() {
             self.on_word_boundary = last_character.is_whitespace();
             self.last_inline_box_ended_with_collapsible_white_space =
@@ -388,8 +397,11 @@ impl InlineFormattingContextBuilder {
 
         if let Some(inline_item) = self.inline_items.last() {
             if let InlineItem::TextRun(text_run) = &mut *inline_item.borrow_mut() {
+                println!("appending to existing text run");
                 text_run.borrow_mut().text_range.end = new_range.end;
                 return;
+            } else {
+                println!("adding a new text run inline item");
             }
         }
 

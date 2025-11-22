@@ -9,7 +9,7 @@ use html5ever::LocalName;
 use layout_api::wrapper_traits::{
     PseudoElementChain, ThreadSafeLayoutElement, ThreadSafeLayoutNode,
 };
-use layout_api::{LayoutDamage, LayoutElementType, LayoutNodeType};
+use layout_api::{LayoutDamage, LayoutElementType, LayoutNodeType, Selection};
 use range::Range;
 use script::layout_dom::ServoThreadSafeLayoutNode;
 use selectors::Element as SelectorsElement;
@@ -34,6 +34,7 @@ pub(crate) struct NodeAndStyleInfo<'dom> {
     pub node: ServoThreadSafeLayoutNode<'dom>,
     pub style: ServoArc<ComputedValues>,
     pub damage: LayoutDamage,
+    pub selection: Option<Selection>,
 }
 
 impl<'dom> NodeAndStyleInfo<'dom> {
@@ -41,11 +42,13 @@ impl<'dom> NodeAndStyleInfo<'dom> {
         node: ServoThreadSafeLayoutNode<'dom>,
         style: ServoArc<ComputedValues>,
         damage: LayoutDamage,
+        selection: Option<Selection>,
     ) -> Self {
         Self {
             node,
             style,
             damage,
+            selection,
         }
     }
 
@@ -64,11 +67,27 @@ impl<'dom> NodeAndStyleInfo<'dom> {
             node: element.as_node(),
             style,
             damage: self.damage,
+            selection: self.selection.clone(),
         })
     }
 
     pub(crate) fn get_selection_range(&self) -> Option<Range<ByteIndex>> {
-        self.node.selection()
+        self.node.selection().map(|range| {
+            let node = self.node.opaque();
+            let Some(ref selection) = self.selection else {
+                return range;
+            };
+            if node == selection.start.0 {
+                Range::new(
+                    ByteIndex(selection.start.1 as _),
+                    ByteIndex(range.length().0 - selection.start.1 as isize),
+                )
+            } else if node == selection.end.0 {
+                Range::new(range.begin(), ByteIndex(selection.end.1 as _))
+            } else {
+                range
+            }
+        })
     }
 }
 
@@ -146,6 +165,7 @@ fn traverse_children_of<'dom>(
                     child,
                     child.style(&context.style_context),
                     child.take_restyle_damage(),
+                    context.selection.clone(),
                 );
                 handler.handle_text(&info, child.node_text_content());
             } else if child.is_element() {
@@ -168,7 +188,7 @@ fn traverse_element<'dom>(
     }
 
     let style = element.style(&context.style_context);
-    let info = NodeAndStyleInfo::new(element, style, damage);
+    let info = NodeAndStyleInfo::new(element, style, damage, context.selection.clone());
 
     match Display::from(info.style.get_box().display) {
         Display::None => element.unset_all_boxes(),

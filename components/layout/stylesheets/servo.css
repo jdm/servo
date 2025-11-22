@@ -66,6 +66,11 @@ textarea::selection {
   color: black;
 }
 
+::selection {
+  background: rgba(176, 214, 255, 1.0);
+  color: black;
+}
+
 button,
 input[type="button"],
 input[type="submit"],

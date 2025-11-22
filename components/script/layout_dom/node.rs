@@ -204,6 +204,10 @@ impl<'dom> LayoutNode<'dom> for ServoLayoutNode<'dom> {
         unsafe { self.node.get_flag(NodeFlags::IS_CONNECTED) }
     }
 
+    fn is_selected(&self) -> bool {
+        unsafe { self.node.get_flag(NodeFlags::IS_SELECTED) }
+    }
+
     fn style_data(&self) -> Option<&'dom StyleData> {
         self.get_jsmanaged().style_data()
     }

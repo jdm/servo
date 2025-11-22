@@ -59,8 +59,8 @@ use layout_api::{
     BoxAreaType, ElementsFromPointFlags, ElementsFromPointResult, FragmentType, Layout,
     LayoutImageDestination, PendingImage, PendingImageState, PendingRasterizationImage,
     PhysicalSides, QueryMsg, ReflowGoal, ReflowPhasesRun, ReflowRequest, ReflowRequestRestyle,
-    RestyleReason, ScrollContainerQueryFlags, ScrollContainerResponse, TrustedNodeAddress,
-    combine_id_with_fragment_type,
+    RestyleReason, ScrollContainerQueryFlags, ScrollContainerResponse,
+    Selection as LayoutSelection, TrustedNodeAddress, combine_id_with_fragment_type,
 };
 use malloc_size_of::MallocSizeOf;
 use media::WindowGLContext;
@@ -113,6 +113,7 @@ use crate::dom::bindings::codegen::Bindings::ImageBitmapBinding::{
 use crate::dom::bindings::codegen::Bindings::MediaQueryListBinding::MediaQueryList_Binding::MediaQueryListMethods;
 use crate::dom::bindings::codegen::Bindings::ReportingObserverBinding::Report;
 use crate::dom::bindings::codegen::Bindings::RequestBinding::{RequestInfo, RequestInit};
+use crate::dom::bindings::codegen::Bindings::SelectionBinding::SelectionMethods;
 use crate::dom::bindings::codegen::Bindings::VoidFunctionBinding::VoidFunction;
 use crate::dom::bindings::codegen::Bindings::WindowBinding::{
     self, DeferredRequestInit, FrameRequestCallback, ScrollBehavior, WindowMethods,
@@ -2451,6 +2452,15 @@ impl Window {
             None
         };
 
+        let selection = document.GetSelection(CanGc::note()).and_then(|selection| {
+            let anchor = selection.GetAnchorNode()?;
+            let focus = selection.GetFocusNode()?;
+            Some(LayoutSelection {
+                start: (anchor.to_opaque(), selection.AnchorOffset()),
+                end: (focus.to_opaque(), selection.FocusOffset()),
+            })
+        });
+
         let reflow = ReflowRequest {
             document: document.upcast::<Node>().to_trusted_node_address(),
             epoch: document.current_rendering_epoch(),
@@ -2464,6 +2474,7 @@ impl Window {
             animating_images: document.image_animation_manager().animating_images(),
             theme: self.theme.get(),
             highlighted_dom_node: document.highlighted_dom_node().map(|node| node.to_opaque()),
+            selection,
         };
 
         let Some(reflow_result) = self.layout.borrow_mut().reflow(reflow) else {

@@ -241,6 +241,9 @@ bitflags! {
         /// Whether this node resides in UA shadow DOM. Element within UA Shadow DOM
         /// will have a different style computation behavior
         const IS_IN_UA_WIDGET = 1 << 12;
+
+        ///
+        const IS_SELECTED = 1 << 13;
     }
 }
 
@@ -733,6 +736,18 @@ impl Node {
 
     pub(crate) fn is_in_ua_widget(&self) -> bool {
         self.flags.get().contains(NodeFlags::IS_IN_UA_WIDGET)
+    }
+
+    pub(crate) fn set_selected(&self, selected: bool) {
+        for child in self.children() {
+            child.set_selected(selected);
+        }
+        println!(
+            "setting selected for {self:p} ({:?}) to {selected}",
+            self.type_id()
+        );
+        self.dirty(NodeDamage::Other);
+        self.set_flag(NodeFlags::IS_SELECTED, selected)
     }
 
     /// Returns the type ID of this node.
@@ -1972,6 +1987,12 @@ impl<'dom> LayoutNodeHelpers<'dom> for LayoutDom<'dom, Node> {
 
         if let Some(input) = self.downcast::<HTMLInputElement>() {
             return input.selection_for_layout();
+        }
+
+        #[allow(unsafe_code)]
+        if unsafe { self.get_flag(NodeFlags::IS_SELECTED) } {
+            println!("getting selection range");
+            return Some(0..self.unsafe_get().len() as usize);
         }
 
         None

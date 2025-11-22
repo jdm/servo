@@ -584,6 +584,7 @@ impl LineItemLayout<'_, '_> {
             },
         };
 
+        println!("new text fragment has {} glyph runs", text_item.text.len());
         self.current_state.inline_advance += inline_advance;
         self.current_state.fragments.push((
             Fragment::Text(ArcRefCell::new(TextFragment {

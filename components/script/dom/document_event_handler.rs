@@ -27,6 +27,7 @@ use script_bindings::codegen::GenericBindings::EventBinding::EventMethods;
 use script_bindings::codegen::GenericBindings::NavigatorBinding::NavigatorMethods;
 use script_bindings::codegen::GenericBindings::NodeBinding::NodeMethods;
 use script_bindings::codegen::GenericBindings::PerformanceBinding::PerformanceMethods;
+use script_bindings::codegen::GenericBindings::SelectionBinding::SelectionMethods;
 use script_bindings::codegen::GenericBindings::TouchBinding::TouchMethods;
 use script_bindings::codegen::GenericBindings::WindowBinding::{ScrollBehavior, WindowMethods};
 use script_bindings::inheritance::Castable;
@@ -97,6 +98,8 @@ pub(crate) struct DocumentEventHandler {
     /// The active keyboard modifiers for the WebView. This is updated when receiving any input event.
     #[no_trace]
     active_keyboard_modifiers: Cell<Modifiers>,
+
+    selection_active: Cell<bool>,
 }
 
 impl DocumentEventHandler {
@@ -113,6 +116,7 @@ impl DocumentEventHandler {
             current_cursor: Default::default(),
             active_touch_points: Default::default(),
             active_keyboard_modifiers: Default::default(),
+            selection_active: Default::default(),
         }
     }
 
@@ -370,6 +374,18 @@ impl DocumentEventHandler {
         // Update the cursor when the mouse moves, if it has changed.
         self.set_cursor(Some(hit_test_result.cursor));
 
+        if self.selection_active.get() {
+            println!("selection active");
+            if let Some(selection) = self.window.GetSelection() {
+                println!("extending");
+                if let Err(e) =
+                    selection.Extend(&hit_test_result.node, hit_test_result.node.len(), can_gc)
+                {
+                    println!("{e:?}");
+                }
+            }
+        }
+
         let Some(new_target) = hit_test_result
             .node
             .inclusive_ancestors(ShadowIncluding::No)
@@ -569,6 +585,24 @@ impl DocumentEventHandler {
             event.action, hit_test_result.point_in_frame
         );
 
+        if event.button == MouseButton::Left {
+            self.selection_active
+                .set(event.action == embedder_traits::MouseButtonAction::Down);
+            if event.action == embedder_traits::MouseButtonAction::Down {
+                if let Some(selection) = self.window.GetSelection() {
+                    if let Err(e) = selection.SetBaseAndExtent(
+                        &hit_test_result.node,
+                        0,
+                        &hit_test_result.node,
+                        hit_test_result.node.len(),
+                        CanGc::note(),
+                    ) {
+                        println!("{e:?}");
+                    }
+                }
+            }
+        }
+
         let Some(element) = hit_test_result
             .node
             .inclusive_ancestors(ShadowIncluding::Yes)
@@ -689,6 +723,10 @@ impl DocumentEventHandler {
         let maximum_click_distance = 10.0 * self.window.device_pixel_ratio().get();
         if distance > maximum_click_distance {
             return;
+        }
+
+        if let Some(selection) = self.window.GetSelection() {
+            selection.Empty();
         }
 
         // From <https://w3c.github.io/uievents/#event-type-click>

@@ -280,11 +280,31 @@ impl Range {
     pub(crate) fn associate_selection(&self, selection: &Selection) {
         let mut selections = self.associated_selections.borrow_mut();
         if !selections.iter().any(|s| &**s == selection) {
+            self.update_selected_state(true);
             selections.push(Dom::from_ref(selection));
         }
     }
 
+    fn update_selected_state(&self, selected: bool) {
+        if let Ok(contained) = self.contained_children() {
+            println!("updating selected state");
+            if let Some(first) = contained.first_partially_contained_child {
+                println!("partially contained start");
+                first.set_selected(selected);
+            }
+            if let Some(last) = contained.last_partially_contained_child {
+                println!("partially contained end");
+                last.set_selected(selected);
+            }
+            for node in &contained.contained_children {
+                println!("fully contained child");
+                node.set_selected(selected);
+            }
+        }
+    }
+
     pub(crate) fn disassociate_selection(&self, selection: &Selection) {
+        self.update_selected_state(false);
         self.associated_selections
             .borrow_mut()
             .retain(|s| &**s != selection);

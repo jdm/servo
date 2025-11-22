@@ -165,6 +165,7 @@ fn construct_for_root_element(
         root_element,
         root_element.style(&context.style_context),
         root_element.take_restyle_damage(),
+        context.selection.clone(),
     );
     let box_style = info.style.get_box();
 
@@ -412,8 +413,12 @@ impl<'dom> IncrementalBoxTreeUpdate<'dom> {
         let node = self.node.to_threadsafe();
         let contents = Contents::for_element(node, context);
 
-        let info =
-            NodeAndStyleInfo::new(node, self.primary_style.clone(), node.take_restyle_damage());
+        let info = NodeAndStyleInfo::new(
+            node,
+            self.primary_style.clone(),
+            node.take_restyle_damage(),
+            context.selection.clone(),
+        );
 
         let out_of_flow_absolutely_positioned_box = ArcRefCell::new(
             AbsolutelyPositionedBox::construct(context, &info, self.display_inside, contents),

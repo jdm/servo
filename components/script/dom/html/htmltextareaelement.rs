@@ -35,6 +35,7 @@ use crate::dom::html::htmlfieldsetelement::HTMLFieldSetElement;
 use crate::dom::html::htmlformelement::{FormControl, HTMLFormElement};
 use crate::dom::html::htmlinputelement::HTMLInputElement;
 use crate::dom::keyboardevent::KeyboardEvent;
+use crate::dom::mouseevent::MouseEvent;
 use crate::dom::node::{
     BindContext, ChildrenMutation, CloneChildrenFlag, Node, NodeDamage, NodeTraits, UnbindContext,
 };
@@ -658,6 +659,36 @@ impl VirtualMethods for HTMLTextAreaElement {
         }
 
         if event.type_() == atom!("click") && !event.DefaultPrevented() {
+            if let Some(mouse_event) = event.downcast::<MouseEvent>() {
+                if let Some(point_in_target) = mouse_event.point_in_target() {
+                    let window = self.owner_window();
+                    //let query_node = mouse_event.upcast::<Event>().GetTarget().unwrap_or_else(|| DomRoot::from_ref(self.upcast::<EventTarget>()));
+                    println!(
+                        "performing text index query with {:?}, target {:?}",
+                        self.upcast::<crate::dom::eventtarget::EventTarget>()
+                            .type_id(),
+                        event
+                            .GetTarget()
+                            .unwrap()
+                            .upcast::<crate::dom::eventtarget::EventTarget>()
+                            .type_id()
+                    );
+                    let index = window
+                        .text_index_query(self.upcast::<Node>(), point_in_target.to_untyped());
+                    // Position the caret at the click position or at the end of the current
+                    // value.
+                    let edit_point_index = match index {
+                        Some(i) => i,
+                        None => self.textinput.borrow().char_count(),
+                    };
+                    self.textinput
+                        .borrow_mut()
+                        .set_edit_point_index(edit_point_index);
+                    // trigger redraw
+                    self.upcast::<Node>().dirty(NodeDamage::Other);
+                    event.PreventDefault();
+                }
+            }
             // TODO: set the editing position for text inputs
         } else if event.type_() == atom!("keydown") && !event.DefaultPrevented() {
             if let Some(kevent) = event.downcast::<KeyboardEvent>() {

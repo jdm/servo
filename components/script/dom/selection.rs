@@ -62,6 +62,7 @@ impl Selection {
         // and no task to queue.
         if let Some(existing) = self.range.get() {
             if &*existing == range {
+                println!("identical range; ignoring");
                 return;
             }
         }
@@ -302,6 +303,7 @@ impl SelectionMethods<crate::DomTypeHolder> for Selection {
     // method to call as the continue-selection action
     fn Extend(&self, node: &Node, offset: u32, can_gc: CanGc) -> ErrorResult {
         if !self.is_same_root(node) {
+            println!("not same root with node");
             // Step 1
             return Ok(());
         }
