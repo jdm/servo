@@ -652,7 +652,8 @@ impl IntersectionObserver {
     }
 
     /// <https://w3c.github.io/IntersectionObserver/#calculate-visibility-algo>
-    pub(crate) fn calculate_visibility(&self, document: &Document, target: &Element) -> bool {
+    #[allow(unsafe_code)]
+    fn calculate_visibility(&self, document: &Document, target: &Element) -> bool {
         // Step 1
         // > If the observer’s trackVisibility attribute is false, return false.
         if !self.track_visibility.get() {
@@ -665,6 +666,7 @@ impl IntersectionObserver {
             self.calculate_effective_transformation_matrix(document, target);
 
         if !effective_transformation_matrix.is_2d() {
+            println!("not a 2d transformation matrix");
             // TODO proportional 2d upscaling?
             return false;
         }
@@ -687,7 +689,34 @@ impl IntersectionObserver {
 
         // Step 5
         // > If the implementation cannot guarantee that the target is completely unoccluded by other page content, return false.
-        // TODO Not sure how to do this bit
+        let target_rect = target.upcast::<Node>().client_rect();
+        let results = target
+            .owner_window()
+            .elements_from_point_query(target_rect.center().cast_unit().try_cast().unwrap_or_default());
+        let mut skip = true;
+        for result in results.iter().rev() {
+            let untrusted_node = embedder_traits::UntrustedNodeAddress(result.node.0 as *const std::os::raw::c_void);
+            let node = unsafe { crate::dom::node::from_untrusted_node_address(untrusted_node) };
+            if node.is::<crate::dom::html::htmliframeelement::HTMLIFrameElement>() {
+                println!("skipping iframe");
+                continue;
+            }
+            let element_rect = node.client_rect();
+            println!("{:?} {:?} vs {:?}", node.type_id(), element_rect, target_rect);
+            
+            if &*node == target.upcast::<Node>() {
+                println!("skipping check against same node");
+                skip = false;
+                continue;
+            }
+            if skip {
+                continue;
+            }
+
+            if element_rect.contains_rect(&target_rect) {
+                return false;
+            }
+        }
 
         // Step 6
         // > Return true.
@@ -741,20 +770,25 @@ impl IntersectionObserver {
 
             // Step 3.3 TODO not sure how to go about this bit
             // > If container is the root element of a nested browsing context, update container to be the browsing context container of container. Otherwise, update container to be the containing block of container.
-            if container.is_root() {
-                let Some(parent) = container.owner_window().GetParent() else {
+            let container_window = container.owner_window();
+            if container.is_root() && !container_window.is_top_level() {
+                println!("root element found");
+                let Some(parent) = container_window.undiscarded_window_proxy() else {
                     // Either a top-level browsing context or not part of
                     // a browsing context hierarchy.
+                    println!("no parent, early exit");
                     break;
                 };
                 let Some(frame_container) = parent.frame_element() else {
                     // Cross-origin; not sure how to proceed.
+                    println!("cross origin iframe");
                     break;
                 };
                 container = DomRoot::from_ref(frame_container);
             } else {
                 let Some(containing_block) = containing_block else {
                     // No containing block? Can't continue.
+                    println!("no containing block, early exit");
                     break;
                 };
                 container = containing_block;
@@ -774,7 +808,7 @@ impl IntersectionObserver {
         let target_style = target.style().unwrap();
         let transform = target_style.clone_transform();
         let transform_origin = target_style.clone_transform_origin();
-
+        println!("{:?} {:?}", transform, transform_origin);
         // Step 1
         // > Start with the identity matrix.
         let mut transformation_matrix: Transform3D<
