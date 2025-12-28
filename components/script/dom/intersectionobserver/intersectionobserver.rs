@@ -19,6 +19,7 @@ use servo_geometry::f32_rect_to_au_rect;
 use style::parser::Parse;
 use style::stylesheets::CssRuleType;
 use style::values::computed::Overflow;
+use style::values::computed::length::{CSSPixelLength, Length};
 use style::values::specified::intersection_observer::IntersectionObserverMargin;
 use style_traits::{CSSPixel, ParsingMode, ToCss};
 
@@ -714,28 +715,25 @@ impl IntersectionObserver {
 
         // Step 2
         // > Let container be the target.
-        #[allow(unused_mut)] // TODO remove
-        let mut container = target;
+        let mut container = DomRoot::from_ref(target);
 
         // Step 3
         // > While container is not the intersection root:
-        #[allow(clippy::never_loop)] // TODO remove
-        while if self.root.is_none() {
-            *container.owner_document() != *document
-        } else {
-            match self.root.as_ref() {
-                Some(ElementOrDocument::Element(root)) => {
-                    *root.as_traced().to_owned() != *container
-                },
-                Some(ElementOrDocument::Document(root)) => {
-                    *root.as_traced().to_owned() != *container.owner_document()
-                },
-                None => true,
-            }
-        } {
+        let intersection_root = match self.root.as_ref() {
+            None => document.upcast::<Node>(),
+            Some(ElementOrDocument::Element(root)) => root.upcast::<Node>(),
+            Some(ElementOrDocument::Document(root)) => root.upcast::<Node>(),
+        };
+        while container.upcast::<Node>() != intersection_root {
+            let containing_block = container
+                .upcast::<Node>()
+                .containing_block_node_without_reflow()
+                .and_then(DomRoot::downcast::<Element>);
+
             // Step 3.1
             // > Set t to container’s transformation matrix.
-            let t = Self::transformation_matrix_computation(container);
+            let t =
+                Self::transformation_matrix_computation(&container, containing_block.as_deref());
 
             // Step 3.2
             // > Set matrix to t post-multiplied by matrix.
@@ -743,7 +741,24 @@ impl IntersectionObserver {
 
             // Step 3.3 TODO not sure how to go about this bit
             // > If container is the root element of a nested browsing context, update container to be the browsing context container of container. Otherwise, update container to be the containing block of container.
-            break; // TODO remove when the above step is implemented
+            if container.is_root() {
+                let Some(parent) = container.owner_window().GetParent() else {
+                    // Either a top-level browsing context or not part of
+                    // a browsing context hierarchy.
+                    break;
+                };
+                let Some(frame_container) = parent.frame_element() else {
+                    // Cross-origin; not sure how to proceed.
+                    break;
+                };
+                container = DomRoot::from_ref(frame_container);
+            } else {
+                let Some(containing_block) = containing_block else {
+                    // No containing block? Can't continue.
+                    break;
+                };
+                container = containing_block;
+            }
         }
 
         // Step 4
@@ -752,11 +767,13 @@ impl IntersectionObserver {
     }
 
     /// <https://drafts.csswg.org/css-transforms-1/#transformation-matrix-computation>
-    pub(crate) fn transformation_matrix_computation(
+    fn transformation_matrix_computation(
         target: &Element,
+        containing_block: Option<&Element>,
     ) -> Transform3D<f32, style_traits::CSSPixel, style_traits::CSSPixel> {
-        let transform = target.style().unwrap().clone_transform();
-        let transform_origin = target.style().unwrap().clone_transform_origin();
+        let target_style = target.style().unwrap();
+        let transform = target_style.clone_transform();
+        let transform_origin = target_style.clone_transform_origin();
 
         // Step 1
         // > Start with the identity matrix.
@@ -766,11 +783,31 @@ impl IntersectionObserver {
             style_traits::CSSPixel,
         > = Transform3D::identity();
 
+        let containing_size = containing_block.and_then(|containing_block| {
+            containing_block
+                .upcast::<Node>()
+                .content_box()
+                .map(|content_box| {
+                    (
+                        Length::from(content_box.size.width),
+                        Length::from(content_box.size.height),
+                    )
+                })
+        });
+        let transform_horizontal = transform_origin
+            .horizontal
+            .maybe_percentage_relative_to(containing_size.map(|size| size.0))
+            .unwrap_or(CSSPixelLength::new(0.));
+        let transform_vertical = transform_origin
+            .vertical
+            .maybe_percentage_relative_to(containing_size.map(|size| size.0))
+            .unwrap_or(CSSPixelLength::new(0.));
+
         // Step 2
         // > Translate by the computed X and Y of transform-origin
         transformation_matrix = transformation_matrix.then_translate(Vector3D::from_lengths(
-            transform_origin.horizontal.to_length().unwrap().into(),
-            transform_origin.vertical.to_length().unwrap().into(),
+            transform_horizontal.into(),
+            transform_vertical.into(),
             transform_origin.depth.into(),
         ));
 
@@ -783,8 +820,8 @@ impl IntersectionObserver {
         // Step 4
         // > Translate by the negated computed X and Y values of transform-origin
         transformation_matrix = transformation_matrix.then_translate(Vector3D::from_lengths(
-            euclid::Length::new(-transform_origin.horizontal.to_length().unwrap().px()),
-            euclid::Length::new(-transform_origin.vertical.to_length().unwrap().px()),
+            euclid::Length::new(-transform_horizontal.px()),
+            euclid::Length::new(-transform_vertical.px()),
             transform_origin.depth.into(),
         ));
         transformation_matrix
