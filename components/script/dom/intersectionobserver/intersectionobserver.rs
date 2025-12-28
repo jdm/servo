@@ -668,16 +668,20 @@ impl IntersectionObserver {
             return false;
         }
 
-        // Step 3
-        // > If the target, or any element in its containing block chain, has an effective opacity other than 100%, return false.
-        if target.style().unwrap().clone_opacity() != 1.0 {
-            return false;
-        } // TODO containing block chain
-
-        // Step 4
-        // > If the target, or any element in its containing block chain, has any filters applied, return false.
-        if !target.style().unwrap().clone_filter().0.is_empty() {
-            return false;
+        let mut current = Some(DomRoot::from_ref(target));
+        while let Some(element) = current {
+            // Step 3
+            // > If the target, or any element in its containing block chain, has an effective opacity other than 100%, return false.
+            // Step 4
+            // > If the target, or any element in its containing block chain, has any filters applied, return false.
+            let element_style = element.style().unwrap();
+            if element_style.clone_opacity() != 1.0 || !element_style.clone_filter().0.is_empty() {
+                return false;
+            }
+            current = element
+                .upcast::<Node>()
+                .containing_block_node_without_reflow()
+                .and_then(DomRoot::downcast::<Element>);
         }
 
         // Step 5
