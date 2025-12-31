@@ -182,6 +182,7 @@ impl<'dom> TraversalHandler<'dom> for ModernContainerBuilder<'_, 'dom> {
         display: DisplayGeneratingBox,
         contents: Contents,
         box_slot: BoxSlot<'dom>,
+        _current_list_index: &mut u32,
     ) {
         self.wrap_any_text_in_anonymous_block_container();
 

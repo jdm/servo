@@ -14,6 +14,7 @@ use crate::replaced::ReplacedContents;
 pub(crate) fn make_marker<'dom>(
     context: &LayoutContext,
     info: &NodeAndStyleInfo<'dom>,
+    list_index: u32,
 ) -> Option<(NodeAndStyleInfo<'dom>, Vec<PseudoElementContentItem>)> {
     let marker_info =
         info.with_pseudo_element(context, style::selector_parser::PseudoElement::Marker)?;
@@ -40,7 +41,7 @@ pub(crate) fn make_marker<'dom>(
     };
     let content = marker_image().or_else(|| {
         Some(vec![PseudoElementContentItem::Text(
-            marker_string(list_style)?.into(),
+            marker_string(list_style, list_index)?.into(),
         )])
     })?;
 
@@ -48,20 +49,26 @@ pub(crate) fn make_marker<'dom>(
 }
 
 /// <https://drafts.csswg.org/css-lists/#marker-string>
-fn marker_string(style: &style_structs::List) -> Option<&'static str> {
+fn marker_string(style: &style_structs::List, index: u32) -> Option<String> {
     match style.list_style_type {
         ListStyleType::None => None,
         // TODO: Using non-breaking space here is a bit of a hack to give a bit of margin to outside
         // markers, but really we should be setting `white-space: pre` on them instead.
         // See https://github.com/w3c/csswg-drafts/issues/4891.
-        ListStyleType::Disc => Some("•\u{00a0}"),
-        ListStyleType::Circle => Some("◦\u{00a0}"),
-        ListStyleType::Square => Some("▪\u{00a0}"),
-        ListStyleType::DisclosureOpen => Some("▾\u{00a0}"),
-        ListStyleType::DisclosureClosed => Some("‣\u{00a0}"),
-        ListStyleType::Decimal |
-        ListStyleType::LowerAlpha |
-        ListStyleType::UpperAlpha |
+        ListStyleType::Disc => Some("•\u{00a0}".to_string()),
+        ListStyleType::Circle => Some("◦\u{00a0}".to_string()),
+        ListStyleType::Square => Some("▪\u{00a0}".to_string()),
+        ListStyleType::DisclosureOpen => Some("▾\u{00a0}".to_string()),
+        ListStyleType::DisclosureClosed => Some("‣\u{00a0}".to_string()),
+        ListStyleType::Decimal => Some(format!("{}.\u{00a0}", index.to_string())),
+        ListStyleType::LowerAlpha => Some(format!(
+            "{}.\u{00a0}",
+            char::from(b"a"[0] + (index % 26) as u8)
+        )),
+        ListStyleType::UpperAlpha => Some(format!(
+            "{}.\u{00a0}",
+            char::from(b"A"[0] + (index % 26) as u8)
+        )),
         ListStyleType::ArabicIndic |
         ListStyleType::Bengali |
         ListStyleType::Cambodian |

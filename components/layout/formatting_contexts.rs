@@ -102,7 +102,7 @@ impl IndependentFormattingContext {
                             &widget_info,
                             NonReplacedContents::OfElement,
                             propagated_data,
-                            false, /* is_list_item */
+                            None, /* list_index */
                         )
                     });
                 return Self {
@@ -117,13 +117,13 @@ impl IndependentFormattingContext {
             Contents::NonReplaced(non_replaced_contents) => non_replaced_contents,
         };
         let contents = match display_inside {
-            DisplayInside::Flow { is_list_item } | DisplayInside::FlowRoot { is_list_item } => {
+            DisplayInside::Flow { list_index } | DisplayInside::FlowRoot { list_index } => {
                 IndependentFormattingContextContents::Flow(BlockFormattingContext::construct(
                     context,
                     node_and_style_info,
                     non_replaced_contents,
                     propagated_data,
-                    is_list_item,
+                    list_index,
                 ))
             },
             DisplayInside::Grid => {

@@ -38,7 +38,7 @@ impl TaffyContainer {
         propagated_data: PropagatedBoxTreeData,
     ) -> Self {
         let mut builder = ModernContainerBuilder::new(context, info, propagated_data);
-        contents.traverse(context, info, &mut builder);
+        contents.traverse(context, info, &mut builder, &mut 0);
         let items = builder.finish();
 
         let children = items

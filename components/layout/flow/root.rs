@@ -168,7 +168,7 @@ fn construct_for_root_element(
     );
     let box_style = info.style.get_box();
 
-    let display_inside = match Display::from(box_style.display) {
+    let display_inside = match Display::from((box_style.display, 0)) {
         Display::None => {
             root_element.unset_all_boxes();
             return Vec::new();
@@ -338,7 +338,7 @@ impl<'dom> IncrementalBoxTreeUpdate<'dom> {
             return None;
         }
 
-        let display_inside = match Display::from(box_style.display) {
+        let display_inside = match Display::from((box_style.display, 0)) {
             Display::GeneratingBox(DisplayGeneratingBox::OutsideInside { inside, .. }) => inside,
             _ => return None,
         };

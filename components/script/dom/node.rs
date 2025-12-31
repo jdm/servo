@@ -4536,6 +4536,15 @@ impl From<ElementTypeIdWrapper> for LayoutElementType {
     #[inline(always)]
     fn from(element_type: ElementTypeIdWrapper) -> LayoutElementType {
         match element_type.0 {
+            ElementTypeId::HTMLElement(HTMLElementTypeId::HTMLLIElement) => {
+                LayoutElementType::HTMLListItemElement
+            },
+            ElementTypeId::HTMLElement(HTMLElementTypeId::HTMLOListElement) => {
+                LayoutElementType::HTMLOrderedListElement
+            },
+            ElementTypeId::HTMLElement(HTMLElementTypeId::HTMLUListElement) => {
+                LayoutElementType::HTMLUnorderedListElement
+            },
             ElementTypeId::HTMLElement(HTMLElementTypeId::HTMLBodyElement) => {
                 LayoutElementType::HTMLBodyElement
             },

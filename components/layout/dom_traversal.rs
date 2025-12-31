@@ -111,6 +111,7 @@ pub(super) trait TraversalHandler<'dom> {
         display: DisplayGeneratingBox,
         contents: Contents,
         box_slot: BoxSlot<'dom>,
+        current_list_index: &mut u32,
     );
 
     /// Notify the handler that we are about to recurse into a `display: contents` element.
@@ -124,6 +125,7 @@ fn traverse_children_of<'dom>(
     parent_element_info: &NodeAndStyleInfo<'dom>,
     context: &LayoutContext,
     handler: &mut impl TraversalHandler<'dom>,
+    current_list_index: &mut u32,
 ) {
     parent_element_info
         .node
@@ -131,7 +133,13 @@ fn traverse_children_of<'dom>(
 
     let is_element = parent_element_info.pseudo_element_chain().is_empty();
     if is_element {
-        traverse_eager_pseudo_element(PseudoElement::Before, parent_element_info, context, handler);
+        traverse_eager_pseudo_element(
+            PseudoElement::Before,
+            parent_element_info,
+            context,
+            handler,
+            current_list_index,
+        );
     }
 
     // TODO(stevennovaryo): In the past we are rendering text input as a normal element,
@@ -155,13 +163,19 @@ fn traverse_children_of<'dom>(
                 );
                 handler.handle_text(&info, child.node_text_content());
             } else if child.is_element() {
-                traverse_element(child, context, handler);
+                traverse_element(child, context, handler, current_list_index);
             }
         }
     }
 
     if is_element {
-        traverse_eager_pseudo_element(PseudoElement::After, parent_element_info, context, handler);
+        traverse_eager_pseudo_element(
+            PseudoElement::After,
+            parent_element_info,
+            context,
+            handler,
+            current_list_index,
+        );
     }
 }
 
@@ -169,6 +183,7 @@ fn traverse_element<'dom>(
     element: ServoThreadSafeLayoutNode<'dom>,
     context: &LayoutContext,
     handler: &mut impl TraversalHandler<'dom>,
+    current_list_index: &mut u32,
 ) {
     let damage = element.take_restyle_damage();
     if damage.has_box_damage() {
@@ -178,7 +193,20 @@ fn traverse_element<'dom>(
     let style = element.style(&context.style_context);
     let info = NodeAndStyleInfo::new(element, style, damage);
 
-    match Display::from(info.style.get_box().display) {
+    let mut this_list_index: u32;
+    let this_list_index_ref = match element.type_id() {
+        Some(LayoutNodeType::Element(LayoutElementType::HTMLListItemElement)) => {
+            *current_list_index += 1;
+            current_list_index
+        },
+        Some(LayoutNodeType::Element(LayoutElementType::HTMLOrderedListElement)) |
+        Some(LayoutNodeType::Element(LayoutElementType::HTMLUnorderedListElement)) => {
+            this_list_index = 0;
+            &mut this_list_index
+        },
+        _ => current_list_index,
+    };
+    match Display::from((info.style.get_box().display, *this_list_index_ref)) {
         Display::None => element.unset_all_boxes(),
         Display::Contents => {
             if ReplacedContents::for_element(element, context).is_some() {
@@ -192,7 +220,7 @@ fn traverse_element<'dom>(
                     .set(LayoutBox::DisplayContents(shared_inline_styles.clone()));
 
                 handler.enter_display_contents(shared_inline_styles);
-                traverse_children_of(&info, context, handler);
+                traverse_children_of(&info, context, handler, this_list_index_ref);
                 handler.leave_display_contents();
             }
         },
@@ -200,7 +228,7 @@ fn traverse_element<'dom>(
             let contents = Contents::for_element(element, context);
             let display = display.used_value_for_contents(&contents);
             let box_slot = element.box_slot();
-            handler.handle_element(&info, display, contents, box_slot);
+            handler.handle_element(&info, display, contents, box_slot, this_list_index_ref);
         },
     }
 }
@@ -210,6 +238,7 @@ fn traverse_eager_pseudo_element<'dom>(
     node_info: &NodeAndStyleInfo<'dom>,
     context: &LayoutContext,
     handler: &mut impl TraversalHandler<'dom>,
+    current_list_index: &mut u32,
 ) {
     assert!(pseudo_element_type.is_eager());
 
@@ -223,7 +252,10 @@ fn traverse_eager_pseudo_element<'dom>(
         return;
     }
 
-    match Display::from(pseudo_element_info.style.get_box().display) {
+    match Display::from((
+        pseudo_element_info.style.get_box().display,
+        *current_list_index,
+    )) {
         Display::None => {},
         Display::Contents => {
             let items = generate_pseudo_element_content(&pseudo_element_info, context);
@@ -232,14 +264,26 @@ fn traverse_eager_pseudo_element<'dom>(
             box_slot.set(LayoutBox::DisplayContents(shared_inline_styles.clone()));
 
             handler.enter_display_contents(shared_inline_styles);
-            traverse_pseudo_element_contents(&pseudo_element_info, context, handler, items);
+            traverse_pseudo_element_contents(
+                &pseudo_element_info,
+                context,
+                handler,
+                items,
+                current_list_index,
+            );
             handler.leave_display_contents();
         },
         Display::GeneratingBox(display) => {
             let items = generate_pseudo_element_content(&pseudo_element_info, context);
             let box_slot = pseudo_element_info.node.box_slot();
             let contents = Contents::for_pseudo_element(items);
-            handler.handle_element(&pseudo_element_info, display, contents, box_slot);
+            handler.handle_element(
+                &pseudo_element_info,
+                display,
+                contents,
+                box_slot,
+                current_list_index,
+            );
         },
     }
 }
@@ -249,6 +293,7 @@ fn traverse_pseudo_element_contents<'dom>(
     context: &LayoutContext,
     handler: &mut impl TraversalHandler<'dom>,
     items: Vec<PseudoElementContentItem>,
+    current_list_index: &mut u32,
 ) {
     let mut anonymous_info = None;
     for item in items {
@@ -261,13 +306,11 @@ fn traverse_pseudo_element_contents<'dom>(
                 });
                 let display_inline = DisplayGeneratingBox::OutsideInside {
                     outside: DisplayOutside::Inline,
-                    inside: DisplayInside::Flow {
-                        is_list_item: false,
-                    },
+                    inside: DisplayInside::Flow { list_index: None },
                 };
                 // `display` is not inherited, so we get the initial value
                 debug_assert!(
-                    Display::from(anonymous_info.style.get_box().display) ==
+                    Display::from((anonymous_info.style.get_box().display, *current_list_index)) ==
                         Display::GeneratingBox(display_inline)
                 );
                 handler.handle_element(
@@ -275,6 +318,7 @@ fn traverse_pseudo_element_contents<'dom>(
                     display_inline,
                     Contents::Replaced(contents),
                     anonymous_info.node.box_slot(),
+                    current_list_index,
                 )
             },
         }
@@ -327,11 +371,14 @@ impl NonReplacedContents {
         context: &LayoutContext,
         info: &NodeAndStyleInfo<'dom>,
         handler: &mut impl TraversalHandler<'dom>,
+        current_list_index: &mut u32,
     ) {
         match self {
-            NonReplacedContents::OfElement => traverse_children_of(info, context, handler),
+            NonReplacedContents::OfElement => {
+                traverse_children_of(info, context, handler, current_list_index)
+            },
             NonReplacedContents::OfPseudoElement(items) => {
-                traverse_pseudo_element_contents(info, context, handler, items)
+                traverse_pseudo_element_contents(info, context, handler, items, current_list_index)
             },
         }
     }

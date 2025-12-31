@@ -80,7 +80,7 @@ impl Table {
         propagated_data: PropagatedBoxTreeData,
     ) -> Self {
         let mut traversal = TableBuilderTraversal::new(context, info, grid_style, propagated_data);
-        contents.traverse(context, info, &mut traversal);
+        contents.traverse(context, info, &mut traversal, &mut 0);
         traversal.finish()
     }
 
@@ -105,7 +105,7 @@ impl Table {
                     contents,
                     box_slot,
                 } => {
-                    table_builder.handle_element(&info, display, contents, box_slot);
+                    table_builder.handle_element(&info, display, contents, box_slot, &mut 0);
                 },
                 AnonymousTableContent::Text(..) => {
                     // This only happens if there was whitespace between our internal table elements.
@@ -701,7 +701,7 @@ impl<'style, 'dom> TableBuilderTraversal<'style, 'dom> {
                     contents,
                     box_slot,
                 } => {
-                    row_builder.handle_element(&info, display, contents, box_slot);
+                    row_builder.handle_element(&info, display, contents, box_slot, &mut 0);
                 },
                 AnonymousTableContent::Text(info, text) => {
                     row_builder.handle_text(&info, text);
@@ -750,6 +750,7 @@ impl<'dom> TraversalHandler<'dom> for TableBuilderTraversal<'_, 'dom> {
         display: DisplayGeneratingBox,
         contents: Contents,
         box_slot: BoxSlot<'dom>,
+        current_list_index: &mut u32,
     ) {
         match display {
             DisplayGeneratingBox::LayoutInternal(internal) => match internal {
@@ -774,7 +775,7 @@ impl<'dom> TraversalHandler<'dom> for TableBuilderTraversal<'_, 'dom> {
                     contents
                         .non_replaced_contents()
                         .expect("Replaced should not have a LayoutInternal display type.")
-                        .traverse(self.context, info, self);
+                        .traverse(self.context, info, self, current_list_index);
                     self.finish_anonymous_row_if_needed();
 
                     self.current_row_group_index = None;
@@ -794,7 +795,7 @@ impl<'dom> TraversalHandler<'dom> for TableBuilderTraversal<'_, 'dom> {
                     contents
                         .non_replaced_contents()
                         .expect("Replaced should not have a LayoutInternal display type.")
-                        .traverse(context, info, &mut row_builder);
+                        .traverse(context, info, &mut row_builder, current_list_index);
                     row_builder.finish();
 
                     let row = ArcRefCell::new(TableTrack {
@@ -831,7 +832,12 @@ impl<'dom> TraversalHandler<'dom> for TableBuilderTraversal<'_, 'dom> {
                     contents
                         .non_replaced_contents()
                         .expect("Replaced should not have a LayoutInternal display type.")
-                        .traverse(self.context, info, &mut column_group_builder);
+                        .traverse(
+                            self.context,
+                            info,
+                            &mut column_group_builder,
+                            current_list_index,
+                        );
 
                     let first_column = self.builder.table.columns.len();
                     if column_group_builder.columns.is_empty() {
@@ -877,7 +883,7 @@ impl<'dom> TraversalHandler<'dom> for TableBuilderTraversal<'_, 'dom> {
                                 info,
                                 non_replaced_contents,
                                 self.current_propagated_data,
-                                false, /* is_list_item */
+                                None, /* list_index */
                             ),
                         );
                         let base = LayoutBoxBase::new(info.into(), info.style.clone());
@@ -969,7 +975,7 @@ impl<'style, 'builder, 'dom, 'a> TableRowBuilder<'style, 'builder, 'dom, 'a> {
                     contents,
                     box_slot,
                 } => {
-                    builder.handle_element(&info, display, contents, box_slot);
+                    builder.handle_element(&info, display, contents, box_slot, &mut 0);
                 },
                 AnonymousTableContent::Text(info, text) => {
                     builder.handle_text(&info, text);
@@ -1010,6 +1016,7 @@ impl<'dom> TraversalHandler<'dom> for TableRowBuilder<'_, '_, 'dom, '_> {
         display: DisplayGeneratingBox,
         contents: Contents,
         box_slot: BoxSlot<'dom>,
+        _current_list_index: &mut u32,
     ) {
         #[allow(clippy::collapsible_match)] //// TODO: Remove once the other cases are handled
         match display {
@@ -1051,7 +1058,7 @@ impl<'dom> TraversalHandler<'dom> for TableRowBuilder<'_, '_, 'dom, '_> {
                             info,
                             non_replaced_contents,
                             propagated_data,
-                            false, /* is_list_item */
+                            None, /* list_index */
                         );
 
                         ArcRefCell::new(TableSlotCell {
@@ -1102,6 +1109,7 @@ impl<'dom> TraversalHandler<'dom> for TableColumnGroupBuilder {
         display: DisplayGeneratingBox,
         _contents: Contents,
         box_slot: BoxSlot<'dom>,
+        _current_list_index: &mut u32,
     ) {
         if !matches!(
             display,
