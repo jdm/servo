@@ -38,14 +38,16 @@ impl BlockFormattingContext {
         info: &NodeAndStyleInfo<'_>,
         contents: NonReplacedContents,
         propagated_data: PropagatedBoxTreeData,
-        list_index: Option<u32>,
+        is_list_item: bool,
+        current_list_index: &mut u32,
     ) -> Self {
         Self::from_block_container(BlockContainer::construct(
             context,
             info,
             contents,
             propagated_data,
-            list_index,
+            is_list_item,
+            current_list_index,
         ))
     }
 
@@ -164,17 +166,18 @@ impl BlockContainer {
         info: &NodeAndStyleInfo<'_>,
         contents: NonReplacedContents,
         propagated_data: PropagatedBoxTreeData,
-        list_index: Option<u32>,
+        is_list_item: bool,
+        current_list_index: &mut u32,
     ) -> BlockContainer {
         let mut builder = BlockContainerBuilder::new(context, info, propagated_data);
 
-        if let Some(list_index) = list_index {
+        if is_list_item {
             if let Some((marker_info, marker_contents)) =
-                crate::lists::make_marker(context, info, list_index)
+                crate::lists::make_marker(context, info, *current_list_index)
             {
                 match marker_info.style.clone_list_style_position() {
                     ListStylePosition::Inside => {
-                        builder.handle_list_item_marker_inside(&marker_info, marker_contents)
+                        builder.handle_list_item_marker_inside(&marker_info, marker_contents, current_list_index)
                     },
                     ListStylePosition::Outside => builder.handle_list_item_marker_outside(
                         &marker_info,
@@ -185,8 +188,7 @@ impl BlockContainer {
             }
         }
 
-        let mut list_index = list_index.unwrap_or_default();
-        contents.traverse(context, info, &mut builder, &mut list_index);
+        contents.traverse(context, info, &mut builder, current_list_index);
         builder.finish()
     }
 }
@@ -333,7 +335,7 @@ impl<'dom> TraversalHandler<'dom> for BlockContainerBuilder<'dom, '_> {
         display: DisplayGeneratingBox,
         contents: Contents,
         box_slot: BoxSlot<'dom>,
-        _current_list_index: &mut u32,
+        current_list_index: &mut u32,
     ) {
         match display {
             DisplayGeneratingBox::OutsideInside { outside, inside } => {
@@ -341,7 +343,7 @@ impl<'dom> TraversalHandler<'dom> for BlockContainerBuilder<'dom, '_> {
 
                 match outside {
                     DisplayOutside::Inline => {
-                        self.handle_inline_level_element(info, inside, contents, box_slot)
+                        self.handle_inline_level_element(info, inside, contents, box_slot, current_list_index)
                     },
                     DisplayOutside::Block => {
                         let box_style = info.style.get_box();
@@ -354,7 +356,7 @@ impl<'dom> TraversalHandler<'dom> for BlockContainerBuilder<'dom, '_> {
                         } else if box_style.float.is_floating() {
                             self.handle_float_element(info, inside, contents, box_slot)
                         } else {
-                            self.handle_block_level_element(info, inside, contents, box_slot)
+                            self.handle_block_level_element(info, inside, contents, box_slot, current_list_index)
                         }
                     },
                 };
@@ -411,13 +413,15 @@ impl<'dom> BlockContainerBuilder<'dom, '_> {
         &mut self,
         marker_info: &NodeAndStyleInfo<'dom>,
         contents: Vec<crate::dom_traversal::PseudoElementContentItem>,
+        current_list_index: &mut u32,
     ) {
         let box_slot = marker_info.node.box_slot();
         self.handle_inline_level_element(
             marker_info,
-            DisplayInside::Flow { list_index: None },
+            DisplayInside::Flow { is_list_item: false },
             Contents::for_pseudo_element(contents),
             box_slot,
+            current_list_index,
         );
     }
 
@@ -445,11 +449,12 @@ impl<'dom> BlockContainerBuilder<'dom, '_> {
         display_inside: DisplayInside,
         contents: Contents,
         box_slot: BoxSlot<'dom>,
+        current_list_index: &mut u32,
     ) {
         let old_layout_box = box_slot.take_layout_box_if_undamaged(info.damage);
-        let (list_index, non_replaced_contents) = match (display_inside, contents) {
-            (DisplayInside::Flow { list_index }, Contents::NonReplaced(non_replaced_contents)) => {
-                (list_index, non_replaced_contents)
+        let (is_list_item, non_replaced_contents) = match (display_inside, contents) {
+            (DisplayInside::Flow { is_list_item }, Contents::NonReplaced(non_replaced_contents)) => {
+                (is_list_item, non_replaced_contents)
             },
             (_, contents) => {
                 // If this inline element is an atomic, handle it and return.
@@ -479,9 +484,9 @@ impl<'dom> BlockContainerBuilder<'dom, '_> {
         self.ensure_inline_formatting_context_builder()
             .start_inline_box(|| ArcRefCell::new(InlineBox::new(info)), old_layout_box);
 
-        if let Some(list_index) = list_index {
+        if is_list_item {
             if let Some((marker_info, marker_contents)) =
-                crate::lists::make_marker(self.context, info, list_index)
+                crate::lists::make_marker(self.context, info, *current_list_index)
             {
                 // Ignore `list-style-position` here:
                 // “If the list item is an inline box: this value is equivalent to `inside`.”
@@ -491,8 +496,7 @@ impl<'dom> BlockContainerBuilder<'dom, '_> {
         }
 
         // `unwrap` doesn’t panic here because `is_replaced` returned `false`.
-        let mut list_index = list_index.unwrap_or_default();
-        non_replaced_contents.traverse(self.context, info, self, &mut list_index);
+        non_replaced_contents.traverse(self.context, info, self, current_list_index);
 
         self.finish_anonymous_table_if_needed();
 
@@ -515,6 +519,7 @@ impl<'dom> BlockContainerBuilder<'dom, '_> {
         display_inside: DisplayInside,
         contents: Contents,
         box_slot: BoxSlot<'dom>,
+        current_list_index: &mut u32,
     ) {
         // We just found a block level element, all ongoing inline level boxes
         // need to be split around it.
@@ -539,7 +544,7 @@ impl<'dom> BlockContainerBuilder<'dom, '_> {
         let propagated_data = self.propagated_data;
         let kind = match contents {
             Contents::NonReplaced(contents) => match display_inside {
-                DisplayInside::Flow { list_index }
+                DisplayInside::Flow { is_list_item }
                     // Fragment flags are just used to indicate that the element is not replaced, so empty
                     // flags are okay here.
                     if !info.style.establishes_block_formatting_context(
@@ -550,7 +555,8 @@ impl<'dom> BlockContainerBuilder<'dom, '_> {
                         IntermediateBlockContainer::Deferred {
                             contents,
                             propagated_data,
-                            list_index,
+                            is_list_item,
+                            current_list_index: *current_list_index,
                         },
                     )
                 },
@@ -693,7 +699,7 @@ impl<'dom> BlockContainerBuilder<'dom, '_> {
 }
 
 impl BlockLevelJob<'_> {
-    fn finish(self, context: &LayoutContext) -> ArcRefCell<BlockLevelBox> {
+    fn finish(self, context: &LayoutContext, current_list_index: &mut u32) -> ArcRefCell<BlockLevelBox> {
         let info = &self.info;
 
         // If this `BlockLevelBox` is undamaged and it has been laid out before, reuse
@@ -712,7 +718,7 @@ impl BlockLevelJob<'_> {
 
         let block_level_box = match self.kind {
             BlockLevelCreator::SameFormattingContextBlock(intermediate_block_container) => {
-                let contents = intermediate_block_container.finish(context, info);
+                let contents = intermediate_block_container.finish(context, info, current_list_index);
                 let contains_floats = contents.contains_floats();
                 ArcRefCell::new(BlockLevelBox::SameFormattingContextBlock {
                     base: LayoutBoxBase::new(info.into(), info.style.clone()),
@@ -765,6 +771,7 @@ impl BlockLevelJob<'_> {
                     contents,
                     self.propagated_data,
                     None, /* list_index */
+                    current_list_index,
                 );
                 // An outside ::marker must establish a BFC, and can't contain floats.
                 let block_formatting_context = BlockFormattingContext {
@@ -786,13 +793,13 @@ impl BlockLevelJob<'_> {
 }
 
 impl IntermediateBlockContainer {
-    fn finish(self, context: &LayoutContext, info: &NodeAndStyleInfo<'_>) -> BlockContainer {
+    fn finish(self, context: &LayoutContext, info: &NodeAndStyleInfo<'_>, current_list_index: &mut u32) -> BlockContainer {
         match self {
             IntermediateBlockContainer::Deferred {
                 contents,
                 propagated_data,
-                list_index,
-            } => BlockContainer::construct(context, info, contents, propagated_data, list_index),
+                is_list_item,
+            } => BlockContainer::construct(context, info, contents, propagated_data, current_list_index),
             IntermediateBlockContainer::InlineFormattingContext(block_container) => block_container,
         }
     }

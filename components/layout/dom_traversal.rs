@@ -206,7 +206,7 @@ fn traverse_element<'dom>(
         },
         _ => current_list_index,
     };
-    match Display::from((info.style.get_box().display, *this_list_index_ref)) {
+    match Display::from(info.style.get_box().display) {
         Display::None => element.unset_all_boxes(),
         Display::Contents => {
             if ReplacedContents::for_element(element, context).is_some() {
@@ -252,10 +252,7 @@ fn traverse_eager_pseudo_element<'dom>(
         return;
     }
 
-    match Display::from((
-        pseudo_element_info.style.get_box().display,
-        *current_list_index,
-    )) {
+    match Display::from(pseudo_element_info.style.get_box().display) {
         Display::None => {},
         Display::Contents => {
             let items = generate_pseudo_element_content(&pseudo_element_info, context);
@@ -306,11 +303,11 @@ fn traverse_pseudo_element_contents<'dom>(
                 });
                 let display_inline = DisplayGeneratingBox::OutsideInside {
                     outside: DisplayOutside::Inline,
-                    inside: DisplayInside::Flow { list_index: None },
+                    inside: DisplayInside::Flow { is_list_item: false },
                 };
                 // `display` is not inherited, so we get the initial value
                 debug_assert!(
-                    Display::from((anonymous_info.style.get_box().display, *current_list_index)) ==
+                    Display::from(anonymous_info.style.get_box().display) ==
                         Display::GeneratingBox(display_inline)
                 );
                 handler.handle_element(

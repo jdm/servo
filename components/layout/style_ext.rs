@@ -79,7 +79,7 @@ impl DisplayGeneratingBox {
         if matches!(self, Self::LayoutInternal(_)) && contents.is_replaced() {
             Self::OutsideInside {
                 outside: DisplayOutside::Inline,
-                inside: DisplayInside::Flow { list_index: None },
+                inside: DisplayInside::Flow { is_list_item: false },
             }
         } else if matches!(contents, Contents::Widget(_)) {
             // If it's a widget, make sure the display-inside is flow-root.
@@ -88,7 +88,7 @@ impl DisplayGeneratingBox {
             if let DisplayGeneratingBox::OutsideInside { outside, .. } = self {
                 DisplayGeneratingBox::OutsideInside {
                     outside: *outside,
-                    inside: DisplayInside::FlowRoot { list_index: None },
+                    inside: DisplayInside::FlowRoot { is_list_item: false },
                 }
             } else {
                 *self
@@ -109,8 +109,8 @@ pub(crate) enum DisplayOutside {
 pub(crate) enum DisplayInside {
     // “list-items are limited to the Flow Layout display types”
     // <https://drafts.csswg.org/css-display/#list-items>
-    Flow { list_index: Option<u32> },
-    FlowRoot { list_index: Option<u32> },
+    Flow { is_list_item: bool },
+    FlowRoot { is_list_item: bool },
     Flex,
     Grid,
     Table,
@@ -136,7 +136,7 @@ impl DisplayLayoutInternal {
         // When we add ruby, the display_inside of ruby must be Flow.
         // TODO: this should be unreachable for everything but
         // table cell and caption, once we have box tree fixups.
-        DisplayInside::FlowRoot { list_index: None }
+        DisplayInside::FlowRoot { is_list_item: false }
     }
 }
 
@@ -1201,8 +1201,8 @@ impl LayoutStyle<'_> {
     }
 }
 
-impl From<(stylo::Display, u32)> for Display {
-    fn from((packed, current_list_index): (stylo::Display, u32)) -> Self {
+impl From<stylo::Display> for Display {
+    fn from(packed: stylo::Display) -> Self {
         let outside = packed.outside();
         let inside = packed.inside();
 
@@ -1243,10 +1243,10 @@ impl From<(stylo::Display, u32)> for Display {
 
         let inside = match packed.inside() {
             stylo::DisplayInside::Flow => DisplayInside::Flow {
-                list_index: packed.is_list_item().then_some(current_list_index),
+                is_list_item: packed.is_list_item(),
             },
             stylo::DisplayInside::FlowRoot => DisplayInside::FlowRoot {
-                list_index: packed.is_list_item().then_some(current_list_index),
+                is_list_item: packed.is_list_item(),
             },
             stylo::DisplayInside::Flex => DisplayInside::Flex,
             stylo::DisplayInside::Grid => DisplayInside::Grid,
