@@ -23,6 +23,7 @@ use std::default::Default;
 use std::option::Option;
 use std::rc::{Rc, Weak};
 use std::result::Result;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::{self, JoinHandle};
@@ -2791,10 +2792,24 @@ impl ScriptThread {
                 // If this is an about:blank or about:srcdoc load, it must share the
                 // creator's origin. This must match the logic in the constellation
                 // when creating a new pipeline
-                let not_an_about_blank_and_about_srcdoc_load =
-                    new_pipeline_info.load_data.url.as_str() != "about:blank" &&
-                        new_pipeline_info.load_data.url.as_str() != "about:srcdoc";
-                let origin = if not_an_about_blank_and_about_srcdoc_load {
+                let about_blank_or_about_srcdoc_load =
+                    new_pipeline_info.load_data.url.as_str() == "about:blank" ||
+                    new_pipeline_info.load_data.url.as_str() == "about:srcdoc" ||
+                    new_pipeline_info.load_data.js_eval_result.is_some();
+                let origin = if about_blank_or_about_srcdoc_load {
+                    match new_pipeline_info.load_data.load_origin {
+                        LoadOrigin::Script(ref snapshot) => Some(MutableOrigin::from_snapshot(snapshot.clone())),
+                        _ => None,
+                    }
+                } else {
+                    None
+                };
+                /*let origin = /*if new_pipeline_info.load_data.js_eval_result.is_some() {
+                    match new_pipeline_info.load_data.load_origin {
+                        LoadOrigin::Script(ref snapshot) => MutableOrigin::from_snapshot(snapshot.clone()),
+                        _ => unreachable!(),
+                    }
+                } else*/ if not_an_about_blank_and_about_srcdoc_load {
                     MutableOrigin::new(new_pipeline_info.load_data.url.origin())
                 } else if let Some(parent) = new_pipeline_info
                     .parent_info
@@ -2809,7 +2824,9 @@ impl ScriptThread {
                     creator.origin().clone()
                 } else {
                     MutableOrigin::new(ImmutableOrigin::new_opaque())
-                };
+                };*/
+
+                println!("{:?} document's origin is {:?}", new_pipeline_info.load_data.url, origin);
 
                 self.devtools_state
                     .notify_pipeline_created(new_pipeline_info.new_pipeline_id);
@@ -3424,12 +3441,13 @@ impl ScriptThread {
             incomplete.load_data.url, incomplete.pipeline_id
         );
 
-        let origin = if final_url.as_str() == "about:blank" || final_url.as_str() == "about:srcdoc"
+        /*let origin = if final_url.as_str() == "about:blank" || final_url.as_str() == "about:srcdoc"
         {
             incomplete.origin.clone()
         } else {
             MutableOrigin::new(final_url.origin())
-        };
+    };*/
+        let origin = incomplete.origin.unwrap_or_else(|| MutableOrigin::new(final_url.origin()));
 
         let font_context = Arc::new(FontContext::new(
             self.system_font_service.clone(),
@@ -3861,8 +3879,8 @@ impl ScriptThread {
     /// argument until a notification is received that the fetch is complete.
     fn pre_page_load(&self, cx: &mut js::context::JSContext, mut incomplete: InProgressLoad) {
         let url_str = incomplete.load_data.url.as_str();
-        if url_str == "about:blank" {
-            self.start_page_load_about_blank(cx, incomplete);
+        if url_str == "about:blank" || incomplete.load_data.js_eval_result.is_some() {
+            self.start_synchronous_page_load(cx, incomplete);
             return;
         }
         if url_str == "about:srcdoc" {
@@ -4056,23 +4074,27 @@ impl ScriptThread {
             .initiate_fetch(&self.resource_threads.core_thread, response_init);
     }
 
-    /// Synchronously fetch `about:blank`. Stores the `InProgressLoad`
+    /// Synchronously fetch a page with fixed content. Stores the `InProgressLoad`
     /// argument until a notification is received that the fetch is complete.
-    fn start_page_load_about_blank(
+    fn start_synchronous_page_load(
         &self,
         cx: &mut js::context::JSContext,
         mut incomplete: InProgressLoad,
     ) {
-        let url = ServoUrl::parse("about:blank").unwrap();
         let mut context = ParserContext::new(
             incomplete.webview_id,
             incomplete.pipeline_id,
-            url.clone(),
+            incomplete.load_data.url.clone(),
             incomplete.load_data.creation_sandboxing_flag_set,
         );
 
-        let mut meta = Metadata::default(url);
-        meta.set_content_type(Some(&mime::TEXT_HTML));
+        let mut meta = Metadata::default(incomplete.load_data.url.clone());
+        if let Some(content_type) = incomplete.load_data.headers.get("Content-Type") {
+            meta.set_content_type(Some(&mime::Mime::from_str(content_type.to_str().unwrap()).unwrap()));
+            
+        } else {
+            meta.set_content_type(Some(&mime::TEXT_HTML));
+        }
         meta.set_referrer_policy(incomplete.load_data.referrer_policy);
 
         // If this page load is the result of a javascript scheme url, map

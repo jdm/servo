@@ -35,6 +35,7 @@ use crate::dom::bindings::codegen::Bindings::WindowBinding::Window_Binding::Wind
 use crate::dom::bindings::codegen::UnionTypes::TrustedHTMLOrString;
 use crate::dom::bindings::error::Fallible;
 use crate::dom::bindings::inheritance::Castable;
+use crate::dom::bindings::refcounted::Trusted;
 use crate::dom::bindings::reflector::DomGlobal;
 use crate::dom::bindings::root::{DomRoot, LayoutDom, MutNullableDom};
 use crate::dom::bindings::str::{DOMString, USVString};
@@ -170,16 +171,6 @@ impl HTMLIFrameElement {
         history_handling: NavigationHistoryBehavior,
         cx: &mut js::context::JSContext,
     ) {
-        let browsing_context_id = match self.browsing_context_id() {
-            None => return warn!("Attempted to start a new pipeline on an unattached iframe."),
-            Some(id) => id,
-        };
-
-        let webview_id = match self.webview_id() {
-            None => return warn!("Attempted to start a new pipeline on an unattached iframe."),
-            Some(id) => id,
-        };
-
         let document = self.owner_document();
 
         {
@@ -189,28 +180,59 @@ impl HTMLIFrameElement {
             LoadBlocker::terminate(load_blocker, cx);
         }
 
-        if load_data.url.scheme() == "javascript" {
-            let window_proxy = self.GetContentWindow();
-            if let Some(window_proxy) = window_proxy {
-                if !ScriptThread::navigate_to_javascript_url(
-                    cx,
-                    &document.global(),
-                    &window_proxy.global(),
-                    &mut load_data,
-                    Some(self.upcast()),
-                ) {
-                    return;
-                }
-                load_data.about_base_url = document.about_base_url();
-            }
-        }
-
-        if load_data.js_eval_result.is_some() {
+        {
             let mut load_blocker = self.load_blocker.borrow_mut();
             *load_blocker = Some(LoadBlocker::new(
                 &document,
                 LoadType::Subframe(load_data.url.clone()),
             ));
+        }
+
+        if load_data.url.scheme() == "javascript" {
+            let iframe = Trusted::new(self);
+            let doc = Trusted::new(&*document);
+            document
+                .global()
+                .task_manager()
+                .networking_task_source()
+                .queue(task!(navigate_to_javascript: move |cx| {
+                    let this = iframe.root();
+                    let window_proxy = this.GetContentWindow();
+                    if let Some(window_proxy) = window_proxy {
+                        if !ScriptThread::navigate_to_javascript_url(
+                            cx,
+                            &this.owner_global(),
+                            &window_proxy.global(),
+                            &mut load_data,
+                            Some(this.upcast()),
+                        ) {
+                            LoadBlocker::terminate(&this.load_blocker, cx);
+                            return;
+                        }
+                        load_data.about_base_url = doc.root().about_base_url();
+                    }
+                    this.continue_navigation(load_data, pipeline_type, history_handling);
+                }));
+            return;
+        }
+
+        self.continue_navigation(load_data, pipeline_type, history_handling);
+    }
+
+    fn continue_navigation(
+        &self,
+        load_data: LoadData,
+        pipeline_type: PipelineType,
+        history_handling: NavigationHistoryBehavior,
+    ) {
+        let browsing_context_id = match self.browsing_context_id() {
+            None => return warn!("Attempted to start a new pipeline on an unattached iframe."),
+            Some(id) => id,
+        };
+
+        let webview_id = match self.webview_id() {
+            None => return warn!("Attempted to start a new pipeline on an unattached iframe."),
+            Some(id) => id,
         };
 
         let window = self.owner_window();
@@ -683,11 +705,6 @@ impl HTMLIFrameElement {
         // TODO(#9592): assert that the load blocker is present at all times when we
         //              can guarantee that it's created for the case of iframe.reload().
         if Some(loaded_pipeline) != self.pending_pipeline_id.get() {
-            info!(
-                "loaded pipeline doesn't match pending pipeline: {:?} vs {:?}",
-                loaded_pipeline,
-                self.pending_pipeline_id.get()
-            );
             return;
         }
 
@@ -973,6 +990,7 @@ impl HTMLIFrameElementMethods<crate::DomTypeHolder> for HTMLIFrameElement {
             .origin()
             .same_origin_domain(document.origin())
         {
+            println!("{:?} vs {:?}", self.owner_document().origin(), document.origin());
             return None;
         }
         // Step 4. Return document.
