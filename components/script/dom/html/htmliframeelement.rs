@@ -151,6 +151,7 @@ impl HTMLIFrameElement {
         &self,
         load_data: LoadData,
         history_handling: NavigationHistoryBehavior,
+        initial_insertion: bool,
         cx: &mut js::context::JSContext,
     ) {
         // In case we fired a synchronous load event, but navigate away
@@ -161,7 +162,13 @@ impl HTMLIFrameElement {
         // of whether we synchronously fired a load in the same microtask.
         self.already_fired_synchronous_load_event.set(false);
 
-        self.start_new_pipeline(load_data, PipelineType::Navigation, history_handling, cx);
+        self.start_new_pipeline(
+            load_data,
+            PipelineType::Navigation,
+            history_handling,
+            initial_insertion,
+            cx,
+        );
     }
 
     fn start_new_pipeline(
@@ -169,6 +176,7 @@ impl HTMLIFrameElement {
         mut load_data: LoadData,
         pipeline_type: PipelineType,
         history_handling: NavigationHistoryBehavior,
+        initial_insertion: bool,
         cx: &mut js::context::JSContext,
     ) {
         let document = self.owner_document();
@@ -197,6 +205,7 @@ impl HTMLIFrameElement {
                 .networking_task_source()
                 .queue(task!(navigate_to_javascript: move |cx| {
                     let this = iframe.root();
+                    //this.pending_pipeline_id.set(None);
                     let window_proxy = this.GetContentWindow();
                     if let Some(window_proxy) = window_proxy {
                         if !ScriptThread::navigate_to_javascript_url(
@@ -205,6 +214,7 @@ impl HTMLIFrameElement {
                             &window_proxy.global(),
                             &mut load_data,
                             Some(this.upcast()),
+                            Some(initial_insertion),
                         ) {
                             LoadBlocker::terminate(&this.load_blocker, cx);
                             return;
@@ -320,7 +330,12 @@ impl HTMLIFrameElement {
     }
 
     /// <https://html.spec.whatwg.org/multipage/#navigate-an-iframe-or-frame>
-    fn navigate_an_iframe_or_frame(&self, cx: &mut js::context::JSContext, load_data: LoadData) {
+    fn navigate_an_iframe_or_frame(
+        &self,
+        cx: &mut js::context::JSContext,
+        load_data: LoadData,
+        initial_insertion: bool,
+    ) {
         // Step 2. If element's content navigable's active document is not completely loaded,
         // then set historyHandling to "replace".
         let history_handling = if !self
@@ -339,7 +354,7 @@ impl HTMLIFrameElement {
         // Step 4. Navigate element's content navigable to url using element's node document,
         // with historyHandling set to historyHandling, referrerPolicy set to referrerPolicy,
         // documentResource set to srcdocString, and initialInsertion set to initialInsertion.
-        self.navigate_or_reload_child_browsing_context(load_data, history_handling, cx);
+        self.navigate_or_reload_child_browsing_context(load_data, history_handling, initial_insertion, cx);
     }
 
     /// <https://html.spec.whatwg.org/multipage/#will-lazy-load-element-steps>
@@ -354,7 +369,11 @@ impl HTMLIFrameElement {
     }
 
     /// Step 1.3. of <https://html.spec.whatwg.org/multipage/#process-the-iframe-attributes>
-    fn navigate_to_the_srcdoc_resource(&self, cx: &mut js::context::JSContext) {
+    fn navigate_to_the_srcdoc_resource(
+        &self,
+        initial_insertion: bool,
+        cx: &mut js::context::JSContext,
+    ) {
         // Step 1.3. Navigate to the srcdoc resource: Navigate an iframe or frame given element,
         // about:srcdoc, the empty string, and the value of element's srcdoc attribute.
         let url = ServoUrl::parse("about:srcdoc").unwrap();
@@ -380,7 +399,7 @@ impl HTMLIFrameElement {
                 .get_string_attribute(&local_name!("srcdoc")),
         );
 
-        self.navigate_an_iframe_or_frame(cx, load_data);
+        self.navigate_an_iframe_or_frame(cx, load_data, initial_insertion);
     }
 
     /// <https://html.spec.whatwg.org/multipage/#the-iframe-element:potentially-delays-the-load-event>
@@ -394,6 +413,8 @@ impl HTMLIFrameElement {
     /// <https://html.spec.whatwg.org/multipage/#process-the-iframe-attributes>
     fn process_the_iframe_attributes(&self, mode: ProcessingMode, cx: &mut js::context::JSContext) {
         let element = self.upcast::<Element>();
+        let initial_insertion = mode == ProcessingMode::FirstTime;
+
         // Step 1. If `element`'s `srcdoc` attribute is specified, then:
         //
         // Note that this also includes the empty string
@@ -415,7 +436,7 @@ impl HTMLIFrameElement {
             }
             // Step 1.3. Navigate to the srcdoc resource: Navigate an iframe or frame given element,
             // about:srcdoc, the empty string, and the value of element's srcdoc attribute.
-            self.navigate_to_the_srcdoc_resource(cx);
+            self.navigate_to_the_srcdoc_resource(initial_insertion, cx);
             return;
         }
 
@@ -444,7 +465,7 @@ impl HTMLIFrameElement {
         };
 
         // Step 2.3. If url matches about:blank and initialInsertion is true, then:
-        if url.matches_about_blank() && mode == ProcessingMode::FirstTime {
+        if url.matches_about_blank() && initial_insertion {
             // We should **not** send a load event in `iframe_load_event_steps`.
             self.already_fired_synchronous_load_event.set(true);
             // Step 2.3.1. Run the iframe load event steps given element.
@@ -535,7 +556,7 @@ impl HTMLIFrameElement {
             NavigationHistoryBehavior::Push
         };
 
-        self.navigate_or_reload_child_browsing_context(load_data, history_handling, cx);
+        self.navigate_or_reload_child_browsing_context(load_data, history_handling, initial_insertion, cx);
     }
 
     /// <https://html.spec.whatwg.org/multipage/#create-a-new-child-navigable>
@@ -575,6 +596,7 @@ impl HTMLIFrameElement {
             load_data,
             PipelineType::InitialAboutBlank,
             NavigationHistoryBehavior::Push,
+            true,
             cx,
         );
     }
@@ -1125,7 +1147,7 @@ impl VirtualMethods for HTMLIFrameElement {
                     LazyLoadResumptionSteps::None => (),
                     LazyLoadResumptionSteps::SrcDoc => {
                         // Step 4. Invoke resumptionSteps.
-                        self.navigate_to_the_srcdoc_resource(cx);
+                        self.navigate_to_the_srcdoc_resource(false, cx);
                     },
                 }
             },
