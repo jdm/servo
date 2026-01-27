@@ -7159,11 +7159,28 @@ class CGForbidDrop(CGThing):
     def __init__(self, descriptor: Descriptor) -> None:
         CGThing.__init__(self)
         assert not descriptor.allowDropImpl
+        
         self.code = f"""
 impl Drop for {firstCap(descriptor.interface.identifier.name)} {{
-    fn drop(&mut self) {{ }}
-}}
+    fn drop(&mut self) {{
+"""
+        if not descriptor.interface.isNamespace():
+            self.code += f"""
+         unsafe {{
+            use script_bindings::reflector::AssociatedMemorySize;
+            let reflector = script_bindings::reflector::DomObject::reflector(self).get_jsobject().get();
+            let reflector_size = Self::reflector_size();
+            let associated_memory_size = self.associated_memory_size();
+            js::jsapi::RemoveAssociatedMemory(reflector, reflector_size + associated_memory_size, js::jsapi::MemoryUse::DOMBinding);
+         }}
+            """
+        self.code += """
+    }
+}
         """
+
+        if not descriptor.overrideMemoryUsage:
+            self.code += f"impl script_bindings::reflector::AssociatedMemorySize for {firstCap(descriptor.interface.identifier.name)} {{}}"
 
     def define(self) -> str:
         return self.code

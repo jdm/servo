@@ -42,6 +42,13 @@ pub(crate) struct CanvasRenderingContext2D {
     reflector_: Reflector,
     canvas: HTMLCanvasElementOrOffscreenCanvas,
     canvas_state: CanvasState,
+    size_in_bytes: std::cell::Cell<u32>,
+}
+
+impl script_bindings::reflector::AssociatedMemorySize for CanvasRenderingContext2D{
+    fn associated_memory_size(&self) -> usize {
+        self.size_in_bytes.get() as usize
+    }
 }
 
 impl CanvasRenderingContext2D {
@@ -57,6 +64,7 @@ impl CanvasRenderingContext2D {
             reflector_: Reflector::new(),
             canvas,
             canvas_state,
+            size_in_bytes: std::cell::Cell::new(size.area()),
         })
     }
 
@@ -110,6 +118,9 @@ impl CanvasContext for CanvasRenderingContext2D {
     }
 
     fn resize(&self) {
+        let new_bytes = self.size().area();
+        crate::dom::bindings::reflector::update_associated_memory(self, new_bytes as usize);
+        self.size_in_bytes.set(new_bytes);
         self.canvas_state.set_bitmap_dimensions(self.size().cast());
     }
 

@@ -87,11 +87,14 @@ pub trait MutDomObject: DomObject {
     /// # Safety
     ///
     /// The provided [`JSObject`] pointer must point to a valid [`JSObject`].
-    unsafe fn init_reflector(&self, obj: *mut JSObject);
+    unsafe fn init_reflector<T>(&self, obj: *mut JSObject);
 }
 
 impl MutDomObject for Reflector {
-    unsafe fn init_reflector(&self, obj: *mut JSObject) {
+    unsafe fn init_reflector<T>(&self, obj: *mut JSObject) {
+        unsafe {
+            js::jsapi::AddAssociatedMemory(obj, std::mem::size_of::<T>() + std::mem::size_of::<Box<T>>(), js::jsapi::MemoryUse::DOMBinding);
+        }
         self.set_jsobject(obj)
     }
 }
@@ -135,4 +138,12 @@ pub trait DomObjectIteratorWrap<D: DomTypes>: DomObjectWrap<D> + JSTraceable + I
         Box<IterableIterator<D, Self>>,
         CanGc,
     ) -> Root<Dom<IterableIterator<D, Self>>>;
+}
+
+pub trait AssociatedMemorySize {
+    fn reflector_size() -> usize where Self: Sized {
+        std::mem::size_of::<Self>() +
+            std::mem::size_of::<Box<Self>>()
+    }
+    fn associated_memory_size(&self) -> usize { 0 }
 }

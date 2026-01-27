@@ -65,4 +65,22 @@ impl<T: DomGlobalGeneric<crate::DomTypeHolder>> DomGlobal for T {
     }
 }
 
+#[expect(unsafe_code)]
+pub(crate) fn update_associated_memory<T: DomObject + AssociatedMemorySize>(obj: &T, new_size: usize) {
+    let reflector_size = T::reflector_size();
+    let associated_memory_size = obj.associated_memory_size();
+    unsafe {
+        js::jsapi::RemoveAssociatedMemory(
+            obj.reflector().get_jsobject().get(),
+            reflector_size + associated_memory_size,
+            js::jsapi::MemoryUse::DOMBinding,
+        );
+        js::jsapi::RemoveAssociatedMemory(
+            obj.reflector().get_jsobject().get(),
+            reflector_size + new_size,
+            js::jsapi::MemoryUse::DOMBinding,
+        );
+    }
+}
+
 pub(crate) use script_bindings::reflector::*;
