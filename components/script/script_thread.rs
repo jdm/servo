@@ -3444,12 +3444,14 @@ impl ScriptThread {
         );
 
         /*let origin = if final_url.as_str() == "about:blank" || final_url.as_str() == "about:srcdoc"
-        {
-            incomplete.origin.clone()
-        } else {
-            MutableOrigin::new(final_url.origin())
-    };*/
-        let origin = incomplete.origin.unwrap_or_else(|| MutableOrigin::new(final_url.origin()));
+            {
+                incomplete.origin.clone()
+            } else {
+                MutableOrigin::new(final_url.origin())
+        };*/
+        let origin = incomplete
+            .origin
+            .unwrap_or_else(|| MutableOrigin::new(final_url.origin()));
 
         let font_context = Arc::new(FontContext::new(
             self.system_font_service.clone(),
@@ -3817,7 +3819,12 @@ impl ScriptThread {
             .borrow()
             .find_iframe(parent_pipeline_id, browsing_context_id);
         if let Some(iframe) = iframe {
-            iframe.navigate_or_reload_child_browsing_context(load_data, history_handling, false, cx);
+            iframe.navigate_or_reload_child_browsing_context(
+                load_data,
+                history_handling,
+                false,
+                cx,
+            );
         }
     }
 

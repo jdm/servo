@@ -556,7 +556,12 @@ impl HTMLIFrameElement {
             NavigationHistoryBehavior::Push
         };
 
-        self.navigate_or_reload_child_browsing_context(load_data, history_handling, initial_insertion, cx);
+        self.navigate_or_reload_child_browsing_context(
+            load_data,
+            history_handling,
+            initial_insertion,
+            cx,
+        );
     }
 
     /// <https://html.spec.whatwg.org/multipage/#create-a-new-child-navigable>
@@ -1007,12 +1012,16 @@ impl HTMLIFrameElementMethods<crate::DomTypeHolder> for HTMLIFrameElement {
         // so we should return None in that case.
         let document = ScriptThread::find_document(pipeline_id)?;
         // Step 3. If document's origin and container's node document's origin are not same origin-domain, then return null.
+        println!(
+            "{:?} vs {:?}",
+            self.owner_document().origin(),
+            document.origin()
+        );
         if !self
             .owner_document()
             .origin()
             .same_origin_domain(document.origin())
         {
-            println!("{:?} vs {:?}", self.owner_document().origin(), document.origin());
             return None;
         }
         // Step 4. Return document.
