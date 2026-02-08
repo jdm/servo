@@ -13,7 +13,9 @@ use stylo_atoms::Atom;
 use uuid::Uuid;
 
 use crate::dom::bindings::codegen::Bindings::IDBOpenDBRequestBinding::IDBOpenDBRequestMethods;
-use crate::dom::bindings::codegen::Bindings::IDBTransactionBinding::IDBTransactionMode;
+use crate::dom::bindings::codegen::Bindings::IDBTransactionBinding::{
+    IDBTransactionMethods, IDBTransactionMode,
+};
 use crate::dom::bindings::error::{Error, ErrorToJsval};
 use crate::dom::bindings::inheritance::Castable;
 use crate::dom::bindings::refcounted::Trusted;
@@ -200,7 +202,7 @@ impl IDBOpenDBRequest {
         // Step 10.5: Let didThrow be the result of
         // firing a version change event named upgradeneeded
         // at request with old version and version.
-        let event = IDBVersionChangeEvent::new(
+        let event = DomRoot::upcast::<Event>(IDBVersionChangeEvent::new(
             &global,
             Atom::from("upgradeneeded"),
             EventBubbles::DoesNotBubble,
@@ -208,10 +210,16 @@ impl IDBOpenDBRequest {
             old_version,
             Some(version),
             CanGc::note(),
-        );
+        ));
+        event.set_trusted(true);
 
-        // TODO: use as part of step 10.6.2
-        let _did_throw = event.upcast::<Event>().fire(self.upcast(), can_gc);
+        let mut did_throw = false;
+        event.dispatch_with_legacy_did_listeners_throw(
+            self.upcast(),
+            false,
+            &mut did_throw,
+            can_gc,
+        );
 
         // Step 10.6: If transaction’s state is active, then:
         if transaction.is_active() {
@@ -221,7 +229,10 @@ impl IDBOpenDBRequest {
             // Step 10.6.2: If didThrow is true,
             // run abort a transaction with transaction
             // and a newly created "AbortError" DOMException.
-            // TODO: implement.
+            if did_throw {
+                let _ = transaction.Abort();
+                return;
+            }
 
             // Note: only sending this if active,
             // because if the transaction was aborted

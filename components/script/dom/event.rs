@@ -289,7 +289,22 @@ impl Event {
         target: &EventTarget,
         legacy_target_override: bool,
         can_gc: CanGc,
-        // TODO legacy_did_output_listeners_throw_flag for indexeddb
+    ) -> bool {
+        self.dispatch_with_legacy_did_listeners_throw(
+            target,
+            legacy_target_override,
+            &mut false,
+            can_gc,
+        )
+    }
+
+    /// <https://dom.spec.whatwg.org/#concept-event-dispatch>
+    pub(crate) fn dispatch_with_legacy_did_listeners_throw(
+        &self,
+        target: &EventTarget,
+        legacy_target_override: bool,
+        legacy_output_did_listeners_throw: &mut bool,
+        can_gc: CanGc,
     ) -> bool {
         // > When a user interaction causes firing of an activation triggering input event in a Document document, the user agent
         // > must perform the following activation notification steps before dispatching the event:
@@ -562,6 +577,7 @@ impl Event {
                     self,
                     ListenerPhase::Capturing,
                     timeline_window.as_deref(),
+                    legacy_output_did_listeners_throw,
                     can_gc,
                 )
             }
@@ -591,6 +607,7 @@ impl Event {
                     self,
                     ListenerPhase::Bubbling,
                     timeline_window.as_deref(),
+                    legacy_output_did_listeners_throw,
                     can_gc,
                 );
             }
@@ -1216,8 +1233,8 @@ fn invoke(
     event: &Event,
     phase: ListenerPhase,
     timeline_window: Option<&Window>,
+    legacy_output_did_listeners_throw: &mut bool,
     can_gc: CanGc,
-    // TODO legacy_output_did_listeners_throw for indexeddb
 ) {
     // Step 1. Set event’s target to the shadow-adjusted target of the last struct in event’s path,
     // that is either struct or preceding struct, whose shadow-adjusted target is non-null.
@@ -1257,6 +1274,7 @@ fn invoke(
         phase,
         invocation_target_in_shadow_tree,
         timeline_window,
+        legacy_output_did_listeners_throw,
         can_gc,
     );
 
@@ -1286,6 +1304,7 @@ fn invoke(
             phase,
             invocation_target_in_shadow_tree,
             timeline_window,
+            legacy_output_did_listeners_throw,
             can_gc,
         );
 
@@ -1301,6 +1320,7 @@ fn inner_invoke(
     phase: ListenerPhase,
     invocation_target_in_shadow_tree: bool,
     timeline_window: Option<&Window>,
+    legacy_output_did_listeners_throw: &mut bool,
     can_gc: CanGc,
 ) -> bool {
     // Step 1. Let found be false.
@@ -1368,12 +1388,15 @@ fn inner_invoke(
         //     associated realm’s global object.
         //     TODO Step 2.10.2 Set legacyOutputDidListenersThrowFlag if given.
         let marker = TimelineMarker::start("DOMEvent".to_owned());
-        compiled_listener.call_or_handle_event(
+        let threw_exception = !compiled_listener.call_or_handle_event(
             &event_target,
             event,
             ExceptionHandling::Report,
             can_gc,
         );
+        if threw_exception {
+            *legacy_output_did_listeners_throw = true;
+        }
         if let Some(window) = timeline_window {
             window.emit_timeline_marker(marker.end());
         }
