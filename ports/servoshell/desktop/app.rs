@@ -4,6 +4,9 @@
 
 //! Application entry point, runs the event loop.
 
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::io::Write;
 use std::path::Path;
 use std::rc::Rc;
 use std::time::Instant;
@@ -39,6 +42,38 @@ pub(crate) enum AppState {
     ShuttingDown,
 }
 
+pub struct Downloads {
+    active: RefCell<HashMap<servo::RequestId, std::path::PathBuf>>,
+}
+
+impl Downloads {
+    pub fn new() -> Rc<Downloads> {
+        Rc::new(Downloads {
+            active: Default::default(),
+        })
+    }
+}
+
+impl Downloads {
+    pub fn start(&self, request_id: servo::RequestId, path: std::path::PathBuf) {
+        if let Err(error) = std::fs::File::create(&path) {
+            println!("Error creating downlaod for {}: {error:?}", path.display());
+            return;
+        };
+        self.active.borrow_mut().insert(request_id, path);
+    }
+    pub fn update(&self, request_id: servo::RequestId, chunk: Vec<u8>) {
+        if let Some(filename) = self.active.borrow().get(&request_id) {
+            if let Ok(mut file) = std::fs::File::options().append(true).open(&filename) {
+                let _ = file.write_all(&chunk);
+            }
+        }
+    }
+    pub fn complete(&self, request_id: servo::RequestId, _result: Result<(), ()>) {
+        self.active.borrow_mut().remove(&request_id);
+    }
+}
+
 pub struct App {
     opts: Opts,
     preferences: Preferences,
@@ -49,6 +84,7 @@ pub struct App {
     t_start: Instant,
     t: Instant,
     state: AppState,
+    downloads: Rc<Downloads>,
 }
 
 impl App {
@@ -76,6 +112,7 @@ impl App {
             t_start: t,
             t,
             state: AppState::Initializing,
+            downloads: Downloads::new(),
         }
     }
 
@@ -132,6 +169,7 @@ impl App {
             self.waker.clone(),
             user_content_manager,
             self.preferences.clone(),
+            self.downloads.clone(),
             #[cfg(feature = "gamepad")]
             ServoshellGamepadProvider::maybe_new().map(Rc::new),
         ));
@@ -161,6 +199,7 @@ impl App {
                 .clone()
                 .expect("Should always have event loop proxy in headed mode."),
             url,
+            self.downloads.clone(),
         )
     }
 

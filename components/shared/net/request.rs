@@ -480,6 +480,8 @@ pub struct RequestBuilder {
     pub response_tainting: ResponseTainting,
     /// Servo internal: if crash details are present, trigger a crash error page with these details.
     pub crash: Option<String>,
+
+    pub supported_mime_types: Option<Vec<String>>,
 }
 
 impl RequestBuilder {
@@ -519,7 +521,13 @@ impl RequestBuilder {
             https_state: HttpsState::None,
             response_tainting: ResponseTainting::Basic,
             crash: None,
+            supported_mime_types: None,
         }
+    }
+
+    pub fn supported_mime_types(mut self, supported: Vec<Mime>) -> RequestBuilder {
+        self.supported_mime_types = Some(supported.into_iter().map(|mime| mime.to_string()).collect());
+        self
     }
 
     pub fn preload_id(mut self, preload_id: PreloadId) -> RequestBuilder {
@@ -737,6 +745,7 @@ impl RequestBuilder {
         request.policy_container = self.policy_container;
         request.insecure_requests_policy = self.insecure_requests_policy;
         request.has_trustworthy_ancestor_origin = self.has_trustworthy_ancestor_origin;
+        request.supported_mime_types = self.supported_mime_types;
         request
     }
 
@@ -825,6 +834,7 @@ pub struct Request {
     pub https_state: HttpsState,
     /// Servo internal: if crash details are present, trigger a crash error page with these details.
     pub crash: Option<String>,
+    pub supported_mime_types: Option<Vec<String>>,
 }
 
 impl Request {
@@ -874,6 +884,7 @@ impl Request {
             has_trustworthy_ancestor_origin: false,
             https_state,
             crash: None,
+            supported_mime_types: None,
         }
     }
 

@@ -40,6 +40,7 @@ pub use keyboard_types::{
 pub use media::{
     GlApi as MediaGlApi, GlContext as MediaGlContext, NativeDisplay as MediaNativeDisplay,
 };
+pub use net_traits::request::RequestId;
 // This API should probably not be exposed in this way. Instead there should be a fully
 // fleshed out public domains API if we want to expose it.
 pub use net_traits::pub_domains::is_reg_domain;
@@ -77,7 +78,7 @@ pub use crate::webview_delegate::{
     AlertDialog, AllowOrDenyRequest, AuthenticationRequest, ColorPicker, ConfirmDialog,
     ContextMenu, CreateNewWebViewRequest, EmbedderControl, FilePicker, InputMethodControl,
     NavigationRequest, PermissionRequest, PromptDialog, SelectElement, SimpleDialog,
-    WebResourceLoad, WebViewDelegate,
+    UnsupportedResponse, WebResourceLoad, WebViewDelegate, 
 };
 
 #[cfg(feature = "webxr")]

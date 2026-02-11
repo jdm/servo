@@ -5194,6 +5194,7 @@ dependencies = [
  "libservo",
  "log",
  "media",
+ "mime",
  "mozangle",
  "net",
  "net_traits",

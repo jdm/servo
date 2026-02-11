@@ -155,6 +155,56 @@ impl HttpState {
             ));
         receiver.await.ok()?
     }
+
+    pub(crate) async fn offer_unsupported_response(&self, request: &Request, response: &Response) -> Option<Box<dyn net_traits::FetchTaskTarget + Send>> {
+        let Some(webview_id) = request.target_webview_id else {
+            return None;
+        };
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+        let offer = NetToEmbedderMsg::OfferUnsupportedResponse {
+            webview_id,
+            request_id: request.id.clone(),
+            url: response.url()?.clone(),
+            content_type: response.metadata().ok()?.metadata().content_type.as_ref().map(|mime| mime::Mime::from(mime.0.clone())),
+            filename_hint: None,
+            responder: sender,
+        };
+        self.embedder_proxy.send(offer);
+        let embedder_accepts = receiver.await.ok()?;
+        if !embedder_accepts {
+            return None;
+        }
+        Some(Box::new(EmbedderFetchTarget {
+            embedder_proxy: self.embedder_proxy.clone(),
+        }))
+    }
+}
+
+struct EmbedderFetchTarget {
+    embedder_proxy: GenericEmbedderProxy<NetToEmbedderMsg>,
+}
+
+impl net_traits::FetchTaskTarget for EmbedderFetchTarget {
+    fn process_request_body(&mut self, _request: &Request) {}
+    fn process_request_eof(&mut self, _request: &Request) {}
+    fn process_response(&mut self, _request: &Request, _response: &Response) {}
+    fn process_response_chunk(&mut self, request: &Request, chunk: Vec<u8>) {
+        let Some(webview_id) = request.target_webview_id else {
+            return;
+        };
+        self.embedder_proxy.send(NetToEmbedderMsg::FetchResponseChunk(webview_id, request.id.clone(), chunk));
+    }
+    fn process_response_eof(&mut self, request: &Request, response: &Response) {
+        let Some(webview_id) = request.target_webview_id else {
+            return;
+        };
+        let result = match response.get_network_error() {
+            Some(error) => Err(error.clone()),
+            None => Ok(()),
+        };
+        self.embedder_proxy.send(NetToEmbedderMsg::FetchResponseEof(webview_id, request.id.clone(), result));
+    }
+    fn process_csp_violations(&mut self, _request: &Request, _: Vec<content_security_policy::Violation>) {}
 }
 
 /// Step 11 of <https://fetch.spec.whatwg.org/#concept-fetch>.

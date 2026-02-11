@@ -623,6 +623,7 @@ pub struct CoreResourceManager {
     preloaded_resources: SharedPreloadedResources,
     /// <https://fetch.spec.whatwg.org/#concept-fetch-record>
     in_flight_keep_alive_records: SharedInflightKeepAliveRecords,
+    embedder_proxy: GenericEmbedderProxy<NetToEmbedderMsg>,
 }
 
 impl CoreResourceManager {
@@ -637,11 +638,12 @@ impl CoreResourceManager {
             devtools_sender,
             sw_managers: Default::default(),
             filemanager: FileManager::new(embedder_proxy.clone()),
-            request_interceptor: RequestInterceptor::new(embedder_proxy),
+            request_interceptor: RequestInterceptor::new(embedder_proxy.clone()),
             ca_certificates,
             ignore_certificate_errors,
             preloaded_resources: Default::default(),
             in_flight_keep_alive_records: Default::default(),
+            embedder_proxy,
         }
     }
 
@@ -722,6 +724,7 @@ impl CoreResourceManager {
             let entry = PreloadEntry::new(request.integrity_metadata.clone());
             preloaded_resources.insert(preload_id.clone(), entry);
         }
+        let embedder_proxy = self.embedder_proxy.clone();
 
         spawn_task(async move {
             // XXXManishearth: Check origin against pipeline id (also ensure that the mode is allowed)
@@ -743,6 +746,7 @@ impl CoreResourceManager {
                 ignore_certificate_errors,
                 preloaded_resources,
                 in_flight_keep_alive_records,
+                embedder_proxy,
             };
 
             match res_init_ {
@@ -794,6 +798,7 @@ impl CoreResourceManager {
         let ignore_certificate_errors = self.ignore_certificate_errors;
         let in_flight_keep_alive_records = self.in_flight_keep_alive_records.clone();
         let preloaded_resources = self.preloaded_resources.clone();
+        let embedder_proxy = self.embedder_proxy.clone();
 
         spawn_task(async move {
             let mut event_sender = event_sender;
@@ -832,6 +837,7 @@ impl CoreResourceManager {
                         ignore_certificate_errors,
                         preloaded_resources,
                         in_flight_keep_alive_records,
+                        embedder_proxy,
                     };
                     fetch(request, &mut event_sender, &context).await;
                 },

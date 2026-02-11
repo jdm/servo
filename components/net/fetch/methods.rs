@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+use std::str::FromStr;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::{io, mem, str};
@@ -12,6 +13,7 @@ use base64::engine::general_purpose;
 use content_security_policy as csp;
 use crossbeam_channel::Sender;
 use devtools_traits::DevtoolsControlMsg;
+use embedder_traits::GenericEmbedderProxy;
 use embedder_traits::resources::{self, Resource};
 use headers::{AccessControlExposeHeaders, ContentType, HeaderMapExt};
 use http::header::{self, HeaderMap, HeaderName, RANGE};
@@ -45,6 +47,7 @@ use tokio::sync::Mutex as TokioMutex;
 use tokio::sync::mpsc::{UnboundedReceiver as TokioReceiver, UnboundedSender as TokioSender};
 
 use crate::connector::CACertificates;
+use crate::embedder::NetToEmbedderMsg;
 use crate::fetch::cors_cache::CorsCache;
 use crate::fetch::fetch_params::{
     ConsumePreloadedResources, FetchParams, SharedPreloadedResources,
@@ -109,6 +112,7 @@ pub struct FetchContext {
     pub ignore_certificate_errors: bool,
     pub preloaded_resources: SharedPreloadedResources,
     pub in_flight_keep_alive_records: SharedInflightKeepAliveRecords,
+    pub embedder_proxy: GenericEmbedderProxy<NetToEmbedderMsg>,
 }
 
 #[derive(Default)]
@@ -348,7 +352,7 @@ pub async fn main_fetch(
     fetch_params: &mut FetchParams,
     cache: &mut CorsCache,
     recursive_flag: bool,
-    target: Target<'_>,
+    mut target: Target<'_>,
     done_chan: &mut DoneChannel,
     context: &FetchContext,
 ) -> Response {
@@ -792,6 +796,24 @@ pub async fn main_fetch(
         // the body got sent in one chunk
         target.process_request_body(request);
         target.process_request_eof(request);
+    }
+
+    let mut new_target;
+    if let Some(ref mime_types) = request.supported_mime_types {
+        if let Some(ref content_type) = response.metadata().ok().as_ref().and_then(|metadata| metadata.metadata().content_type.as_ref()) {
+            let mime = Mime::from(content_type.0.clone());
+            let supported_mime = mime_types.iter().any(|supported| {
+                let supported = Mime::from_str(supported).unwrap();
+                supported.type_() == mime.type_() &&
+                    supported.subtype() == mime.subtype()
+            });
+            if !supported_mime {
+                new_target = context.state.offer_unsupported_response(&request, &response).await;
+                if let Some(new_target) = new_target.as_mut() {
+                    target = &mut **new_target;
+                }
+            }
+        }
     }
 
     // Step 22.

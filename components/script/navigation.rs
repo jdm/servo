@@ -232,6 +232,15 @@ impl InProgressLoad {
         .redirect_mode(RedirectMode::Manual)
         .origin(self.origin.immutable().clone())
         .crash(self.load_data.crash.clone())
+        // TODO: derive this list from the types supported in servoparser
+        // TODO: make this behaviour a preference?
+        // TODO: send an empty vec for anchors with download attribute or Save Link As
+        // TODO: how to get the filename attribute from the anchor to the embedder?
+        .supported_mime_types(vec![
+            mime::TEXT_HTML,
+            mime::TEXT_PLAIN,
+            mime::TEXT_XML,
+        ])
         .client(request_client);
         request_builder.url_list = self.url_list.clone();
 

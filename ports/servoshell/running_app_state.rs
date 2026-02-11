@@ -29,6 +29,7 @@ use servo::{
 };
 use url::Url;
 
+use crate::desktop::app::Downloads;
 #[cfg(all(
     feature = "gamepad",
     not(any(target_os = "android", target_env = "ohos"))
@@ -216,6 +217,8 @@ pub(crate) struct RunningAppState {
 
     /// The currently focused [`ServoShellWindow`], if one is focused.
     focused_window: RefCell<Option<Rc<ServoShellWindow>>>,
+
+    downloads: Rc<Downloads>
 }
 
 impl RunningAppState {
@@ -225,6 +228,7 @@ impl RunningAppState {
         event_loop_waker: Box<dyn EventLoopWaker>,
         user_content_manager: Rc<UserContentManager>,
         default_preferences: Preferences,
+        downloads: Rc<Downloads>,
         #[cfg(all(
             feature = "gamepad",
             not(any(target_os = "android", target_env = "ohos"))
@@ -265,6 +269,7 @@ impl RunningAppState {
             exit_scheduled: Default::default(),
             user_content_manager,
             experimental_preferences_enabled,
+            downloads,
         }
     }
 
@@ -859,9 +864,25 @@ impl WebViewDelegate for RunningAppState {
         self.platform_window_for_webview_id(webview.id())
             .notify_accessibility_tree_update(webview, tree_update);
     }
+
+    fn notify_unsupported_response(
+        &self,
+        webview: WebView,
+        response: servo::UnsupportedResponse) {
+        self.platform_window_for_webview_id(webview.id())
+            .request_download(response);
+    }
+
+    fn notify_response_chunk(&self, _webview: WebView, request_id: servo::RequestId, chunk: Vec<u8>) {
+        self.downloads.update(request_id, chunk);
+    }
+    fn notify_response_eof(&self, _webview: WebView, request_id: servo::RequestId, result: Result<(), ()>) {
+        self.downloads.complete(request_id, result);
+    }
 }
 
 struct ServoShellServoDelegate;
+
 impl ServoDelegate for ServoShellServoDelegate {
     fn notify_devtools_server_started(&self, port: u16, _token: String) {
         info!("Devtools Server running on port {port}");

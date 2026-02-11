@@ -98,6 +98,7 @@ layout = { path = "../layout" }
 layout_api = { workspace = true }
 log = { workspace = true }
 media = { path = "../media/media-thread" }
+mime = { workspace = true }
 mozangle = { workspace = true }
 net = { path = "../net" }
 net_traits = { workspace = true }

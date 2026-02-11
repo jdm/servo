@@ -109,6 +109,7 @@ impl HeadedWindow {
         event_loop: &ActiveEventLoop,
         event_loop_proxy: EventLoopProxy<AppEvent>,
         initial_url: Url,
+        downloads: Rc<super::app::Downloads>,
     ) -> Rc<Self> {
         let no_native_titlebar = servoshell_preferences.no_native_titlebar;
         let inner_size = servoshell_preferences.initial_window_size;
@@ -189,6 +190,7 @@ impl HeadedWindow {
             event_loop_proxy,
             rendering_context.clone(),
             initial_url,
+            downloads,
         ));
 
         debug!("Created window {:?}", winit_window.id());
@@ -760,16 +762,24 @@ impl HeadedWindow {
     }
 
     pub(crate) fn handle_winit_app_event(&self, _window: &ServoShellWindow, app_event: AppEvent) {
-        if let AppEvent::Accessibility(ref event) = app_event {
-            // TODO(#41930): Forward accesskit_winit::WindowEvent events to Servo where appropriate
+        match app_event {
+            AppEvent::Waker => {},
+            AppEvent::Download(event) => {
+                self.gui
+                    .borrow_mut()
+                    .handle_download(event);
+            },
+            AppEvent::Accessibility(event) => {
+                // TODO(#41930): Forward accesskit_winit::WindowEvent events to Servo where appropriate
 
-            if self
-                .gui
-                .borrow_mut()
-                .handle_accesskit_event(&event.window_event)
-            {
-                self.winit_window.request_redraw();
-            }
+                if self
+                    .gui
+                    .borrow_mut()
+                    .handle_accesskit_event(&event.window_event)
+                {
+                    self.winit_window.request_redraw();
+                }
+            },
         }
     }
 }
@@ -1145,6 +1155,10 @@ impl PlatformWindow for HeadedWindow {
         self.gui
             .borrow_mut()
             .notify_accessibility_tree_update(tree_update);
+    }
+
+    fn request_download(&self, response: servo::UnsupportedResponse) {
+        self.gui.borrow_mut().handle_download(response);
     }
 }
 

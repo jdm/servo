@@ -9,6 +9,8 @@ use embedder_traits::{
     AuthenticationResponse, EmbedderControlId, FilePickerRequest, WebResourceRequest,
     WebResourceResponseMsg,
 };
+use net_traits::NetworkError;
+use net_traits::request::RequestId;
 use servo_url::ServoUrl;
 use tokio::sync::mpsc::UnboundedSender as TokioSender;
 use tokio::sync::oneshot::Sender as TokioOneshotSender;
@@ -33,4 +35,17 @@ pub enum NetToEmbedderMsg {
         bool, /* for proxy */
         TokioOneshotSender<Option<AuthenticationResponse>>,
     ),
+    ///
+    OfferUnsupportedResponse {
+        webview_id: WebViewId,
+        request_id: RequestId,
+        url: ServoUrl,
+        content_type: Option<mime::Mime>,
+        filename_hint: Option<String>,
+        responder: TokioOneshotSender<bool>,
+    },
+    ///
+    FetchResponseChunk(WebViewId, RequestId, Vec<u8>),
+    ///
+    FetchResponseEof(WebViewId, RequestId, Result<(), NetworkError>),
 }

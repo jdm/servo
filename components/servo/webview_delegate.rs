@@ -991,6 +991,46 @@ pub trait WebViewDelegate {
         _tree_update: accesskit::TreeUpdate,
     ) {
     }
+
+    ///
+    fn notify_unsupported_response(
+        &self,
+        _webview: WebView,
+        _response: UnsupportedResponse) {}
+    fn notify_response_chunk(
+        &self,
+        _webview: WebView,
+        _request_id: net_traits::request::RequestId,
+        _chunk: Vec<u8>) {}
+    fn notify_response_eof(
+        &self,
+        _webview: WebView,
+        _request_id: net_traits::request::RequestId,
+        _result: Result<(), ()>,
+    ) {}
+}
+
+pub struct UnsupportedResponse {
+    pub request_id: net_traits::request::RequestId,
+    pub url: servo_url::ServoUrl,
+    pub content_type: Option<mime::Mime>,
+    pub(crate) responder: crate::responders::IpcResponder<bool>,
+}
+
+impl std::fmt::Debug for UnsupportedResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        f.write_str("UnsupportedResponse(..)")
+    }
+}
+
+impl UnsupportedResponse {
+    pub fn accept(&mut self) {
+        let _ = self.responder.send(true);
+    }
+
+    pub fn decline(&mut self) {
+        let _ = self.responder.send(false);
+    }
 }
 
 pub(crate) struct DefaultWebViewDelegate;

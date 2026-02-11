@@ -28,6 +28,11 @@ pub enum Dialog {
         dialog: EguiFileDialog,
         maybe_picker: Option<FilePicker>,
     },
+    /*Save {
+        dialog: EguiFileDialog,
+        
+        
+    },*/
     Alert(Option<AlertDialog>),
     Confirm(Option<ConfirmDialog>),
     Prompt(Option<PromptDialog>),

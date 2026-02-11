@@ -341,6 +341,30 @@ impl ServoInner {
                         .request_authentication(webview, authentication_request);
                 }
             },
+            NetToEmbedderMsg::OfferUnsupportedResponse {
+                webview_id, request_id, url, content_type, responder, ..
+            } => {
+                if let Some(webview) = self.get_webview_handle(webview_id) {
+                    let sender = crate::responders::OneshotSender::from(responder);
+                    let response = crate::webview_delegate::UnsupportedResponse {
+                        request_id,
+                        url,
+                        content_type,
+                        responder: crate::responders::IpcResponder::new_same_process(Box::new(sender), false),
+                    };
+                    webview.delegate().notify_unsupported_response(webview, response);
+                }
+            },
+            NetToEmbedderMsg::FetchResponseChunk(webview_id, request_id, chunk) => {
+                if let Some(webview) = self.get_webview_handle(webview_id) {
+                    webview.delegate().notify_response_chunk(webview, request_id, chunk);
+                }
+            },
+            NetToEmbedderMsg::FetchResponseEof(webview_id, request_id, result) => {
+                if let Some(webview) = self.get_webview_handle(webview_id) {
+                    webview.delegate().notify_response_eof(webview, request_id, result.map_err(|_| ()));
+                }
+            },
         }
     }
 

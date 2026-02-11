@@ -443,4 +443,6 @@ pub(crate) trait PlatformWindow {
     }
 
     fn notify_accessibility_tree_update(&self, _: WebView, _: accesskit::TreeUpdate) {}
+
+    fn request_download(&self, _response: servo::UnsupportedResponse) {}
 }

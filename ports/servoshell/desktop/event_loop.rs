@@ -19,6 +19,7 @@ pub enum AppEvent {
     /// Another process or thread has kicked the OS event loop with EventLoopWaker.
     Waker,
     Accessibility(egui_winit::accesskit_winit::Event),
+    Download(servo::UnsupportedResponse),
 }
 
 impl From<egui_winit::accesskit_winit::Event> for AppEvent {
@@ -32,6 +33,7 @@ impl AppEvent {
         match self {
             AppEvent::Waker => None,
             AppEvent::Accessibility(event) => Some(event.window_id),
+            AppEvent::Download(..) => None,
         }
     }
 }
