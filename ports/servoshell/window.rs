@@ -38,6 +38,12 @@ impl From<u64> for ServoShellWindowId {
     }
 }
 
+impl From<ServoShellWindowId> for u64 {
+    fn from(id: ServoShellWindowId) -> u64 {
+        id.0
+    }
+}
+
 pub(crate) struct ServoShellWindow {
     /// The [`WebView`]s that have been added to this window.
     pub(crate) webview_collection: RefCell<WebViewCollection>,

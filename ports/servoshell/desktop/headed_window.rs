@@ -47,7 +47,7 @@ use {
 use super::geometry::{winit_position_to_euclid_point, winit_size_to_euclid_size};
 use super::keyutils::{CMD_OR_ALT, keyboard_event_from_winit};
 use crate::desktop::accelerated_gl_media::setup_gl_accelerated_media;
-use crate::desktop::dialog::Dialog;
+use crate::desktop::dialog::{Dialog, AppPicker};
 use crate::desktop::event_loop::AppEvent;
 use crate::desktop::gui::Gui;
 use crate::desktop::keyutils::CMD_OR_CONTROL;
@@ -101,6 +101,10 @@ pub struct HeadedWindow {
     visible_input_methods: RefCell<Vec<EmbedderControlId>>,
     /// The position of the mouse cursor after the most recent `MouseMove` event.
     last_mouse_position: Cell<Option<Point2D<f32, DeviceIndependentPixel>>>,
+    ///
+    event_loop_proxy: EventLoopProxy<AppEvent>,
+    ///
+    downloads: Rc<super::app::Downloads>,
 }
 
 impl HeadedWindow {
@@ -187,10 +191,9 @@ impl HeadedWindow {
         let gui = RefCell::new(Gui::new(
             &winit_window,
             event_loop,
-            event_loop_proxy,
+            event_loop_proxy.clone(),
             rendering_context.clone(),
             initial_url,
-            downloads,
         ));
 
         debug!("Created window {:?}", winit_window.id());
@@ -215,6 +218,8 @@ impl HeadedWindow {
             dialogs: Default::default(),
             visible_input_methods: Default::default(),
             last_mouse_position: Default::default(),
+            event_loop_proxy,
+            downloads,
         })
     }
 
@@ -765,9 +770,7 @@ impl HeadedWindow {
         match app_event {
             AppEvent::Waker => {},
             AppEvent::Download(event) => {
-                self.gui
-                    .borrow_mut()
-                    .handle_download(event);
+                self.downloads.start(event);
             },
             AppEvent::Accessibility(event) => {
                 // TODO(#41930): Forward accesskit_winit::WindowEvent events to Servo where appropriate
@@ -1158,7 +1161,21 @@ impl PlatformWindow for HeadedWindow {
     }
 
     fn request_download(&self, response: servo::UnsupportedResponse) {
-        self.gui.borrow_mut().handle_download(response);
+        let default_filename = response.url.path().rsplit_once('/')
+            .map(|(_, name)| name)
+            .unwrap()
+            .to_string();
+        self.add_dialog(
+            response.webview_id.clone(),
+            Dialog::new_save_file_dialog(AppPicker {
+                window_id: self.id(),
+                request_id: response.request_id.clone(),
+                event_loop_proxy: self.event_loop_proxy.clone(),
+                default_filename,
+                path: None,
+            }),
+        );
+        self.downloads.note(response);
     }
 }
 

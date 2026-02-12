@@ -40,9 +40,6 @@ pub struct Gui {
 
     location: String,
 
-    pending_download_requests: Vec<servo::UnsupportedResponse>,
-    downloads: Rc<super::app::Downloads>,
-
     /// Whether the location has been edited by the user without clicking Go.
     location_dirty: bool,
 
@@ -89,7 +86,6 @@ impl Gui {
         event_loop_proxy: EventLoopProxy<AppEvent>,
         rendering_context: Rc<OffscreenRenderingContext>,
         initial_url: Url,
-        downloads: Rc<super::app::Downloads>,
     ) -> Self {
         rendering_context
             .make_current()
@@ -128,8 +124,6 @@ impl Gui {
             can_go_back: false,
             can_go_forward: false,
             favicon_textures: Default::default(),
-            pending_download_requests: Default::default(),
-            downloads,
         }
     }
 
@@ -594,16 +588,6 @@ impl Gui {
             self.update_location_in_toolbar(window) |
             self.update_status_text(window) |
             self.update_can_go_back_and_forward(window)
-    }
-
-    pub(crate) fn handle_download(&mut self, mut response: servo::UnsupportedResponse) {
-        let Some((_, filename)) = response.url.path().rsplit_once("/") else {
-            return;
-        };
-        let path: std::path::PathBuf = ["/tmp", "download", filename].iter().collect();
-        self.downloads.start(response.request_id.clone(), path);
-        println!("accepting {}", response.url);
-        response.accept();
     }
 
     /// Returns true if a redraw is required after handling the provided event.

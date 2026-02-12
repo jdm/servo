@@ -2,7 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use egui::{
@@ -15,12 +15,47 @@ use servo::{
     AlertDialog, AuthenticationRequest, ColorPicker, ConfirmDialog, ContextMenu, ContextMenuItem,
     DeviceIndependentPixel, EmbedderControlId, FilePicker, GenericSender, PermissionRequest,
     PromptDialog, RgbColor, SelectElement, SelectElementOption, SelectElementOptionOrOptgroup,
-    SimpleDialog,
+    SimpleDialog, RequestId,
 };
+use winit::event_loop::EventLoopProxy;
+
+use crate::desktop::event_loop::AppEvent;
 
 /// The minimum width of many UI elements including dialog boxes and menus,
 /// for the sake of consistency.
 const MINIMUM_UI_ELEMENT_WIDTH: f32 = 150.0;
+
+pub struct AppPicker {
+    pub window_id: crate::window::ServoShellWindowId,
+    pub request_id: RequestId,
+    pub event_loop_proxy: EventLoopProxy<AppEvent>,
+    pub default_filename: String,
+    pub path: Option<PathBuf>,
+}
+
+impl AppPicker {
+    pub fn save(&mut self, path: &PathBuf) {
+        self.path = Some(path.clone());
+    }
+
+    pub fn submit(self) {
+        let event = super::event_loop::DownloadEvent {
+            path: self.path,
+            request_id: self.request_id,
+            window_id: u64::from(self.window_id).into(),
+        };
+        let _ = self.event_loop_proxy.send_event(AppEvent::Download(event));
+    }
+
+    pub fn cancel(self) {
+        let event = super::event_loop::DownloadEvent {
+            path: None,
+            request_id: self.request_id,
+            window_id: u64::from(self.window_id).into(),
+        };
+        let _ = self.event_loop_proxy.send_event(AppEvent::Download(event));
+    }
+}
 
 #[expect(clippy::large_enum_variant)]
 pub enum Dialog {
@@ -28,11 +63,10 @@ pub enum Dialog {
         dialog: EguiFileDialog,
         maybe_picker: Option<FilePicker>,
     },
-    /*Save {
+    Save {
         dialog: EguiFileDialog,
-        
-        
-    },*/
+        maybe_picker: Option<AppPicker>,
+    },
     Alert(Option<AlertDialog>),
     Confirm(Option<ConfirmDialog>),
     Prompt(Option<PromptDialog>),
@@ -66,6 +100,15 @@ pub enum Dialog {
 }
 
 impl Dialog {
+    pub fn new_save_file_dialog(app_picker: AppPicker) -> Self {
+        let dialog = EguiFileDialog::new()
+            .default_file_name(&app_picker.default_filename);
+        Dialog::Save {
+            dialog,
+            maybe_picker: Some(app_picker),
+        }
+    }
+
     pub fn new_file_dialog(file_picker: FilePicker) -> Self {
         let mut dialog = EguiFileDialog::new();
         if !file_picker.filter_patterns().is_empty() {
@@ -163,6 +206,45 @@ impl Dialog {
         }
 
         match self {
+            Dialog::Save {
+                dialog,
+                maybe_picker,
+            } => {
+                let action = maybe_picker
+                    .as_mut()
+                    .map(|picker| {
+                        if *dialog.state() == DialogState::Closed {
+                            dialog.save_file();
+                        }
+
+                        let state = dialog.update(ctx).state();
+                        match state {
+                            DialogState::Open => DialogAction::Continue,
+                            DialogState::Picked(path) => {
+                                picker.save(path);
+                                DialogAction::Submit
+                            },
+                            DialogState::PickedMultiple(..) => unreachable!(),
+                            DialogState::Cancelled | DialogState::Closed => DialogAction::Dismiss,
+                        }
+                    })
+                    .unwrap_or(DialogAction::Dismiss);
+
+                match action {
+                    DialogAction::Dismiss => {
+                        if let Some(picker) = maybe_picker.take() {
+                            picker.cancel();
+                        }
+                    },
+                    DialogAction::Submit => {
+                        if let Some(picker) = maybe_picker.take() {
+                            picker.submit();
+                        }
+                    },
+                    DialogAction::Continue => {},
+                }
+                matches!(action, DialogAction::Continue)
+            },
             Dialog::File {
                 dialog,
                 maybe_picker,

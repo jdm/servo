@@ -43,6 +43,7 @@ pub(crate) enum AppState {
 }
 
 pub struct Downloads {
+    pending: RefCell<HashMap<servo::RequestId, servo::UnsupportedResponse>>,
     active: RefCell<HashMap<servo::RequestId, std::path::PathBuf>>,
 }
 
@@ -50,17 +51,36 @@ impl Downloads {
     pub fn new() -> Rc<Downloads> {
         Rc::new(Downloads {
             active: Default::default(),
+            pending: Default::default(),
         })
     }
-}
 
-impl Downloads {
-    pub fn start(&self, request_id: servo::RequestId, path: std::path::PathBuf) {
+    pub fn note(&self, response: servo::UnsupportedResponse) {
+        self.pending.borrow_mut().insert(response.request_id.clone(), response);
+    }
+
+    pub fn start(&self, event: super::event_loop::DownloadEvent) {
+        let Some(mut response) = self.pending.borrow_mut().remove(&event.request_id) else {
+            return;
+        };
+        let Some(path) = event.path else {
+            // Automatically cancels the pending response if we don't have a path.
+            return;
+        };
+        /*let Some((_, filename)) = response.url.path().rsplit_once("/") else {
+            return;
+        };
+        let path: std::path::PathBuf = ["/tmp", "download", filename].iter().collect();*/
+
         if let Err(error) = std::fs::File::create(&path) {
             println!("Error creating downlaod for {}: {error:?}", path.display());
             return;
         };
-        self.active.borrow_mut().insert(request_id, path);
+
+        println!("accepting {}, writing to {}", response.url, path.display());
+        response.accept();
+
+        self.active.borrow_mut().insert(event.request_id, path);
     }
     pub fn update(&self, request_id: servo::RequestId, chunk: Vec<u8>) {
         if let Some(filename) = self.active.borrow().get(&request_id) {

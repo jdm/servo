@@ -1011,6 +1011,7 @@ pub trait WebViewDelegate {
 }
 
 pub struct UnsupportedResponse {
+    pub webview_id: base::id::WebViewId,
     pub request_id: net_traits::request::RequestId,
     pub url: servo_url::ServoUrl,
     pub content_type: Option<mime::Mime>,

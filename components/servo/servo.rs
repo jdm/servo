@@ -347,6 +347,7 @@ impl ServoInner {
                 if let Some(webview) = self.get_webview_handle(webview_id) {
                     let sender = crate::responders::OneshotSender::from(responder);
                     let response = crate::webview_delegate::UnsupportedResponse {
+                        webview_id,
                         request_id,
                         url,
                         content_type,

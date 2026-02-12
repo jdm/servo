@@ -4,22 +4,30 @@
 
 //! An event loop implementation that works in headless mode.
 
+use std::path::PathBuf;
 use std::sync::{Arc, Condvar, Mutex};
 use std::time;
 
 use log::warn;
-use servo::EventLoopWaker;
+use servo::{EventLoopWaker, RequestId};
 use winit::event_loop::{EventLoop, EventLoop as WinitEventLoop, EventLoopProxy};
 use winit::window::WindowId;
 
 use super::app::App;
 
 #[derive(Debug)]
+pub struct DownloadEvent {
+    pub path: Option<PathBuf>,
+    pub request_id: RequestId,
+    pub window_id: WindowId,
+}
+
+#[derive(Debug)]
 pub enum AppEvent {
     /// Another process or thread has kicked the OS event loop with EventLoopWaker.
     Waker,
     Accessibility(egui_winit::accesskit_winit::Event),
-    Download(servo::UnsupportedResponse),
+    Download(DownloadEvent),
 }
 
 impl From<egui_winit::accesskit_winit::Event> for AppEvent {
@@ -33,7 +41,7 @@ impl AppEvent {
         match self {
             AppEvent::Waker => None,
             AppEvent::Accessibility(event) => Some(event.window_id),
-            AppEvent::Download(..) => None,
+            AppEvent::Download(event) => Some(event.window_id),
         }
     }
 }
