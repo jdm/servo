@@ -1015,6 +1015,7 @@ pub struct UnsupportedResponse {
     pub request_id: net_traits::request::RequestId,
     pub url: servo_url::ServoUrl,
     pub content_type: Option<mime::Mime>,
+    pub default_filename: String,
     pub(crate) responder: crate::responders::IpcResponder<bool>,
 }
 

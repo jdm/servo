@@ -1161,17 +1161,13 @@ impl PlatformWindow for HeadedWindow {
     }
 
     fn request_download(&self, response: servo::UnsupportedResponse) {
-        let default_filename = response.url.path().rsplit_once('/')
-            .map(|(_, name)| name)
-            .unwrap()
-            .to_string();
         self.add_dialog(
             response.webview_id.clone(),
             Dialog::new_save_file_dialog(AppPicker {
                 window_id: self.id(),
                 request_id: response.request_id.clone(),
                 event_loop_proxy: self.event_loop_proxy.clone(),
-                default_filename,
+                default_filename: response.default_filename.clone(),
                 path: None,
             }),
         );

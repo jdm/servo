@@ -41,7 +41,7 @@ pub enum NetToEmbedderMsg {
         request_id: RequestId,
         url: ServoUrl,
         content_type: Option<mime::Mime>,
-        filename_hint: Option<String>,
+        default_filename: String,
         responder: TokioOneshotSender<bool>,
     },
     ///

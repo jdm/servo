@@ -342,7 +342,7 @@ impl ServoInner {
                 }
             },
             NetToEmbedderMsg::OfferUnsupportedResponse {
-                webview_id, request_id, url, content_type, responder, ..
+                webview_id, request_id, url, content_type, responder, default_filename,
             } => {
                 if let Some(webview) = self.get_webview_handle(webview_id) {
                     let sender = crate::responders::OneshotSender::from(responder);
@@ -351,6 +351,7 @@ impl ServoInner {
                         request_id,
                         url,
                         content_type,
+                        default_filename,
                         responder: crate::responders::IpcResponder::new_same_process(Box::new(sender), false),
                     };
                     webview.delegate().notify_unsupported_response(webview, response);

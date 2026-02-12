@@ -21,6 +21,7 @@ use js::rust::wrappers::{JS_GetPendingException, JS_ParseJSON};
 use js::typedarray::{ArrayBufferU8, Uint8};
 use mime::{self, Mime};
 use mime_multipart_hyper1::{Node, read_multipart_body};
+use net_traits::extract_filename_from_content_disposition;
 use net_traits::request::{
     BodyChunkRequest, BodyChunkResponse, BodySource as NetBodySource, RequestBody,
 };
@@ -920,29 +921,6 @@ fn extract_name_from_content_disposition(headers: &HeaderMap) -> Option<String> 
             let v = v.strip_suffix('"').unwrap_or(v);
             return Some(v.to_string());
         }
-    }
-    None
-}
-
-fn extract_filename_from_content_disposition(headers: &HeaderMap) -> Option<String> {
-    let cd = headers.get(CONTENT_DISPOSITION)?.to_str().ok()?;
-    if let Some(index) = cd.find("filename=") {
-        let start = index + "filename=".len();
-        return Some(
-            cd.get(start..)
-                .unwrap_or_default()
-                .trim_matches('"')
-                .to_owned(),
-        );
-    }
-    if let Some(index) = cd.find("filename*=UTF-8''") {
-        let start = index + "filename*=UTF-8''".len();
-        return Some(
-            cd.get(start..)
-                .unwrap_or_default()
-                .trim_matches('"')
-                .to_owned(),
-        );
     }
     None
 }
