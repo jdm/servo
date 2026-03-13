@@ -3436,51 +3436,59 @@ impl ScriptThread {
         };
 
         // Create the window and document objects.
-        let window = Window::new(
-            cx,
-            incomplete.webview_id,
-            self.js_runtime.clone(),
-            self.senders.self_sender.clone(),
-            self.layout_factory.create(layout_config),
-            font_context,
-            self.senders.image_cache_sender.clone(),
-            image_cache.clone(),
-            self.resource_threads.clone(),
-            self.storage_threads.clone(),
-            #[cfg(feature = "bluetooth")]
-            self.senders.bluetooth_sender.clone(),
-            self.senders.memory_profiler_sender.clone(),
-            self.senders.time_profiler_sender.clone(),
-            self.senders.devtools_server_sender.clone(),
-            script_to_constellation_chan,
-            self.senders.pipeline_to_embedder_sender.clone(),
-            self.senders.constellation_sender.clone(),
-            incomplete.pipeline_id,
-            incomplete.parent_info,
-            incomplete.viewport_details,
-            origin.clone(),
-            final_url.clone(),
-            // TODO(37417): Set correct top-level URL here. Currently, we only specify the
-            // url of the current window. However, in case this is an iframe, we should
-            // pass in the URL from the frame that includes the iframe (which potentially
-            // is another nested iframe in a frame).
-            final_url.clone(),
-            incomplete.navigation_start,
-            self.webgl_chan.as_ref().map(|chan| chan.channel()),
-            #[cfg(feature = "webxr")]
-            self.webxr_registry.clone(),
-            self.paint_api.clone(),
-            self.unminify_js,
-            self.unminify_css,
-            self.local_script_source.clone(),
-            user_contents,
-            self.player_context.clone(),
-            #[cfg(feature = "webgpu")]
-            self.gpu_id_hub.clone(),
-            incomplete.load_data.inherited_secure_context,
-            incomplete.theme,
-            self.this.clone(),
-        );
+        let window = window_for_replacement(
+            &self.window_proxies,
+            incomplete.browsing_context_id,
+            &incomplete.origin,
+        )
+        .unwrap_or_else(|| {
+            Window::new(
+                cx,
+                incomplete.webview_id,
+                self.js_runtime.clone(),
+                self.senders.self_sender.clone(),
+                self.layout_factory.create(layout_config),
+                font_context,
+                self.senders.image_cache_sender.clone(),
+                image_cache.clone(),
+                self.resource_threads.clone(),
+                self.storage_threads.clone(),
+                #[cfg(feature = "bluetooth")]
+                self.senders.bluetooth_sender.clone(),
+                self.senders.memory_profiler_sender.clone(),
+                self.senders.time_profiler_sender.clone(),
+                self.senders.devtools_server_sender.clone(),
+                script_to_constellation_chan,
+                self.senders.pipeline_to_embedder_sender.clone(),
+                self.senders.constellation_sender.clone(),
+                incomplete.pipeline_id,
+                incomplete.parent_info,
+                incomplete.viewport_details,
+                origin.clone(),
+                final_url.clone(),
+                // TODO(37417): Set correct top-level URL here. Currently, we only specify the
+                // url of the current window. However, in case this is an iframe, we should
+                // pass in the URL from the frame that includes the iframe (which potentially
+                // is another nested iframe in a frame).
+                final_url.clone(),
+                incomplete.navigation_start,
+                self.webgl_chan.as_ref().map(|chan| chan.channel()),
+                #[cfg(feature = "webxr")]
+                self.webxr_registry.clone(),
+                self.paint_api.clone(),
+                self.unminify_js,
+                self.unminify_css,
+                self.local_script_source.clone(),
+                user_contents,
+                self.player_context.clone(),
+                #[cfg(feature = "webgpu")]
+                self.gpu_id_hub.clone(),
+                incomplete.load_data.inherited_secure_context,
+                incomplete.theme,
+                self.this.clone(),
+            )
+        });
+
         self.debugger_global.fire_add_debuggee(
             CanGc::from_cx(cx),
             window.upcast(),
@@ -4339,4 +4347,19 @@ impl Drop for ScriptThread {
             root.set(None);
         });
     }
+}
+
+/// Steps 1, 5, and 6 of <https://html.spec.whatwg.org/multipage/#initialise-the-document-object>
+fn window_for_replacement(
+    script_window_proxies: &ScriptWindowProxies,
+    id: BrowsingContextId,
+    origin: &MutableOrigin,
+) -> Option<DomRoot<Window>> {
+    script_window_proxies
+        .find_window_proxy(id)
+        .and_then(|window_proxy| window_proxy.document())
+        .filter(|document| {
+            document.is_initial_about_blank() && document.origin().same_origin(origin)
+        })
+        .map(|document| DomRoot::from_ref(document.window()))
 }

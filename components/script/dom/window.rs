@@ -3082,7 +3082,11 @@ impl Window {
     }
 
     pub(crate) fn init_document(&self, document: &Document) {
-        assert!(self.document.get().is_none());
+        assert!(
+            self.document
+                .get()
+                .is_none_or(|document| document.is_initial_about_blank())
+        );
         assert!(document.window() == self);
         self.document.set(Some(document));
 
