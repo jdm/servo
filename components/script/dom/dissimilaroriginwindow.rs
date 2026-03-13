@@ -69,6 +69,7 @@ impl DissimilarOriginWindow {
                 Some(global_to_clone_from.is_secure_context()),
                 false,
                 global_to_clone_from.font_context().cloned(),
+                None,
             ),
             window_proxy: Dom::from_ref(window_proxy),
             location: Default::default(),

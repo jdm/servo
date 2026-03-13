@@ -85,6 +85,7 @@ use crate::realms::{InRealm, enter_auto_realm};
 use crate::script_module::ScriptFetchOptions;
 use crate::script_runtime::{CanGc, IntroductionType, JSContext, JSContextHelper, Runtime};
 use crate::task::TaskCanceller;
+use crate::task_manager::TaskManager;
 use crate::timers::{IsInterval, TimerCallback};
 
 pub(crate) fn prepare_workerscope_init(
@@ -342,6 +343,7 @@ impl WorkerGlobalScope {
         #[cfg(feature = "webgpu")] gpu_id_hub: Arc<IdentityHub>,
         insecure_requests_policy: InsecureRequestsPolicy,
         font_context: Option<Arc<FontContext>>,
+        task_manager: TaskManager,
     ) -> Self {
         // Install a pipeline-namespace in the current thread.
         PipelineNamespace::auto_install();
@@ -369,6 +371,7 @@ impl WorkerGlobalScope {
                 init.inherited_secure_context,
                 init.unminify_js,
                 font_context,
+                Some(task_manager),
             ),
             microtask_queue: runtime.microtask_queue.clone(),
             worker_id: init.worker_id,

@@ -210,7 +210,7 @@ pub(crate) struct GlobalScope {
     crypto: MutNullableDom<Crypto>,
 
     /// A [`TaskManager`] for this [`GlobalScope`].
-    task_manager: OnceCell<TaskManager>,
+    task_manager: RefCell<Option<TaskManager>>,
 
     /// The message-port router id for this global, if it is managing ports.
     message_port_state: DomRefCell<MessagePortState>,
@@ -241,7 +241,7 @@ pub(crate) struct GlobalScope {
 
     /// Pipeline id associated with this global.
     #[no_trace]
-    pipeline_id: PipelineId,
+    pipeline_id: Cell<PipelineId>,
 
     /// A flag to indicate whether the developer tools has requested
     /// live updates from the worker.
@@ -269,7 +269,7 @@ pub(crate) struct GlobalScope {
 
     /// A handle for communicating messages to the constellation thread.
     #[no_trace]
-    script_to_constellation_chan: ScriptToConstellationChan,
+    script_to_constellation_chan: RefCell<ScriptToConstellationChan>,
 
     /// A handle for communicating messages to the Embedder.
     #[no_trace]
@@ -772,9 +772,10 @@ impl GlobalScope {
         inherited_secure_context: Option<bool>,
         unminify_js: bool,
         font_context: Option<Arc<FontContext>>,
+        task_manager: Option<TaskManager>,
     ) -> Self {
         Self {
-            task_manager: Default::default(),
+            task_manager: task_manager.into(),
             message_port_state: DomRefCell::new(MessagePortState::UnManaged),
             broadcast_channel_state: DomRefCell::new(BroadcastChannelState::UnManaged),
             blob_state: Default::default(),
@@ -784,14 +785,14 @@ impl GlobalScope {
             cookie_store: Default::default(),
             indexeddb: Default::default(),
             worker_map: DomRefCell::new(HashMapTracedValues::new_fx()),
-            pipeline_id,
+            pipeline_id: pipeline_id.into(),
             devtools_wants_updates: Default::default(),
             console_timers: DomRefCell::new(Default::default()),
             module_map: DomRefCell::new(Default::default()),
             devtools_chan,
             mem_profiler_chan,
             time_profiler_chan,
-            script_to_constellation_chan,
+            script_to_constellation_chan: script_to_constellation_chan.into(),
             script_to_embedder_chan,
             in_error_reporting_mode: Default::default(),
             resource_threads,
@@ -2473,8 +2474,8 @@ impl GlobalScope {
     }
 
     /// Get a sender to the constellation thread.
-    pub(crate) fn script_to_constellation_chan(&self) -> &ScriptToConstellationChan {
-        &self.script_to_constellation_chan
+    pub(crate) fn script_to_constellation_chan(&self) -> Ref<ScriptToConstellationChan> {
+        self.script_to_constellation_chan.borrow()
     }
 
     pub(crate) fn script_to_embedder_chan(&self) -> &ScriptToEmbedderChan {
@@ -2487,7 +2488,7 @@ impl GlobalScope {
 
     /// Get the `PipelineId` for this global scope.
     pub(crate) fn pipeline_id(&self) -> PipelineId {
-        self.pipeline_id
+        self.pipeline_id.get()
     }
 
     /// Get the origin for this global scope
@@ -2796,7 +2797,7 @@ impl GlobalScope {
                 // Step 7.3. Otherwise, the user agent may report exception to a developer console.
                 if let Some(ref chan) = self.devtools_chan {
                     let _ = chan.send(ScriptToDevtoolsControlMsg::ReportPageError(
-                        self.pipeline_id,
+                        self.pipeline_id.get(),
                         PageError {
                             error_message: error_info.message.clone(),
                             source_name: error_info.filename.clone(),
@@ -2844,17 +2845,8 @@ impl GlobalScope {
     }
 
     /// A reference to the [`TaskManager`] used to schedule tasks for this [`GlobalScope`].
-    pub(crate) fn task_manager(&self) -> &TaskManager {
-        let shared_canceller = self
-            .downcast::<WorkerGlobalScope>()
-            .map(WorkerGlobalScope::shared_task_canceller);
-        self.task_manager.get_or_init(|| {
-            TaskManager::new(
-                self.event_loop_sender(),
-                self.pipeline_id(),
-                shared_canceller,
-            )
-        })
+    pub(crate) fn task_manager(&self) -> Ref<TaskManager> {
+        Ref::map(self.task_manager.borrow(), |task_manager| task_manager.as_ref().unwrap())
     }
 
     /// Evaluate JS code on this global scope.
@@ -3558,6 +3550,27 @@ impl GlobalScope {
         // Step 5. Return timerKey.
         timer_key
     }
+
+    pub(crate) fn replace_contents(&self, data: ReplaceData) {
+        let ReplaceData {
+            pipeline_id,
+            script_to_constellation_chan,
+            creator_url,
+            task_manager,
+        } = data;
+        self.pipeline_id.set(pipeline_id);
+        *self.script_to_constellation_chan.borrow_mut() = script_to_constellation_chan;
+        *self.creation_url.borrow_mut() = creator_url;
+        *self.task_manager.borrow_mut() = Some(task_manager);
+        //self.timers.reset();
+    }
+}
+
+pub(crate) struct ReplaceData {
+    pub pipeline_id: PipelineId,
+    pub script_to_constellation_chan: ScriptToConstellationChan,
+    pub creator_url: ServoUrl,
+    pub task_manager: TaskManager,
 }
 
 /// Returns the Rust global scope from a JS global object.

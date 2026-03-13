@@ -123,6 +123,7 @@ impl WorkletGlobalScope {
                 inherited_secure_context,
                 false,
                 None, // font_context
+                None,
             ),
             base_url,
             to_script_thread_sender: init.to_script_thread_sender.clone(),

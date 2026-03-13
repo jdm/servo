@@ -61,6 +61,7 @@ use crate::dom::bindings::settings_stack::is_execution_stack_empty;
 use crate::dom::bindings::str::{DOMString, USVString};
 use crate::dom::characterdata::CharacterData;
 use crate::dom::comment::Comment;
+use crate::dom::create::create_element;
 use crate::dom::csp::{GlobalCspReporting, Violation, parse_csp_list_from_metadata};
 use crate::dom::customelementregistry::CustomElementReactionStack;
 use crate::dom::document::{Document, DocumentSource, HasBrowsingContext, IsHTMLDocument};
@@ -673,7 +674,7 @@ impl ServoParser {
         assert!(self.network_input.is_empty());
 
         if self.last_chunk_received.get() {
-            self.finish(cx);
+            self.finish(cx, true);
         }
     }
 
@@ -743,7 +744,7 @@ impl ServoParser {
     }
 
     /// <https://html.spec.whatwg.org/multipage/#the-end>
-    fn finish(&self, cx: &mut js::context::JSContext) {
+    fn finish(&self, cx: &mut js::context::JSContext, run_tokenizer: bool) {
         assert!(!self.suspended.get());
         assert!(self.last_chunk_received.get());
         assert!(self.script_input.is_empty());
@@ -755,7 +756,9 @@ impl ServoParser {
             .set_ready_state(DocumentReadyState::Interactive, CanGc::from_cx(cx));
 
         // Step 2.
-        self.tokenizer.end(cx);
+        if run_tokenizer {
+            self.tokenizer.end(cx);
+        }
         self.document.set_current_parser(None);
 
         // Steps 3-12 are in another castle, namely finish_load.
@@ -883,19 +886,19 @@ impl Tokenizer {
 /// <https://html.spec.whatwg.org/multipage/#navigation-params>
 /// This does not have the relevant fields, but mimics the intent
 /// of the struct when used in loading document spec algorithms.
-struct NavigationParams {
+pub(crate) struct NavigationParams {
     /// <https://html.spec.whatwg.org/multipage/#navigation-params-policy-container>
-    policy_container: PolicyContainer,
+    pub(crate) policy_container: PolicyContainer,
     /// content-type of this document, if known. Otherwise need to sniff it
-    content_type: Option<Mime>,
+    pub(crate) content_type: Option<Mime>,
     /// link headers from the response
-    link_headers: Vec<LinkHeader>,
+    pub(crate) link_headers: Vec<LinkHeader>,
     /// <https://html.spec.whatwg.org/multipage/#navigation-params-sandboxing>
-    final_sandboxing_flag_set: SandboxingFlagSet,
+    pub(crate) final_sandboxing_flag_set: SandboxingFlagSet,
     /// <https://mimesniff.spec.whatwg.org/#resource-header>
-    resource_header: Vec<u8>,
+    pub(crate) resource_header: Vec<u8>,
     /// <https://html.spec.whatwg.org/multipage/#navigation-params-about-base-url>
-    about_base_url: Option<ServoUrl>,
+    pub(crate) about_base_url: Option<ServoUrl>,
 }
 
 /// The context required for asynchronously fetching a document
@@ -978,35 +981,12 @@ impl ParserContext {
 
     /// <https://html.spec.whatwg.org/multipage/#initialise-the-document-object>
     fn initialize_document_object(&self, document: &Document) {
-        // Step 9. Let document be a new Document, with
-        document.set_policy_container(self.navigation_params.policy_container.clone());
-        document.set_active_sandboxing_flag_set(self.navigation_params.final_sandboxing_flag_set);
-        document.set_about_base_url(self.navigation_params.about_base_url.clone());
-        // Step 17. Process link headers given document, navigationParams's response, and "pre-media".
-        process_link_headers(
-            &self.navigation_params.link_headers,
-            document,
-            LinkProcessingPhase::PreMedia,
-        );
+        initialize_document_object(document, &self.navigation_params);
     }
 
     /// Part of various load document methods
     fn process_link_headers_in_media_phase_with_task(&mut self, document: &Document) {
-        // The first task that the networking task source places on the task queue
-        // while fetching runs must process link headers given document,
-        // navigationParams's response, and "media", after the task has been processed by the HTML parser.
-        let link_headers = std::mem::take(&mut self.navigation_params.link_headers);
-        if !link_headers.is_empty() {
-            let window = document.window();
-            let document = Trusted::new(document);
-            window
-                .upcast::<GlobalScope>()
-                .task_manager()
-                .networking_task_source()
-                .queue(task!(process_link_headers_task: move || {
-                    process_link_headers(&link_headers, &document.root(), LinkProcessingPhase::Media);
-                }));
-        }
+        process_link_headers_in_media_phase_with_task(document, &mut self.navigation_params);
     }
 
     /// <https://html.spec.whatwg.org/multipage/#loading-a-document>
@@ -1038,7 +1018,7 @@ impl ParserContext {
         };
         match media_type {
             // Return the result of loading an HTML document, given navigationParams.
-            MediaType::Html => self.load_html_document(parser),
+            MediaType::Html => self.load_html_document(cx, parser),
             // Return the result of loading an XML document given navigationParams and type.
             MediaType::Xml => self.load_xml_document(parser),
             // Return the result of loading a text document given navigationParams and type.
@@ -1067,14 +1047,8 @@ impl ParserContext {
     }
 
     /// <https://html.spec.whatwg.org/multipage/#navigate-html>
-    fn load_html_document(&mut self, parser: &ServoParser) {
-        // Step 1. Let document be the result of creating and initializing a
-        // Document object given "html", "text/html", and navigationParams.
-        self.initialize_document_object(&parser.document);
-        // The first task that the networking task source places on the task queue while fetching
-        // runs must process link headers given document, navigationParams's response, and "media",
-        // after the task has been processed by the HTML parser.
-        self.process_link_headers_in_media_phase_with_task(&parser.document);
+    fn load_html_document(&mut self, cx: &mut js::context::JSContext, parser: &ServoParser) {
+        load_html_document(cx, &parser.document, &mut self.navigation_params);
     }
 
     /// <https://html.spec.whatwg.org/multipage/#read-xml>
@@ -1429,6 +1403,8 @@ impl FetchResponseListener for ParserContext {
             return;
         }
 
+        parser.last_chunk_received.set(true);
+
         if let Err(error) = &status {
             // TODO(Savago): we should send a notification to callers #5463.
             debug!("Failed to load page URL {}, error: {error:?}", self.url);
@@ -1448,8 +1424,10 @@ impl FetchResponseListener for ParserContext {
             parser.document.set_redirect_count(timing.redirect_count);
         }
 
-        parser.last_chunk_received.set(true);
-        if !parser.suspended.get() {
+        // Per step 2 of https://html.spec.whatwg.org/multipage/#navigate-html
+        // the document contents for about:blank are already created, so we must
+        // not run the parser at this point.
+        if !parser.suspended.get() && self.url.as_str() != "about:blank" {
             parser.parse_sync(cx);
         }
 
@@ -2042,5 +2020,80 @@ fn attach_declarative_shadow_inner(host: &Node, template: &Node, attributes: &[A
             true
         },
         Err(_) => false,
+    }
+}
+
+/// <https://html.spec.whatwg.org/multipage/#populate-with-html/head/body>
+fn populate_document_for_about_blank(document: &Document, can_gc: CanGc) {
+    let create = |name| {
+        create_element(
+            QualName::new(None, ns!(html), name),
+            None,
+            document,
+            ElementCreator::ParserCreated(1),
+            CustomElementCreationMode::Asynchronous,
+            None,
+            can_gc,
+        )
+    };
+    // Step 1. Let html be the result of creating an element given document, "html", and the HTML namespace.
+    let html = create(local_name!("html"));
+    // Step 2. Let head be the result of creating an element given document, "head", and the HTML namespace.
+    let head = create(local_name!("head"));
+    // Step 3. Let body be the result of creating an element given document, "body", and the HTML namespace.
+    let body = create(local_name!("body"));
+    // Step 4. Append html to document.
+    document.upcast::<Node>().AppendChild(html.upcast(), can_gc).expect("infallible");
+    // Step 5. Append head to html.
+    html.upcast::<Node>().AppendChild(head.upcast(), can_gc).expect("infallible");
+    // Step 6. Append body to html.
+    html.upcast::<Node>().AppendChild(body.upcast(), can_gc).expect("infallible");
+}
+
+/// <https://html.spec.whatwg.org/multipage/#navigate-html>
+pub(crate) fn load_html_document(cx: &mut js::context::JSContext, document: &Document, navigation_params: &mut NavigationParams) {
+    // Step 1. Let document be the result of creating and initializing a
+    // Document object given "html", "text/html", and navigationParams.
+    initialize_document_object(document, navigation_params);
+    // Step 2. If document's URL is about:blank, then populate with html/head/body given document.
+    if document.url().as_str() == "about:blank" {
+        populate_document_for_about_blank(document, CanGc::from_cx(cx));
+    }
+    // The first task that the networking task source places on the task queue while fetching
+    // runs must process link headers given document, navigationParams's response, and "media",
+    // after the task has been processed by the HTML parser.
+    process_link_headers_in_media_phase_with_task(document, navigation_params);
+}
+
+/// <https://html.spec.whatwg.org/multipage/#initialise-the-document-object>
+fn initialize_document_object(document: &Document, navigation_params: &NavigationParams) {
+    // Step 9. Let document be a new Document, with
+    document.set_policy_container(navigation_params.policy_container.clone());
+    document.set_active_sandboxing_flag_set(navigation_params.final_sandboxing_flag_set);
+    document.set_about_base_url(navigation_params.about_base_url.clone());
+    // Step 17. Process link headers given document, navigationParams's response, and "pre-media".
+    process_link_headers(
+        &navigation_params.link_headers,
+        document,
+        LinkProcessingPhase::PreMedia,
+    );
+}
+
+/// Part of various load document methods
+fn process_link_headers_in_media_phase_with_task(document: &Document, navigation_params: &mut NavigationParams) {
+    // The first task that the networking task source places on the task queue
+    // while fetching runs must process link headers given document,
+    // navigationParams's response, and "media", after the task has been processed by the HTML parser.
+    let link_headers = std::mem::take(&mut navigation_params.link_headers);
+    if !link_headers.is_empty() {
+        let window = document.window();
+        let document = Trusted::new(document);
+        window
+            .upcast::<GlobalScope>()
+            .task_manager()
+            .networking_task_source()
+            .queue(task!(process_link_headers_task: move || {
+                process_link_headers(&link_headers, &document.root(), LinkProcessingPhase::Media);
+            }));
     }
 }

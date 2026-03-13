@@ -56,7 +56,8 @@ impl GPUMethods<crate::DomTypeHolder> for GPU {
     ) -> Rc<Promise> {
         let global = &self.global();
         let promise = Promise::new_in_current_realm(comp, can_gc);
-        let task_source = global.task_manager().dom_manipulation_task_source();
+        let task_manager = global.task_manager();
+        let task_source = task_manager.dom_manipulation_task_source();
         let callback = callback_promise(&promise, self, task_source);
 
         let power_preference = match options.powerPreference {

@@ -57,6 +57,8 @@ use crate::messaging::{CommonScriptMsg, ScriptEventLoopReceiver, ScriptEventLoop
 use crate::realms::{AlreadyInRealm, InRealm, enter_realm};
 use crate::script_runtime::ScriptThreadEventCategory::WorkerEvent;
 use crate::script_runtime::{CanGc, JSContext as SafeJSContext, Runtime, ThreadSafeJSContext};
+use crate::task::TaskCanceller;
+use crate::task_manager::TaskManager;
 use crate::task_queue::{QueuedTask, QueuedTaskConversion, TaskQueue};
 use crate::task_source::{SendableTaskSource, TaskSourceName};
 
@@ -277,6 +279,17 @@ impl DedicatedWorkerGlobalScope {
         insecure_requests_policy: InsecureRequestsPolicy,
         font_context: Option<Arc<FontContext>>,
     ) -> DedicatedWorkerGlobalScope {
+        let task_manager = TaskManager::new(
+            /*ScriptEventLoopSender::DedicatedWorker {
+                sender: own_sender.clone(),
+                main_thread_worker: panic!(),
+            }*/None,
+            init.pipeline_id.clone(),
+            Some(TaskCanceller {
+                cancelled: closing.clone(),
+            }),
+        );
+
         DedicatedWorkerGlobalScope {
             workerglobalscope: WorkerGlobalScope::new_inherited(
                 init,
@@ -290,6 +303,7 @@ impl DedicatedWorkerGlobalScope {
                 gpu_id_hub,
                 insecure_requests_policy,
                 font_context,
+                task_manager,
             ),
             webview_id,
             task_queue: TaskQueue::new(receiver, own_sender.clone()),

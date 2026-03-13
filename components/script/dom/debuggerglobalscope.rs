@@ -109,6 +109,7 @@ impl DebuggerGlobalScope {
                 None,
                 false,
                 None, // font_context
+                None,
             ),
             devtools_to_script_sender,
             get_possible_breakpoints_result_sender: RefCell::new(None),

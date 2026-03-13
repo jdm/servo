@@ -3160,7 +3160,7 @@ impl ScriptThread {
         };
 
         let load = self.incomplete_loads.borrow_mut().remove(idx);
-        metadata.map(|meta| self.load(meta, load, cx))
+        metadata.and_then(|meta| self.load(meta, load, cx))
     }
 
     /// Handles a request for the window title.
@@ -3198,22 +3198,26 @@ impl ScriptThread {
                 parser.abort(cx);
             }
 
-            debug!("{pipeline_id}: Shutting down layout");
-            document.window().layout_mut().exit_now();
+            if document.is_window_relevant() {
+                debug!("{pipeline_id}: Shutting down layout");
+                document.window().layout_mut().exit_now();
+            }
 
             // Clear any active animations and unroot all of the associated DOM objects.
             debug!("{pipeline_id}: Clearing animations");
             document.animations().clear();
 
-            // We discard the browsing context after requesting layout shut down,
-            // to avoid running layout on detached iframes.
-            let window = document.window();
-            if discard_bc == DiscardBrowsingContext::Yes {
-                window.discard_browsing_context();
-            }
+            if document.is_window_relevant() {
+                // We discard the browsing context after requesting layout shut down,
+                // to avoid running layout on detached iframes.
+                let window = document.window();
+                if discard_bc == DiscardBrowsingContext::Yes {
+                    window.discard_browsing_context();
+                }
 
-            debug!("{pipeline_id}: Clearing JavaScript runtime");
-            window.clear_js_runtime();
+                debug!("{pipeline_id}: Clearing JavaScript runtime");
+                window.clear_js_runtime();
+            }
         }
 
         // Prevent any further work for this Pipeline.
@@ -3369,7 +3373,7 @@ impl ScriptThread {
         metadata: Metadata,
         incomplete: InProgressLoad,
         cx: &mut js::context::JSContext,
-    ) -> DomRoot<ServoParser> {
+    ) -> Option<DomRoot<ServoParser>> {
         let script_to_constellation_chan = ScriptToConstellationChan {
             sender: self.senders.pipeline_to_constellation_sender.clone(),
             webview_id: incomplete.webview_id,
@@ -3436,58 +3440,76 @@ impl ScriptThread {
         };
 
         // Create the window and document objects.
-        let window = window_for_replacement(
+        let window = match window_for_replacement(
             &self.window_proxies,
             incomplete.browsing_context_id,
             &incomplete.origin,
-        )
-        .unwrap_or_else(|| {
-            Window::new(
-                cx,
-                incomplete.webview_id,
-                self.js_runtime.clone(),
-                self.senders.self_sender.clone(),
-                self.layout_factory.create(layout_config),
-                font_context,
-                self.senders.image_cache_sender.clone(),
-                image_cache.clone(),
-                self.resource_threads.clone(),
-                self.storage_threads.clone(),
-                #[cfg(feature = "bluetooth")]
-                self.senders.bluetooth_sender.clone(),
-                self.senders.memory_profiler_sender.clone(),
-                self.senders.time_profiler_sender.clone(),
-                self.senders.devtools_server_sender.clone(),
-                script_to_constellation_chan,
-                self.senders.pipeline_to_embedder_sender.clone(),
-                self.senders.constellation_sender.clone(),
-                incomplete.pipeline_id,
-                incomplete.parent_info,
-                incomplete.viewport_details,
-                origin.clone(),
-                final_url.clone(),
-                // TODO(37417): Set correct top-level URL here. Currently, we only specify the
-                // url of the current window. However, in case this is an iframe, we should
-                // pass in the URL from the frame that includes the iframe (which potentially
-                // is another nested iframe in a frame).
-                final_url.clone(),
-                incomplete.navigation_start,
-                self.webgl_chan.as_ref().map(|chan| chan.channel()),
-                #[cfg(feature = "webxr")]
-                self.webxr_registry.clone(),
-                self.paint_api.clone(),
-                self.unminify_js,
-                self.unminify_css,
-                self.local_script_source.clone(),
-                user_contents,
-                self.player_context.clone(),
-                #[cfg(feature = "webgpu")]
-                self.gpu_id_hub.clone(),
-                incomplete.load_data.inherited_secure_context,
-                incomplete.theme,
-                self.this.clone(),
-            )
-        });
+        ) {
+            Some(window) => {
+                let task_manager = crate::task_manager::TaskManager::new(
+                    Some(ScriptEventLoopSender::MainThread(self.senders.self_sender.clone())),
+                    incomplete.pipeline_id.clone(),
+                    None,
+                );
+
+                window.replace_contents(crate::dom::window::ReplaceData {
+                    script_to_constellation_chan,
+                    task_manager,
+                    layout: self.layout_factory.create(layout_config),
+                    pipeline_id: incomplete.pipeline_id,
+                    creator_url: final_url.clone(),
+                });
+                window.Document().disown_window();
+                window
+            },
+            None => {
+                Window::new(
+                    cx,
+                    incomplete.webview_id,
+                    self.js_runtime.clone(),
+                    self.senders.self_sender.clone(),
+                    self.layout_factory.create(layout_config),
+                    font_context,
+                    self.senders.image_cache_sender.clone(),
+                    image_cache.clone(),
+                    self.resource_threads.clone(),
+                    self.storage_threads.clone(),
+                    #[cfg(feature = "bluetooth")]
+                    self.senders.bluetooth_sender.clone(),
+                    self.senders.memory_profiler_sender.clone(),
+                    self.senders.time_profiler_sender.clone(),
+                    self.senders.devtools_server_sender.clone(),
+                    script_to_constellation_chan,
+                    self.senders.pipeline_to_embedder_sender.clone(),
+                    self.senders.constellation_sender.clone(),
+                    incomplete.pipeline_id,
+                    incomplete.parent_info,
+                    incomplete.viewport_details,
+                    origin.clone(),
+                    final_url.clone(),
+                    // TODO(37417): Set correct top-level URL here. Currently, we only specify the
+                    // url of the current window. However, in case this is an iframe, we should
+                    // pass in the URL from the frame that includes the iframe (which potentially
+                    // is another nested iframe in a frame).
+                    final_url.clone(),
+                    incomplete.navigation_start,
+                    self.webgl_chan.as_ref().map(|chan| chan.channel()),
+                    #[cfg(feature = "webxr")]
+                    self.webxr_registry.clone(),
+                    self.paint_api.clone(),
+                    self.unminify_js,
+                    self.unminify_css,
+                    self.local_script_source.clone(),
+                    user_contents,
+                    self.player_context.clone(),
+                    #[cfg(feature = "webgpu")]
+                    self.gpu_id_hub.clone(),
+                    incomplete.load_data.inherited_secure_context,
+                    incomplete.theme,
+                    self.this.clone(),
+                )
+            },
+        };
 
         self.debugger_global.fire_add_debuggee(
             CanGc::from_cx(cx),
@@ -3648,23 +3670,25 @@ impl ScriptThread {
         document.set_https_state(metadata.https_state);
         document.set_navigation_start(incomplete.navigation_start);
 
-        if is_html_document == IsHTMLDocument::NonHTMLDocument {
-            ServoParser::parse_xml_document(
-                &document,
-                None,
-                final_url,
-                encoding_hint_from_content_type,
-                cx,
-            );
-        } else {
-            ServoParser::parse_html_document(
-                &document,
-                None,
-                final_url,
-                encoding_hint_from_content_type,
-                incomplete.load_data.container_document_encoding,
-                cx,
-            );
+        if final_url.as_str() != "about:blank" {
+            if is_html_document == IsHTMLDocument::NonHTMLDocument {
+                ServoParser::parse_xml_document(
+                    &document,
+                    None,
+                    final_url,
+                    encoding_hint_from_content_type,
+                    cx,
+                );
+            } else {
+                ServoParser::parse_html_document(
+                    &document,
+                    None,
+                    final_url,
+                    encoding_hint_from_content_type,
+                    incomplete.load_data.container_document_encoding,
+                    cx,
+                );
+            }
         }
 
         if incomplete.activity == DocumentActivity::FullyActive {
@@ -3677,7 +3701,7 @@ impl ScriptThread {
             window.set_throttled(true);
         }
 
-        document.get_current_parser().unwrap()
+        document.get_current_parser()
     }
 
     fn notify_devtools(
@@ -4025,14 +4049,8 @@ impl ScriptThread {
         mut incomplete: InProgressLoad,
     ) {
         let url = ServoUrl::parse("about:blank").unwrap();
-        let mut context = ParserContext::new(
-            incomplete.webview_id,
-            incomplete.pipeline_id,
-            url.clone(),
-            incomplete.load_data.creation_sandboxing_flag_set,
-        );
 
-        let mut meta = Metadata::default(url);
+        let mut meta = Metadata::default(url.clone());
         meta.set_content_type(Some(&mime::TEXT_HTML));
         meta.set_referrer_policy(incomplete.load_data.referrer_policy);
 
@@ -4047,21 +4065,49 @@ impl ScriptThread {
             None => vec![],
         };
 
+        let webview_id = incomplete.webview_id.clone();
+        let pipeline_id = incomplete.pipeline_id.clone();
         let policy_container = incomplete.load_data.policy_container.clone();
         let about_base_url = incomplete.load_data.about_base_url.clone();
+        let sandboxing_flags = incomplete.load_data.creation_sandboxing_flag_set;
         self.incomplete_loads.borrow_mut().push(incomplete);
 
         let dummy_request_id = RequestId::default();
-        context.process_response(dummy_request_id, Ok(FetchMetadata::Unfiltered(meta)));
-        context.set_policy_container(policy_container.as_ref());
-        context.set_about_base_url(about_base_url);
-        context.process_response_chunk(dummy_request_id, chunk);
-        context.process_response_eof(
-            cx,
-            dummy_request_id,
-            Ok(()),
-            ResourceFetchTiming::new(ResourceTimingType::None),
-        );
+
+        if chunk.is_empty() {
+            assert!(self.handle_page_headers_available(
+                webview_id,
+                pipeline_id,
+                Some(meta),
+                cx,
+            ).is_none());
+            let document = self.documents.borrow().find_document(pipeline_id).unwrap();
+            crate::dom::servoparser::load_html_document(cx, &document, &mut crate::dom::servoparser::NavigationParams {
+                policy_container: policy_container.unwrap_or_default(),
+                content_type: Some(mime::TEXT_HTML),
+                link_headers: vec![],
+                final_sandboxing_flag_set: sandboxing_flags,
+                resource_header: vec![],
+                about_base_url,
+            });
+        } else {
+            let mut context = ParserContext::new(
+                webview_id,
+                pipeline_id,
+                url,
+                sandboxing_flags,
+            );
+            context.process_response(dummy_request_id, Ok(FetchMetadata::Unfiltered(meta)));
+            context.set_policy_container(policy_container.as_ref());
+            context.set_about_base_url(about_base_url);
+            context.process_response_chunk(dummy_request_id, chunk);
+            context.process_response_eof(
+                cx,
+                dummy_request_id,
+                Ok(()),
+                ResourceFetchTiming::new(ResourceTimingType::None),
+            );
+        }
     }
 
     /// Synchronously parse a srcdoc document from a giving HTML string.

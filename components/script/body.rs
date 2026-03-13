@@ -421,7 +421,8 @@ impl ExtractedBody {
         let trusted_stream = Trusted::new(&*stream);
 
         let global = stream.global();
-        let task_source = global.task_manager().networking_task_source();
+        let task_manager = global.task_manager();
+        let task_source = task_manager.networking_task_source();
 
         // In case of the data being in-memory, send everything in one chunk, by-passing SM.
         let in_memory = stream.get_in_memory_bytes();

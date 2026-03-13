@@ -642,6 +642,7 @@ pub(crate) struct Document {
 
     /// <https://w3c.github.io/editing/docs/execCommand/#css-styling-flag>
     css_styling_flag: Cell<bool>,
+    window_replaced: Cell<bool>,
 }
 
 impl Document {
@@ -658,7 +659,7 @@ impl Document {
         // TODO
 
         // Step 4. If document's salvageable state is false, then:
-        if !self.salvageable.get() {
+        if !self.salvageable.get() && self.is_window_relevant() {
             let global_scope = self.window.as_global_scope();
 
             // Step 4.1. For each EventSource object eventSource whose relevant global object is equal to window, forcibly close eventSource.
@@ -868,7 +869,9 @@ impl Document {
             ClientContextId::build(pipeline_id.namespace_id.0, pipeline_id.index.0.get());
 
         if activity != DocumentActivity::FullyActive {
-            self.window().suspend(cx);
+            if self.is_window_relevant() {
+                self.window().suspend(cx);
+            }
             media.suspend(&client_context_id);
             return;
         }
@@ -2457,7 +2460,7 @@ impl Document {
 
         // Step 9. Queue a global task on the DOM manipulation task source given
         // the Document's relevant global object to run the following steps:
-        debug!("Document loads are complete.");
+        debug!("Document loads are complete for {:?}.", self.url());
         let document = Trusted::new(self);
         self.owner_global()
             .task_manager()
@@ -3969,7 +3972,16 @@ impl Document {
             value_override: Default::default(),
             default_single_line_container_name: Default::default(),
             css_styling_flag: Default::default(),
+            window_replaced: Default::default(),
         }
+    }
+
+    pub(crate) fn disown_window(&self) {
+        self.window_replaced.set(true);
+    }
+
+    pub(crate) fn is_window_relevant(&self) -> bool {
+        !self.window_replaced.get()
     }
 
     /// Returns a policy value that should be used for fetches initiated by this document.

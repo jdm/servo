@@ -195,6 +195,7 @@ use crate::realms::{InRealm, enter_realm};
 use crate::script_runtime::{CanGc, JSContext as SafeJSContext, Runtime};
 use crate::script_thread::ScriptThread;
 use crate::script_window_proxies::ScriptWindowProxies;
+use crate::task_manager::TaskManager;
 use crate::task_source::SendableTaskSource;
 use crate::timers::{IsInterval, TimerCallback};
 use crate::unminify::unminified_path;
@@ -3077,7 +3078,7 @@ impl Window {
     }
 
     pub(crate) fn init_window_proxy(&self, window_proxy: &WindowProxy) {
-        assert!(self.window_proxy.get().is_none());
+        assert!(self.window_proxy.get().is_none_or(|current_proxy| &*current_proxy as *const WindowProxy == window_proxy));
         self.window_proxy.set(Some(window_proxy));
     }
 
@@ -3761,6 +3762,12 @@ impl Window {
             script_chan: control_chan,
         };
 
+        let task_manager = TaskManager::new(
+            Some(ScriptEventLoopSender::MainThread(script_chan.clone())),
+            pipeline_id.clone(),
+            None,
+        );
+
         let win = Box::new(Self {
             webview_id,
             globalscope: GlobalScope::new_inherited(
@@ -3780,6 +3787,7 @@ impl Window {
                 inherited_secure_context,
                 unminify_js,
                 Some(font_context.clone()),
+                Some(task_manager),
             ),
             ongoing_navigation: Default::default(),
             script_chan,
@@ -3863,6 +3871,25 @@ impl Window {
     {
         LayoutValue::new(self.layout_marker.borrow().clone(), value)
     }
+
+    pub(crate) fn replace_contents(&self, data: ReplaceData) {
+        self.globalscope.replace_contents(crate::dom::globalscope::ReplaceData {
+            pipeline_id: data.pipeline_id,
+            script_to_constellation_chan: data.script_to_constellation_chan,
+            creator_url: data.creator_url,
+            task_manager: data.task_manager,
+        });
+        *self.layout.borrow_mut() = data.layout;
+        self.has_sent_idle_message.set(false);
+    }
+}
+
+pub(crate) struct ReplaceData {
+    pub script_to_constellation_chan: ScriptToConstellationChan,
+    pub task_manager: TaskManager,
+    pub layout: Box<dyn Layout>,
+    pub pipeline_id: PipelineId,
+    pub creator_url: ServoUrl,
 }
 
 /// An instance of a value associated with a particular snapshot of layout. This stored

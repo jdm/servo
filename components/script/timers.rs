@@ -551,6 +551,13 @@ impl OneshotTimers {
     pub(crate) fn clear_timeout_or_interval(&self, global: &GlobalScope, handle: i32) {
         self.js_timers.clear_timeout_or_interval(global, handle)
     }
+
+    pub(crate) fn reset(&self) {
+        self.js_timers.reset();
+        self.next_timer_handle.set(OneshotTimerHandle(1));
+        self.timers.borrow_mut().clear();
+        self.expected_event_id.set(TimerEventId(0));
+    }    
 }
 
 #[derive(Clone, Copy, Eq, Hash, JSTraceable, MallocSizeOf, Ord, PartialEq, PartialOrd)]
@@ -622,6 +629,11 @@ impl Default for JsTimers {
 }
 
 impl JsTimers {
+    pub(crate) fn reset(&self) {
+        self.next_timer_handle.set(JsTimerHandle(1));
+        self.active_timers.borrow_mut().clear();
+    }
+
     /// <https://html.spec.whatwg.org/multipage/#timer-initialisation-steps>
     #[allow(clippy::too_many_arguments)]
     #[cfg_attr(crown, expect(crown::unrooted_must_root))]
