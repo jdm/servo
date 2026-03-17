@@ -469,14 +469,7 @@ impl HTMLIFrameElement {
             // We should **not** send a load event in `iframe_load_event_steps`.
             self.already_fired_synchronous_load_event.set(true);
             // Step 2.3.1. Run the iframe load event steps given element.
-            //
-            // Note: we are not actually calling that method. That's because
-            // `iframe_load_event_steps` currently doesn't adhere to the spec
-            // at all. In this case, WPT tests only care about the load event,
-            // so we can fire that. Following https://github.com/servo/servo/issues/31973
-            // we should call `iframe_load_event_steps` once it is spec-compliant.
-            self.upcast::<EventTarget>()
-                .fire_event(atom!("load"), CanGc::from_cx(cx));
+            self.run_iframe_load_event_steps(cx);
             // Step 2.3.2. Return.
             return;
         }
