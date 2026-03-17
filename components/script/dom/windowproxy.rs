@@ -584,7 +584,8 @@ impl WindowProxy {
             } else {
                 NavigationHistoryBehavior::Push
             };
-            target_window.load_url(history_handling, false, load_data, CanGc::from_cx(cx));
+            let initiator_pipeline = existing_document.global().pipeline_id();
+            target_window.load_url(history_handling, false, load_data, initiator_pipeline, CanGc::from_cx(cx));
         }
         // Step 17 (Dis-owning has been done in create_auxiliary_browsing_context).
         if noopener {

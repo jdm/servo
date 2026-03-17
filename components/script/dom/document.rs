@@ -248,11 +248,13 @@ impl RefreshRedirectDue {
         //
         // TODO: check sandbox
         // TODO: Check if meta was given
+        let initiator_pipeline_id = self.window.pipeline_id();
         let load_data = self
             .window
-            .load_data_for_document(self.url.clone(), self.window.pipeline_id());
+            .load_data_for_document(self.url.clone(), initiator_pipeline_id);
+        
         self.window
-            .load_url(NavigationHistoryBehavior::Replace, false, load_data, can_gc);
+            .load_url(NavigationHistoryBehavior::Replace, false, load_data, initiator_pipeline_id, can_gc);
     }
 }
 

@@ -418,6 +418,7 @@ impl ContextMenuNodes {
 
         let window = self.node.owner_window();
         let document = window.Document();
+        let initiator_pipeline_id = window.as_global_scope().pipeline_id();
         let set_clipboard_text = |string: String| {
             if string.is_empty() {
                 return;
@@ -443,7 +444,7 @@ impl ContextMenuNodes {
             let target = Trusted::new(target_window);
             let load_data = LoadData::new_for_new_unrelated_webview(url);
             let task = task!(open_link_in_new_webview: move || {
-                target.root().load_url(NavigationHistoryBehavior::Replace, false, load_data, CanGc::note());
+                target.root().load_url(NavigationHistoryBehavior::Replace, false, load_data, initiator_pipeline_id, CanGc::note());
             });
             target_document
                 .owner_global()

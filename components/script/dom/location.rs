@@ -68,9 +68,10 @@ impl Location {
         let navigable_document = navigable.Document();
         // Step 2. Let sourceDocument be the incumbent global object's associated Document.
         let incumbent_global = GlobalScope::incumbent().expect("no incumbent global object");
+        let initiator_pipeline_id = navigable.pipeline_id();
         let mut load_data = incumbent_global
             .as_window()
-            .load_data_for_document(url, navigable.pipeline_id());
+            .load_data_for_document(url, initiator_pipeline_id);
         load_data.about_base_url = navigable_document.about_base_url();
         // Step 3. If location's relevant Document is not yet completely loaded,
         // and the incumbent global object does not have transient activation, then set historyHandling to "replace".
@@ -82,7 +83,7 @@ impl Location {
             history_handling
         };
         // Step 4. Navigate navigable to url using sourceDocument, with exceptionsEnabled set to true and historyHandling set to historyHandling.
-        navigable.load_url(history_handling, false, load_data, can_gc);
+        navigable.load_url(history_handling, false, load_data, initiator_pipeline_id, can_gc);
     }
 
     /// Navigate the relevant `Document`'s browsing context.
@@ -142,6 +143,7 @@ impl Location {
 
         // Initiate navigation
         // TODO: rethrow exceptions, set exceptions enabled flag.
+        let initiator_pipeline_id = navigation_origin_window.pipeline_id();
         let load_data = LoadData::new(
             LoadOrigin::Script(load_origin),
             url,
@@ -155,7 +157,7 @@ impl Location {
             source_document.creation_sandboxing_flag_set_considering_parent_iframe(),
         );
         self.window
-            .load_url(history_handling, reload_triggered, load_data, can_gc);
+            .load_url(history_handling, reload_triggered, load_data, initiator_pipeline_id, can_gc);
     }
 
     /// Get if this `Location`'s [relevant `Document`][1] is non-null.

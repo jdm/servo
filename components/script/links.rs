@@ -453,7 +453,7 @@ pub(crate) fn follow_hyperlink(
 
     if let Some(target_document) = chosen.document() {
         let target_window = target_document.window();
-        // Step 9: Let urlString be the result of applying the URL serializer to urlRecord.
+        // Step 9: Let urlString be the result of applying the URL serializer to ulRecord.
         // TODO: Implement this.
 
         let attribute = subject.get_attribute(&local_name!("href")).unwrap();
@@ -482,6 +482,7 @@ pub(crate) fn follow_hyperlink(
         //          with referrerPolicy set to referrerPolicy, userInvolvement set to
         //          userInvolvement, and sourceElement set to subject.
         let pipeline_id = target_window.as_global_scope().pipeline_id();
+        let initiator_pipeline_id = window.as_global_scope().pipeline_id();
         let secure = target_window.as_global_scope().is_secure_context();
         let load_data = LoadData::new(
             LoadOrigin::Script(document.origin().snapshot()),
@@ -495,15 +496,7 @@ pub(crate) fn follow_hyperlink(
             document.has_trustworthy_ancestor_origin(),
             document.creation_sandboxing_flag_set_considering_parent_iframe(),
         );
-        let target = Trusted::new(target_window);
-        let task = task!(navigate_follow_hyperlink: move |cx| {
-            debug!("following hyperlink to {}", load_data.url);
-            target.root().load_url(history_handling, false, load_data, CanGc::from_cx(cx));
-        });
-        target_document
-            .owner_global()
-            .task_manager()
-            .dom_manipulation_task_source()
-            .queue(task);
+        debug!("following hyperlink to {}", load_data.url);
+        target_window.load_url(history_handling, false, load_data, initiator_pipeline_id, CanGc::note());
     };
 }

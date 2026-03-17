@@ -1049,6 +1049,7 @@ impl HTMLFormElement {
             },
             _ => target.as_global_scope().get_referrer(),
         };
+        let initiator_pipeline_id = self.global().pipeline_id();
 
         // 3. If the form has a non-null planned navigation, remove it from its task queue.
         // Note: done by incrementing `planned_navigation`.
@@ -1114,6 +1115,7 @@ impl HTMLFormElement {
                     NavigationHistoryBehavior::Push,
                     false,
                     load_data,
+                    initiator_pipeline_id,
                     CanGc::note(),
                 );
         });

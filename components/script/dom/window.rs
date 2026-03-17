@@ -3167,6 +3167,7 @@ impl Window {
         history_handling: NavigationHistoryBehavior,
         force_reload: bool,
         load_data: LoadData,
+        initiator_pipeline_id: PipelineId,
         can_gc: CanGc,
     ) {
         let doc = self.Document();
@@ -3259,7 +3260,7 @@ impl Window {
             }
 
             // Step 13
-            ScriptThread::navigate(self.webview_id, pipeline_id, load_data, history_handling);
+            ScriptThread::navigate(self.webview_id, pipeline_id, initiator_pipeline_id, load_data, history_handling);
         };
     }
 
