@@ -15,7 +15,7 @@ use mime::Mime;
 use parking_lot::Mutex;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
-use servo_base::generic_channel::GenericSharedMemory;
+use servo_base::generic_channel::{self, GenericCallback, GenericReceiver, GenericSender, GenericSharedMemory};
 use servo_base::id::{PipelineId, WebViewId};
 use servo_url::{ImmutableOrigin, ServoUrl};
 use tokio::sync::oneshot::Sender as TokioSender;
@@ -310,9 +310,9 @@ pub enum BodyChunkResponse {
 #[derive(Debug, Deserialize, Serialize)]
 pub enum BodyChunkRequest {
     /// Connect a fetch in `net`, with a stream of bytes from `script`.
-    Connect(IpcSender<BodyChunkResponse>),
+    Connect(GenericCallback<BodyChunkResponse>),
     /// Re-extract a new stream from the source, following a redirect.
-    Extract(IpcReceiver<BodyChunkRequest>),
+    Extract(GenericReceiver<BodyChunkRequest>),
     /// Ask for another chunk.
     Chunk,
     /// Signal the stream is done(sent from script to script).
@@ -330,7 +330,7 @@ pub enum BodyChunkRequest {
 pub struct RequestBody {
     /// Net's channel to communicate with script re this body.
     #[conditional_malloc_size_of]
-    body_chunk_request_channel: Arc<Mutex<Option<IpcSender<BodyChunkRequest>>>>,
+    body_chunk_request_channel: Arc<Mutex<Option<GenericCallback<BodyChunkRequest>>>>,
     /// <https://fetch.spec.whatwg.org/#concept-body-source>
     source: BodySource,
     /// <https://fetch.spec.whatwg.org/#concept-body-total-bytes>
@@ -339,7 +339,7 @@ pub struct RequestBody {
 
 impl RequestBody {
     pub fn new(
-        body_chunk_request_channel: IpcSender<BodyChunkRequest>,
+        body_chunk_request_channel: GenericCallback<BodyChunkRequest>,
         source: BodySource,
         total_bytes: Option<usize>,
     ) -> Self {
@@ -355,7 +355,8 @@ impl RequestBody {
         match self.source {
             BodySource::Null => panic!("Null sources should never be re-directed."),
             BodySource::Object => {
-                let (chan, port) = ipc::channel().unwrap();
+                //let (chan, port) = generic_channel::channel().unwrap();
+                let (chan, port) = GenericCallback::new_blocking().unwrap();
                 let mut lock = self.body_chunk_request_channel.lock();
                 let Some(selfchan) = lock.as_mut() else {
                     error!(
@@ -375,7 +376,7 @@ impl RequestBody {
     }
 
     /// This is the current process shared optional sender for requesting body chunks.
-    pub fn clone_stream(&self) -> Arc<Mutex<Option<IpcSender<BodyChunkRequest>>>> {
+    pub fn clone_stream(&self) -> Arc<Mutex<Option<GenericCallback<BodyChunkRequest>>>> {
         self.body_chunk_request_channel.clone()
     }
 
@@ -1284,17 +1285,12 @@ pub fn create_request_body_with_content(content: String) -> RequestBody {
     let content_bytes = GenericSharedMemory::from_vec(content.into_bytes());
     let content_len = content_bytes.len();
 
-    let (chunk_request_sender, chunk_request_receiver) = ipc::channel().unwrap();
-    ROUTER.add_typed_route(
-        chunk_request_receiver,
-        Box::new(move |message| {
-            let request = message.unwrap();
-            if let BodyChunkRequest::Connect(sender) = request {
-                let _ = sender.send(BodyChunkResponse::Chunk(content_bytes.clone()));
-                let _ = sender.send(BodyChunkResponse::Done);
-            }
-        }),
-    );
-
+    let chunk_request_sender = GenericCallback::new(move |message| {
+        let request = message.unwrap();
+        if let BodyChunkRequest::Connect(sender) = request {
+            let _ = sender.send(BodyChunkResponse::Chunk(content_bytes.clone()));
+            let _ = sender.send(BodyChunkResponse::Done);
+        }
+    }).unwrap();
     RequestBody::new(chunk_request_sender, BodySource::Object, Some(content_len))
 }
