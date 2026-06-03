@@ -206,6 +206,7 @@ pub struct Element {
     /// These flags are set by the style system to indicate the that certain
     /// operations may require restyling this element or its descendants.
     selector_flags: AtomicUsize,
+    #[ignore_malloc_size_of = ""]
     rare_data: DomRefCell<Option<Box<ElementRareData>>>,
 
     /// Style data for this node. This is accessed and mutated by style

@@ -8,7 +8,8 @@
 #![expect(dead_code)]
 
 use core::ffi::c_char;
-use std::cell::Cell;
+use std::cell::{Cell, LazyCell, RefCell};
+use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::io::{Write, stdout};
 use std::ops::{Deref, DerefMut};
@@ -1100,6 +1101,8 @@ fn in_range<T: PartialOrd + Copy>(val: T, min: T, max: T) -> Option<T> {
 
 thread_local!(static MALLOC_SIZE_OF_OPS: Cell<*mut MallocSizeOfOps> = const { Cell::new(ptr::null_mut()) });
 
+thread_local!(static DOM_OBJECT_SIZES: LazyCell<RefCell<HashMap<usize, HashMap<&'static str, (usize, usize)>>>> = const { LazyCell::new(|| RefCell::new(HashMap::new())) });
+
 #[expect(unsafe_code)]
 unsafe extern "C" fn get_size(obj: *mut JSObject) -> usize {
     match unsafe { get_dom_class(obj) } {
@@ -1110,7 +1113,20 @@ unsafe extern "C" fn get_size(obj: *mut JSObject) -> usize {
                 return 0;
             }
             let ops = MALLOC_SIZE_OF_OPS.get();
-            unsafe { (v.malloc_size_of)(&mut *ops, dom_object) }
+            let size = unsafe { (v.malloc_size_of)(&mut *ops, dom_object) };
+            let global = unsafe { js::jsapi::GetNonCCWObjectGlobal(obj) as usize };
+            let interface = v.interface_chain[v.depth as usize];
+            DOM_OBJECT_SIZES.with(move |sizes| {
+                let mut sizes = sizes.borrow_mut();
+                let (count, total) = sizes
+                    .entry(global)
+                    .or_insert(HashMap::new())
+                    .entry(interface.into())
+                    .or_insert((0, 0));
+                *count += 1;
+                *total += size;
+            });
+            0
         },
         Err(_e) => 0,
     }
@@ -1251,6 +1267,25 @@ impl JSContextHelper for JSContext {
             path.append(&mut path_suffix);
             reports.push(Report { path, kind, size })
         };
+
+        DOM_OBJECT_SIZES.with(|sizes| {
+            let mut sizes = sizes.borrow_mut();
+            for (global, global_sizes) in &*sizes {
+                for (interface, (count, size)) in global_sizes {
+                    report(
+                        path![format!("global-{global}"), interface.to_owned()],
+                        ReportKind::ExplicitJemallocHeapSize,
+                        *size,
+                    );
+                    report(
+                        path![format!("global-{global}-count"), interface.to_owned()],
+                        ReportKind::NonExplicitSize,
+                        *count,
+                    );
+                }
+            }
+            sizes.clear();
+        });
 
         // A note about possibly confusing terminology: the JS GC "heap" is allocated via
         // mmap/VirtualAlloc, which means it's not on the malloc "heap", so we use

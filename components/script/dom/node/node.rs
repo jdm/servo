@@ -163,6 +163,7 @@ pub struct Node {
     owner_doc: MutNullableDom<Document>,
 
     /// Rare node data.
+    #[ignore_malloc_size_of = ""]
     rare_data: DomRefCell<Option<Box<NodeRareData>>>,
 
     /// The live count of children of this node.
