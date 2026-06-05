@@ -256,7 +256,7 @@ impl PermissionAlgorithm for Permissions {
     /// > permissionDesc and a PermissionStatus status, runs the following steps:
     fn permission_query(
         _cx: &mut js::context::JSContext,
-        _promise: &Rc<Promise>,
+        _promise: &PromiseRoot,
         _descriptor: &PermissionDescriptor,
         status: &PermissionStatus,
     ) {
@@ -267,7 +267,7 @@ impl PermissionAlgorithm for Permissions {
     /// <https://w3c.github.io/permissions/#boolean-permission-request-algorithm>
     fn permission_request(
         cx: &mut js::context::JSContext,
-        promise: &Rc<Promise>,
+        promise: &PromiseRoot,
         descriptor: &PermissionDescriptor,
         status: &PermissionStatus,
     ) {

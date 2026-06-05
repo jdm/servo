@@ -98,7 +98,7 @@ pub(crate) fn load_requested_modules(
     // Step 3. Let state be the GraphLoadingState Record
     // { [[IsLoading]]: true, [[PendingModulesCount]]: 1, [[Visited]]: « », [[PromiseCapability]]: pc, [[HostDefined]]: hostDefined }.
     let state = GraphLoadingState {
-        promise: promise.clone(),
+        promise: promise.to_traced(),
         is_loading: Cell::new(true),
         pending_modules_count: Cell::new(1),
         visited: RefCell::new(HashSet::new()),

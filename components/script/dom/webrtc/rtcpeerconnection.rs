@@ -643,7 +643,7 @@ impl RTCPeerConnectionMethods<crate::DomTypeHolder> for RTCPeerConnection {
         let p = Promise::new_in_current_realm(comp, can_gc);
         let this = Trusted::new(self);
         let desc: SessionDescription = desc.convert();
-        let trusted_promise = TrustedPromise::new(p.clone());
+        let trusted_promise = TrustedPromise::new(&p);
         let task_source = self
             .global()
             .task_manager()
@@ -686,7 +686,7 @@ impl RTCPeerConnectionMethods<crate::DomTypeHolder> for RTCPeerConnection {
         let p = Promise::new_in_current_realm(comp, can_gc);
         let this = Trusted::new(self);
         let desc: SessionDescription = desc.convert();
-        let trusted_promise = TrustedPromise::new(p.clone());
+        let trusted_promise = TrustedPromise::new(&p);
         let task_source = self
             .global()
             .task_manager()

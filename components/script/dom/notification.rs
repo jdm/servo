@@ -411,7 +411,7 @@ impl NotificationMethods<crate::DomTypeHolder> for Notification {
         let notification_permission = request_notification_permission(cx, global);
 
         // Step 3.2: Queue a global task on the DOM manipulation task source given global to run these steps:
-        let trusted_promise = TrustedPromise::new(promise.clone());
+        let trusted_promise = TrustedPromise::new(&promise);
         let uuid = Uuid::new_v4().simple().to_string();
         let uuid_ = uuid.clone();
 

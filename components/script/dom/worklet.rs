@@ -353,7 +353,7 @@ impl WorkletThreadPool {
                 policy_container: policy_container.clone(),
                 credentials,
                 pending_tasks_struct: pending_tasks_struct.clone(),
-                promise: TrustedPromise::new(promise.clone()),
+                promise: TrustedPromise::new(&promise),
                 inherited_secure_context,
             });
         }

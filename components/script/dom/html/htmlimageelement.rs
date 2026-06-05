@@ -1380,7 +1380,7 @@ impl HTMLImageElement {
             .image_decode_promises
             .borrow()
             .iter()
-            .map(|promise| TrustedPromise::new(promise.clone()))
+            .map(|promise| TrustedPromise::new(&promise))
             .collect();
 
         self.image_decode_promises.borrow_mut().clear();
@@ -1407,7 +1407,7 @@ impl HTMLImageElement {
             .image_decode_promises
             .borrow()
             .iter()
-            .map(|promise| TrustedPromise::new(promise.clone()))
+            .map(|promise| TrustedPromise::new(&promise))
             .collect();
 
         self.image_decode_promises.borrow_mut().clear();

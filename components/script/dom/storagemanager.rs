@@ -150,7 +150,7 @@ impl StorageManagerMethods<crate::DomTypeHolder> for StorageManager {
         // It will be false when there’s an internal error.
         // Step 5.2. Queue a storage task with global to resolve promise with persisted.
         let mut handler = StorageManagerBooleanResponseHandler::new(
-            TrustedPromise::new(promise.clone()),
+            TrustedPromise::new(&promise),
             global.task_manager().storage_task_source().to_sendable(),
         );
         let callback = GenericCallback::new(move |message| {
@@ -202,7 +202,7 @@ impl StorageManagerMethods<crate::DomTypeHolder> for StorageManager {
         // Step 5.4.2. If there was no internal error, then set persisted to true.
         // Step 5.5. Queue a storage task with global to resolve promise with persisted.
         let mut handler = StorageManagerBooleanResponseHandler::new(
-            TrustedPromise::new(promise.clone()),
+            TrustedPromise::new(&promise),
             global.task_manager().storage_task_source().to_sendable(),
         );
         let callback = GenericCallback::new(move |message| {
@@ -254,7 +254,7 @@ impl StorageManagerMethods<crate::DomTypeHolder> for StorageManager {
         // task with global to reject promise with a TypeError.
         // Step 5.5. Otherwise, queue a storage task with global to resolve promise with dictionary.
         let mut handler = StorageManagerEstimateResponseHandler::new(
-            TrustedPromise::new(promise.clone()),
+            TrustedPromise::new(&promise),
             global.task_manager().storage_task_source().to_sendable(),
         );
         let callback = GenericCallback::new(move |message| {

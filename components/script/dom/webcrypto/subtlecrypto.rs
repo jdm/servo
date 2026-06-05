@@ -315,8 +315,8 @@ impl SubtleCrypto {
 
     /// Queue a global task on the crypto task source, given realm's global object, to reject
     /// promise with an error.
-    fn reject_promise_with_error(&self, promise: Rc<Promise>, error: Error) {
-        let trusted_promise = TrustedPromise::new(promise);
+    fn reject_promise_with_error(&self, promise: PromiseRoot, error: Error) {
+        let trusted_promise = TrustedPromise::new(&promise);
         self.global()
             .task_manager()
             .crypto_task_source()
@@ -399,7 +399,7 @@ impl SubtleCryptoMethods<crate::DomTypeHolder> for SubtleCrypto {
 
         // Step 7. Return promise and perform the remaining steps in parallel.
         let this = Trusted::new(self);
-        let trusted_promise = TrustedPromise::new(promise.clone());
+        let trusted_promise = TrustedPromise::new(&promise);
         let trusted_key = Trusted::new(key);
         self.global()
             .task_manager()
@@ -486,7 +486,7 @@ impl SubtleCryptoMethods<crate::DomTypeHolder> for SubtleCrypto {
 
         // Step 7. Return promise and perform the remaining steps in parallel.
         let this = Trusted::new(self);
-        let trusted_promise = TrustedPromise::new(promise.clone());
+        let trusted_promise = TrustedPromise::new(&promise);
         let trusted_key = Trusted::new(key);
         self.global()
             .task_manager()
@@ -573,7 +573,7 @@ impl SubtleCryptoMethods<crate::DomTypeHolder> for SubtleCrypto {
 
         // Step 7. Return promise and perform the remaining steps in parallel.
         let this = Trusted::new(self);
-        let trusted_promise = TrustedPromise::new(promise.clone());
+        let trusted_promise = TrustedPromise::new(&promise);
         let trusted_key = Trusted::new(key);
         self.global()
             .task_manager()
@@ -667,7 +667,7 @@ impl SubtleCryptoMethods<crate::DomTypeHolder> for SubtleCrypto {
 
         // Step 8. Return promise and perform the remaining steps in parallel.
         let this = Trusted::new(self);
-        let trusted_promise = TrustedPromise::new(promise.clone());
+        let trusted_promise = TrustedPromise::new(&promise);
         let trusted_key = Trusted::new(key);
         self.global()
             .task_manager()
@@ -750,7 +750,7 @@ impl SubtleCryptoMethods<crate::DomTypeHolder> for SubtleCrypto {
 
         // Step 7. Return promise and perform the remaining steps in parallel.
         let this = Trusted::new(self);
-        let trusted_promise = TrustedPromise::new(promise.clone());
+        let trusted_promise = TrustedPromise::new(&promise);
         self.global()
             .task_manager()
             .dom_manipulation_task_source()
@@ -812,7 +812,7 @@ impl SubtleCryptoMethods<crate::DomTypeHolder> for SubtleCrypto {
 
         // Step 6. Return promise and perform the remaining steps in parallel.
         let trusted_subtle = Trusted::new(self);
-        let trusted_promise = TrustedPromise::new(promise.clone());
+        let trusted_promise = TrustedPromise::new(&promise);
         self.global()
             .task_manager()
             .dom_manipulation_task_source()
@@ -946,7 +946,7 @@ impl SubtleCryptoMethods<crate::DomTypeHolder> for SubtleCrypto {
         // Step 10. Return promise and perform the remaining steps in parallel.
         let trusted_subtle = Trusted::new(self);
         let trusted_base_key = Trusted::new(base_key);
-        let trusted_promise = TrustedPromise::new(promise.clone());
+        let trusted_promise = TrustedPromise::new(&promise);
         self.global().task_manager().dom_manipulation_task_source().queue(
             task!(derive_key: move |cx| {
                 let subtle = trusted_subtle.root();
@@ -1067,7 +1067,7 @@ impl SubtleCryptoMethods<crate::DomTypeHolder> for SubtleCrypto {
         // Step 5. Return promise and perform the remaining steps in parallel.
         let trsuted_subtle = Trusted::new(self);
         let trusted_base_key = Trusted::new(base_key);
-        let trusted_promise = TrustedPromise::new(promise.clone());
+        let trusted_promise = TrustedPromise::new(&promise);
         self.global()
             .task_manager()
             .dom_manipulation_task_source()
@@ -1208,7 +1208,7 @@ impl SubtleCryptoMethods<crate::DomTypeHolder> for SubtleCrypto {
 
         // Step 7. Return promise and perform the remaining steps in parallel.
         let this = Trusted::new(self);
-        let trusted_promise = TrustedPromise::new(promise.clone());
+        let trusted_promise = TrustedPromise::new(&promise);
         self.global()
             .task_manager()
             .dom_manipulation_task_source()
@@ -1274,7 +1274,7 @@ impl SubtleCryptoMethods<crate::DomTypeHolder> for SubtleCrypto {
 
         // Step 4. Return promise and perform the remaining steps in parallel.
         let trusted_subtle = Trusted::new(self);
-        let trusted_promise = TrustedPromise::new(promise.clone());
+        let trusted_promise = TrustedPromise::new(&promise);
         let trusted_key = Trusted::new(key);
         self.global()
             .task_manager()
@@ -1391,7 +1391,7 @@ impl SubtleCryptoMethods<crate::DomTypeHolder> for SubtleCrypto {
         let trusted_subtle = Trusted::new(self);
         let trusted_key = Trusted::new(key);
         let trusted_wrapping_key = Trusted::new(wrapping_key);
-        let trusted_promise = TrustedPromise::new(promise.clone());
+        let trusted_promise = TrustedPromise::new(&promise);
         self.global()
             .task_manager()
             .dom_manipulation_task_source()
@@ -1588,7 +1588,7 @@ impl SubtleCryptoMethods<crate::DomTypeHolder> for SubtleCrypto {
         // Step 10. Return promise and perform the remaining steps in parallel.
         let trusted_subtle = Trusted::new(self);
         let trusted_unwrapping_key = Trusted::new(unwrapping_key);
-        let trusted_promise = TrustedPromise::new(promise.clone());
+        let trusted_promise = TrustedPromise::new(&promise);
         self.global().task_manager().dom_manipulation_task_source().queue(
             task!(unwrap_key: move |cx| {
                 let subtle = trusted_subtle.root();
@@ -1756,7 +1756,7 @@ impl SubtleCryptoMethods<crate::DomTypeHolder> for SubtleCrypto {
         // Step 8. Return promise and perform the remaining steps in parallel.
         let trusted_subtle = Trusted::new(self);
         let trusted_encapsulated_key = Trusted::new(encapsulation_key);
-        let trusted_promise = TrustedPromise::new(promise.clone());
+        let trusted_promise = TrustedPromise::new(&promise);
         self.global().task_manager().dom_manipulation_task_source().queue(
             task!(encapsulate_keys: move |cx| {
                 let subtle = trusted_subtle.root();
@@ -1884,7 +1884,7 @@ impl SubtleCryptoMethods<crate::DomTypeHolder> for SubtleCrypto {
         // Step 6. Return promise and perform the remaining steps in parallel.
         let trusted_subtle = Trusted::new(self);
         let trusted_encapsulation_key = Trusted::new(encapsulation_key);
-        let trusted_promise = TrustedPromise::new(promise.clone());
+        let trusted_promise = TrustedPromise::new(&promise);
         self.global().task_manager().dom_manipulation_task_source().queue(
             task!(derive_key: move || {
                 let subtle = trusted_subtle.root();
@@ -1999,7 +1999,7 @@ impl SubtleCryptoMethods<crate::DomTypeHolder> for SubtleCrypto {
         // Step 9. Return promise and perform the remaining steps in parallel.
         let trusted_subtle = Trusted::new(self);
         let trusted_decapsulation_key = Trusted::new(decapsulation_key);
-        let trusted_promise = TrustedPromise::new(promise.clone());
+        let trusted_promise = TrustedPromise::new(&promise);
         self.global()
             .task_manager()
             .dom_manipulation_task_source()
@@ -2122,7 +2122,7 @@ impl SubtleCryptoMethods<crate::DomTypeHolder> for SubtleCrypto {
         // Step 7. Return promise and perform the remaining steps in parallel.
         let trusted_subtle = Trusted::new(self);
         let trusted_decapsulation_key = Trusted::new(decapsulation_key);
-        let trusted_promise = TrustedPromise::new(promise.clone());
+        let trusted_promise = TrustedPromise::new(&promise);
         self.global()
             .task_manager()
             .dom_manipulation_task_source()
@@ -2218,7 +2218,7 @@ impl SubtleCryptoMethods<crate::DomTypeHolder> for SubtleCrypto {
 
         // Step 6. Return promise and perform the remaining steps in parallel.
         let trusted_subtle = Trusted::new(self);
-        let trusted_promise = TrustedPromise::new(promise.clone());
+        let trusted_promise = TrustedPromise::new(&promise);
         let trusted_key = Trusted::new(key);
         self.global()
             .task_manager()

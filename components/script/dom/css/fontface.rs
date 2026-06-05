@@ -196,7 +196,7 @@ impl FontFace {
         Self {
             reflector: Reflector::new(),
             font_face_set: MutNullableDom::default(),
-            font_status_promise.into_traced(),
+            font_status_promise: font_status_promise.into_traced(),
             family_name: DomRefCell::default(),
             urls: Default::default(),
             descriptors: DomRefCell::new(FontFaceDescriptors {

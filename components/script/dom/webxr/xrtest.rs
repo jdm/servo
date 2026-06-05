@@ -149,7 +149,7 @@ impl XRTestMethods<crate::DomTypeHolder> for XRTest {
 
         let global = self.global();
         let this = Trusted::new(self);
-        let mut trusted = Some(TrustedPromise::new(p.clone()));
+        let mut trusted = Some(TrustedPromise::new(&p));
 
         let task_source = global
             .task_manager()
@@ -198,7 +198,7 @@ impl XRTestMethods<crate::DomTypeHolder> for XRTest {
             let rooted_devices: Vec<_> = devices.iter().map(|x| DomRoot::from_ref(&**x)).collect();
             devices.clear();
 
-            let mut trusted = Some(TrustedPromise::new(p.clone()));
+            let mut trusted = Some(TrustedPromise::new(&p));
             let task_source = global
                 .task_manager()
                 .dom_manipulation_task_source()

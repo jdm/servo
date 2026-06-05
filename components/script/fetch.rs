@@ -273,7 +273,7 @@ pub(crate) fn Fetch(
     // Step 9. Let locallyAborted be false.
     // Step 10. Let controller be null.
     let fetch_context = FetchContext {
-        fetch_promise: Some(TrustedPromise::new(promise.clone())),
+        fetch_promise: Some(TrustedPromise::new(&promise)),
         response_object: Trusted::new(&*response),
         request: Trusted::new(&*request_object),
         global: Trusted::new(global),
@@ -621,7 +621,7 @@ impl FetchResponseListener for FetchContext {
 
         // Step 12.5. Resolve p with responseObject.
         promise.resolve_native(&self.response_object.root(), CanGc::from_cx(cx));
-        self.fetch_promise = Some(TrustedPromise::new(promise));
+        self.fetch_promise = Some(TrustedPromise::new(&promise));
     }
 
     fn process_response_chunk(

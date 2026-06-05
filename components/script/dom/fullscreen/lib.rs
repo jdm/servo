@@ -186,7 +186,7 @@ impl Document {
         // Step 8
         // > Return promise, and run the remaining steps in parallel.
         let trusted_element = Trusted::new(&*element);
-        let trusted_promise = TrustedPromise::new(promise.clone());
+        let trusted_promise = TrustedPromise::new(&promise);
         let handler = ElementPerformFullscreenExit::new(trusted_element, trusted_promise);
         let pipeline_id = Some(global.pipeline_id());
         let script_msg = CommonScriptMsg::Task(

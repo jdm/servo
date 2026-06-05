@@ -308,7 +308,7 @@ impl FakeXRDeviceMethods<crate::DomTypeHolder> for FakeXRDevice {
     fn Disconnect(&self, can_gc: CanGc) -> PromiseRoot {
         let global = self.global();
         let p = Promise::new(&global, can_gc);
-        let mut trusted = Some(TrustedPromise::new(p.clone()));
+        let mut trusted = Some(TrustedPromise::new(&p));
         let task_source = global
             .task_manager()
             .dom_manipulation_task_source()

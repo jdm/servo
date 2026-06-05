@@ -25,7 +25,7 @@ impl TestUtilsMethods<crate::DomTypeHolder> for TestUtils {
     fn Gc(global: &GlobalScope) -> PromiseRoot {
         // 1. Let p be a new promise.
         let promise = Promise::new(global, CanGc::deprecated_note());
-        let trusted = TrustedPromise::new(promise.clone());
+        let trusted = TrustedPromise::new(&promise);
         // 2. Run the following in parallel:
         // 2.1 Run implementation-defined steps to perform a garbage collection covering at least the entry Realm.
         // 2.2 Resolve p.

@@ -118,7 +118,7 @@ impl XRSystemMethods<crate::DomTypeHolder> for XRSystem {
     fn IsSessionSupported(&self, mode: XRSessionMode, can_gc: CanGc) -> PromiseRoot {
         // XXXManishearth this should select an XR device first
         let promise = Promise::new(&self.global(), can_gc);
-        let mut trusted = Some(TrustedPromise::new(promise.clone()));
+        let mut trusted = Some(TrustedPromise::new(&promise));
         let global = self.global();
         let task_source = global
             .task_manager()
@@ -234,7 +234,7 @@ impl XRSystemMethods<crate::DomTypeHolder> for XRSystem {
             first_person_observer_view: pref!(dom_webxr_first_person_observer_view),
         };
 
-        let mut trusted = Some(TrustedPromise::new(promise.clone()));
+        let mut trusted = Some(TrustedPromise::new(&promise));
         let this = Trusted::new(self);
         let task_source = global
             .task_manager()

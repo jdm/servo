@@ -634,7 +634,7 @@ impl IDBFactoryMethods<crate::DomTypeHolder> for IDBFactory {
 
         // Note: the option is required to pass the promise to a task from within the generic callback,
         // see #41356
-        let mut trusted_promise: Option<TrustedPromise> = Some(TrustedPromise::new(p.clone()));
+        let mut trusted_promise: Option<TrustedPromise> = Some(TrustedPromise::new(&p));
 
         // Step 4: Run these steps in parallel:
         // Note implementing by communicating with the backend.

@@ -15,7 +15,7 @@ use crate::dom::promise::{Promise, PromiseRoot};
 use crate::task_source::TaskSource;
 
 pub(crate) trait RoutedPromiseListener<R: Serialize + DeserializeOwned + Send> {
-    fn handle_response(&self, cx: &mut JSContext, response: R, promise: &Rc<Promise>);
+    fn handle_response(&self, cx: &mut JSContext, response: R, promise: &PromiseRoot);
 }
 
 pub(crate) struct RoutedPromiseContext<
@@ -45,7 +45,7 @@ pub(crate) fn callback_promise<
     task_source: TaskSource,
 ) -> GenericCallback<R> {
     let task_source = task_source.to_sendable();
-    let mut trusted: Option<TrustedPromise> = Some(TrustedPromise::new(promise.clone()));
+    let mut trusted: Option<TrustedPromise> = Some(TrustedPromise::new(&promise));
     let trusted_receiver = Trusted::new(receiver);
     GenericCallback::new(move |message| {
         let trusted = if let Some(trusted) = trusted.take() {
