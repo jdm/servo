@@ -11,7 +11,7 @@ use script_bindings::script_runtime::CanGc;
 
 use crate::dom::bindings::codegen::Bindings::TestUtilsBinding::TestUtilsMethods;
 use crate::dom::globalscope::GlobalScope;
-use crate::dom::promise::Promise;
+use crate::dom::promise::{Promise, PromiseRoot};
 use crate::test::TrustedPromise;
 
 #[dom_struct]

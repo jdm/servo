@@ -50,7 +50,7 @@ use crate::dom::bindings::str::USVString;
 use crate::dom::bindings::trace::{CustomTraceable, JSTraceable, RootedTraceableBox};
 use crate::dom::csp::Violation;
 use crate::dom::globalscope::GlobalScope;
-use crate::dom::promise::Promise;
+use crate::dom::promise::{Promise, PromiseRoot};
 #[cfg(feature = "testbinding")]
 use crate::dom::testworkletglobalscope::TestWorkletTask;
 use crate::dom::window::Window;

@@ -27,7 +27,7 @@ use crate::dom::bindings::serializable::Serializable;
 use crate::dom::bindings::structuredclone::StructuredData;
 use crate::dom::bindings::transferable::Transferable;
 use crate::dom::globalscope::GlobalScope;
-use crate::dom::types::Promise;
+use crate::dom::types::{Promise, PromiseRoot};
 use crate::script_runtime::CanGc;
 
 #[dom_struct]

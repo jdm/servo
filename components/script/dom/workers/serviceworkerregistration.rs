@@ -29,7 +29,7 @@ use crate::dom::bindings::str::{ByteString, USVString};
 use crate::dom::eventtarget::EventTarget;
 use crate::dom::globalscope::GlobalScope;
 use crate::dom::navigationpreloadmanager::NavigationPreloadManager;
-use crate::dom::promise::Promise;
+use crate::dom::promise::{Promise, PromiseRoot};
 use crate::dom::serviceworker::ServiceWorker;
 use crate::dom::window::Window;
 use crate::dom::workerglobalscope::prepare_workerscope_init;

@@ -31,7 +31,7 @@ use crate::DomTypeHolder;
 use crate::dom::bindings::error::Error;
 use crate::dom::bindings::root::DomRoot;
 use crate::dom::globalscope::GlobalScope;
-use crate::dom::promise::Promise;
+use crate::dom::promise::{Promise, PromiseRoot};
 use crate::dom::promisenativehandler::{Callback, PromiseNativeHandler};
 use crate::realms::enter_auto_realm;
 use crate::script_module::{

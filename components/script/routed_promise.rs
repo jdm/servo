@@ -11,7 +11,7 @@ use serde::de::DeserializeOwned;
 use servo_base::generic_channel::GenericCallback;
 
 use crate::dom::bindings::refcounted::{Trusted, TrustedPromise};
-use crate::dom::promise::Promise;
+use crate::dom::promise::{Promise, PromiseRoot};
 use crate::task_source::TaskSource;
 
 pub(crate) trait RoutedPromiseListener<R: Serialize + DeserializeOwned + Send> {

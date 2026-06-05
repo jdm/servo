@@ -30,7 +30,7 @@ use crate::dom::bindings::serializable::Serializable;
 use crate::dom::bindings::str::DOMString;
 use crate::dom::bindings::structuredclone::StructuredData;
 use crate::dom::globalscope::GlobalScope;
-use crate::dom::promise::PromiseRoot;
+use crate::dom::promise::{Promise, PromiseRoot};
 use crate::dom::stream::readablestream::ReadableStream;
 use crate::script_runtime::CanGc;
 

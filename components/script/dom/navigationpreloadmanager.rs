@@ -16,7 +16,7 @@ use crate::dom::bindings::root::{Dom, DomRoot};
 use crate::dom::bindings::str::ByteString;
 use crate::dom::domexception::{DOMErrorName, DOMException};
 use crate::dom::globalscope::GlobalScope;
-use crate::dom::promise::Promise;
+use crate::dom::promise::{Promise, PromiseRoot};
 use crate::dom::serviceworkerregistration::ServiceWorkerRegistration;
 use crate::realms::InRealm;
 use crate::script_runtime::CanGc;

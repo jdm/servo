@@ -36,7 +36,7 @@ use crate::dom::encoding::textencoderstream::{
     Encoder, encode_and_enqueue_a_chunk, encode_and_flush,
 };
 use crate::dom::globalscope::GlobalScope;
-use crate::dom::promise::Promise;
+use crate::dom::promise::{Promise, PromiseRoot};
 use crate::dom::promisenativehandler::{Callback, PromiseNativeHandler};
 use crate::dom::types::{DecompressionStream, TransformStream};
 use crate::realms::enter_auto_realm;

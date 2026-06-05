@@ -12,7 +12,7 @@ use script_bindings::str::USVString;
 
 use crate::dom::bindings::reflector::DomGlobal;
 use crate::dom::client::Client;
-use crate::dom::promise::Promise;
+use crate::dom::promise::{Promise, PromiseRoot};
 
 #[dom_struct]
 pub(crate) struct WindowClient {

@@ -28,7 +28,7 @@ use crate::dom::bindings::reflector::DomGlobal;
 use crate::dom::bindings::root::DomRoot;
 use crate::dom::bindings::str::DOMString;
 use crate::dom::blob::Blob;
-use crate::dom::promise::Promise;
+use crate::dom::promise::{Promise, PromiseRoot};
 use crate::dom::promisenativehandler::{Callback, PromiseNativeHandler};
 use crate::dom::window::Window;
 use crate::script_runtime::CanGc;
@@ -148,7 +148,7 @@ impl ClipboardItemMethods<crate::DomTypeHolder> for ClipboardItem {
         cx: &mut JSContext,
         global: &Window,
         proto: Option<HandleObject>,
-        items: Record<DOMString, Rc<Promise>>,
+        items: Record<DOMString, PromiseRoot>,
         options: &ClipboardItemOptions,
     ) -> Fallible<DomRoot<ClipboardItem>> {
         // Step 1 If items is empty, then throw a TypeError.

@@ -30,7 +30,7 @@ use crate::dom::bluetooth::Bluetooth;
 use crate::dom::bluetoothpermissionresult::BluetoothPermissionResult;
 use crate::dom::globalscope::GlobalScope;
 use crate::dom::permissionstatus::PermissionStatus;
-use crate::dom::promise::Promise;
+use crate::dom::promise::{Promise, PromiseRoot};
 use crate::realms::{AlreadyInRealm, InRealm};
 use crate::script_runtime::CanGc;
 

@@ -13,7 +13,7 @@ use crate::dom::bindings::codegen::Bindings::CredentialBinding::CredentialMethod
 use crate::dom::bindings::codegen::DomTypeHolder::DomTypeHolder;
 use crate::dom::bindings::root::DomRoot;
 use crate::dom::globalscope::GlobalScope;
-use crate::dom::promise::Promise;
+use crate::dom::promise::{Promise, PromiseRoot};
 use crate::dom::window::Window;
 use crate::script_runtime::CanGc;
 
