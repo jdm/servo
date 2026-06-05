@@ -586,7 +586,7 @@ impl WritableStreamDefaultController {
         cx: &mut JSContext,
         global: &GlobalScope,
         reason: SafeHandleValue,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         let result = match &self.underlying_sink_type {
             UnderlyingSinkType::Js {
                 abort,
@@ -659,7 +659,7 @@ impl WritableStreamDefaultController {
         cx: &mut JSContext,
         chunk: SafeHandleValue,
         global: &GlobalScope,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         match &self.underlying_sink_type {
             UnderlyingSinkType::Js {
                 abort: _,
@@ -738,7 +738,7 @@ impl WritableStreamDefaultController {
     }
 
     /// <https://streams.spec.whatwg.org/#writablestreamdefaultcontroller-closealgorithm>
-    fn call_close_algorithm(&self, cx: &mut JSContext, global: &GlobalScope) -> Rc<Promise> {
+    fn call_close_algorithm(&self, cx: &mut JSContext, global: &GlobalScope) -> PromiseRoot {
         match &self.underlying_sink_type {
             UnderlyingSinkType::Js {
                 abort: _,

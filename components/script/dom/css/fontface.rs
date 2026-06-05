@@ -566,7 +566,7 @@ impl FontFaceMethods<crate::DomTypeHolder> for FontFace {
     /// load. For fonts constructed from a buffer source, or fonts that are already loading or
     /// loaded, it does nothing.
     /// <https://drafts.csswg.org/css-font-loading/#font-face-load>
-    fn Load(&self) -> Rc<Promise> {
+    fn Load(&self) -> PromiseRoot {
         let Some(sources) = self.urls.borrow_mut().take() else {
             // Step 2. If font face’s [[Urls]] slot is null, or its status attribute is anything
             // other than "unloaded", return font face’s [[FontStatusPromise]] and abort these
@@ -652,7 +652,7 @@ impl FontFaceMethods<crate::DomTypeHolder> for FontFace {
     }
 
     /// <https://drafts.csswg.org/css-font-loading/#dom-fontface-loaded>
-    fn Loaded(&self) -> Rc<Promise> {
+    fn Loaded(&self) -> PromiseRoot {
         self.font_status_promise.clone()
     }
 

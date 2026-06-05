@@ -53,7 +53,7 @@ impl MediaDevicesMethods<crate::DomTypeHolder> for MediaDevices {
         &self,
         cx: &mut CurrentRealm,
         constraints: &MediaStreamConstraints,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         let p = Promise::new_in_realm(cx);
         let media = ServoMedia::get();
         let stream = MediaStream::new(cx, &self.global());
@@ -75,7 +75,7 @@ impl MediaDevicesMethods<crate::DomTypeHolder> for MediaDevices {
     }
 
     /// <https://w3c.github.io/mediacapture-main/#dom-mediadevices-enumeratedevices>
-    fn EnumerateDevices(&self, cx: &mut JSContext) -> Rc<Promise> {
+    fn EnumerateDevices(&self, cx: &mut JSContext) -> PromiseRoot {
         // Step 1.
         let mut realm = CurrentRealm::assert(cx);
         let p = Promise::new_in_realm(&mut realm);

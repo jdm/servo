@@ -66,7 +66,7 @@ pub(crate) trait ReadableStreamGenericReader {
         cx: &mut js::context::JSContext,
         global: &GlobalScope,
         reason: SafeHandleValue,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         // Let stream be reader.[[stream]].
         let stream = self.get_stream();
 
@@ -134,7 +134,7 @@ pub(crate) trait ReadableStreamGenericReader {
     }
 
     /// <https://streams.spec.whatwg.org/#generic-reader-closed>
-    fn closed(&self) -> Rc<Promise> {
+    fn closed(&self) -> PromiseRoot {
         self.get_closed_promise()
     }
 
@@ -144,7 +144,7 @@ pub(crate) trait ReadableStreamGenericReader {
         cx: &mut js::context::JSContext,
         global: &GlobalScope,
         reason: SafeHandleValue,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         if self.get_stream().is_none() {
             // If this.[[stream]] is undefined,
             // return a promise rejected with a TypeError exception.
@@ -166,7 +166,7 @@ pub(crate) trait ReadableStreamGenericReader {
 
     fn set_closed_promise(&self, promise: Rc<Promise>);
 
-    fn get_closed_promise(&self) -> Rc<Promise>;
+    fn get_closed_promise(&self) -> PromiseRoot;
 
     fn as_default_reader(&self) -> Option<&ReadableStreamDefaultReader> {
         None

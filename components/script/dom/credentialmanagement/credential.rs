@@ -60,14 +60,14 @@ impl CredentialMethods<DomTypeHolder> for Credential {
     }
 
     /// <https://www.w3.org/TR/credential-management-1/#dom-credential-isconditionalmediationavailable>
-    fn IsConditionalMediationAvailable(cx: &mut JSContext, _global: &Window) -> Rc<Promise> {
+    fn IsConditionalMediationAvailable(cx: &mut JSContext, _global: &Window) -> PromiseRoot {
         let in_realm_proof = AlreadyInRealm::assert::<DomTypeHolder>();
         // FIXME:(arihant2math) return false
         Promise::new_in_current_realm(InRealm::Already(&in_realm_proof), CanGc::from_cx(cx))
     }
 
     /// <https://www.w3.org/TR/credential-management-1/#dom-credential-willrequestconditionalcreation>
-    fn WillRequestConditionalCreation(cx: &mut JSContext, _global: &Window) -> Rc<Promise> {
+    fn WillRequestConditionalCreation(cx: &mut JSContext, _global: &Window) -> PromiseRoot {
         let in_realm_proof = AlreadyInRealm::assert::<DomTypeHolder>();
         Promise::new_in_current_realm(InRealm::Already(&in_realm_proof), CanGc::from_cx(cx))
     }

@@ -207,7 +207,7 @@ impl GPUQueueMethods<crate::DomTypeHolder> for GPUQueue {
     }
 
     /// <https://gpuweb.github.io/gpuweb/#dom-gpuqueue-onsubmittedworkdone>
-    fn OnSubmittedWorkDone(&self, can_gc: CanGc) -> Rc<Promise> {
+    fn OnSubmittedWorkDone(&self, can_gc: CanGc) -> PromiseRoot {
         let global = self.global();
         let promise = Promise::new(&global, can_gc);
         let task_source = global.task_manager().dom_manipulation_task_source();

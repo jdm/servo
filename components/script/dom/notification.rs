@@ -402,7 +402,7 @@ impl NotificationMethods<crate::DomTypeHolder> for Notification {
         cx: &mut JSContext,
         global: &GlobalScope,
         permission_callback: Option<Rc<NotificationPermissionCallback>>,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         // Step 2: Let promise be a new promise in this’s relevant Realm.
         let promise = Promise::new(global, CanGc::from_cx(cx));
 

@@ -240,7 +240,7 @@ impl WritableStreamDefaultWriter {
         cx: &mut CurrentRealm,
         global: &GlobalScope,
         reason: SafeHandleValue,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         // Let stream be writer.[[stream]].
         let Some(stream) = self.stream.get() else {
             // Assert: stream is not undefined.
@@ -252,7 +252,7 @@ impl WritableStreamDefaultWriter {
     }
 
     /// <https://streams.spec.whatwg.org/#writable-stream-default-writer-close>
-    fn close(&self, cx: &mut js::context::JSContext, global: &GlobalScope) -> Rc<Promise> {
+    fn close(&self, cx: &mut js::context::JSContext, global: &GlobalScope) -> PromiseRoot {
         // Let stream be writer.[[stream]].
         let Some(stream) = self.stream.get() else {
             // Assert: stream is not undefined.
@@ -269,7 +269,7 @@ impl WritableStreamDefaultWriter {
         cx: &mut js::context::JSContext,
         global: &GlobalScope,
         chunk: SafeHandleValue,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         // Let stream be writer.[[stream]].
         let Some(stream) = self.stream.get() else {
             // Assert: stream is not undefined.
@@ -383,7 +383,7 @@ impl WritableStreamDefaultWriter {
         &self,
         cx: &mut js::context::JSContext,
         global: &GlobalScope,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         // Let stream be writer.[[stream]].
         let Some(stream) = self.stream.get() else {
             // Assert: stream is not undefined.
@@ -426,7 +426,7 @@ impl WritableStreamDefaultWriter {
 
 impl WritableStreamDefaultWriterMethods<crate::DomTypeHolder> for WritableStreamDefaultWriter {
     /// <https://streams.spec.whatwg.org/#default-writer-closed>
-    fn Closed(&self) -> Rc<Promise> {
+    fn Closed(&self) -> PromiseRoot {
         // Return this.[[closedPromise]].
         return self.closed_promise.borrow().clone();
     }
@@ -443,13 +443,13 @@ impl WritableStreamDefaultWriterMethods<crate::DomTypeHolder> for WritableStream
     }
 
     /// <https://streams.spec.whatwg.org/#default-writer-ready>
-    fn Ready(&self) -> Rc<Promise> {
+    fn Ready(&self) -> PromiseRoot {
         // Return this.[[readyPromise]].
         return self.ready_promise.borrow().clone();
     }
 
     /// <https://streams.spec.whatwg.org/#default-writer-abort>
-    fn Abort(&self, cx: &mut CurrentRealm, reason: SafeHandleValue) -> Rc<Promise> {
+    fn Abort(&self, cx: &mut CurrentRealm, reason: SafeHandleValue) -> PromiseRoot {
         let global = GlobalScope::from_current_realm(cx);
 
         // If this.[[stream]] is undefined,
@@ -468,7 +468,7 @@ impl WritableStreamDefaultWriterMethods<crate::DomTypeHolder> for WritableStream
     }
 
     /// <https://streams.spec.whatwg.org/#default-writer-close>
-    fn Close(&self, cx: &mut CurrentRealm) -> Rc<Promise> {
+    fn Close(&self, cx: &mut CurrentRealm) -> PromiseRoot {
         let global = GlobalScope::from_current_realm(cx);
         let promise = Promise::new2(cx, &global);
 
@@ -515,7 +515,7 @@ impl WritableStreamDefaultWriterMethods<crate::DomTypeHolder> for WritableStream
     }
 
     /// <https://streams.spec.whatwg.org/#default-writer-write>
-    fn Write(&self, cx: &mut CurrentRealm, chunk: SafeHandleValue) -> Rc<Promise> {
+    fn Write(&self, cx: &mut CurrentRealm, chunk: SafeHandleValue) -> PromiseRoot {
         let global = GlobalScope::from_current_realm(cx);
 
         // If this.[[stream]] is undefined,

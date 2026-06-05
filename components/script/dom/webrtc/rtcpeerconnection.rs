@@ -557,7 +557,7 @@ impl RTCPeerConnectionMethods<crate::DomTypeHolder> for RTCPeerConnection {
         candidate: &RTCIceCandidateInit,
         comp: InRealm,
         can_gc: CanGc,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         let p = Promise::new_in_current_realm(comp, can_gc);
         if candidate.sdpMid.is_none() && candidate.sdpMLineIndex.is_none() {
             p.reject_error(
@@ -594,7 +594,7 @@ impl RTCPeerConnectionMethods<crate::DomTypeHolder> for RTCPeerConnection {
     }
 
     /// <https://w3c.github.io/webrtc-pc/#dom-rtcpeerconnection-createoffer>
-    fn CreateOffer(&self, _options: &RTCOfferOptions, comp: InRealm, can_gc: CanGc) -> Rc<Promise> {
+    fn CreateOffer(&self, _options: &RTCOfferOptions, comp: InRealm, can_gc: CanGc) -> PromiseRoot {
         let p = Promise::new_in_current_realm(comp, can_gc);
         if self.closed.get() {
             p.reject_error(Error::InvalidState(None), can_gc);
@@ -611,7 +611,7 @@ impl RTCPeerConnectionMethods<crate::DomTypeHolder> for RTCPeerConnection {
         _options: &RTCAnswerOptions,
         comp: InRealm,
         can_gc: CanGc,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         let p = Promise::new_in_current_realm(comp, can_gc);
         if self.closed.get() {
             p.reject_error(Error::InvalidState(None), can_gc);
@@ -638,7 +638,7 @@ impl RTCPeerConnectionMethods<crate::DomTypeHolder> for RTCPeerConnection {
         desc: &RTCSessionDescriptionInit,
         comp: InRealm,
         can_gc: CanGc,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         // XXXManishearth validate the current state
         let p = Promise::new_in_current_realm(comp, can_gc);
         let this = Trusted::new(self);
@@ -681,7 +681,7 @@ impl RTCPeerConnectionMethods<crate::DomTypeHolder> for RTCPeerConnection {
         desc: &RTCSessionDescriptionInit,
         comp: InRealm,
         can_gc: CanGc,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         // XXXManishearth validate the current state
         let p = Promise::new_in_current_realm(comp, can_gc);
         let this = Trusted::new(self);

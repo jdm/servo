@@ -1924,7 +1924,7 @@ impl HTMLImageElementMethods<crate::DomTypeHolder> for HTMLImageElement {
     make_setter!(SetReferrerPolicy, "referrerpolicy");
 
     /// <https://html.spec.whatwg.org/multipage/#dom-img-decode>
-    fn Decode(&self, cx: &mut JSContext) -> Rc<Promise> {
+    fn Decode(&self, cx: &mut JSContext) -> PromiseRoot {
         // Step 1. Let promise be a new promise.
         let promise = Promise::new2(cx, &self.global());
 

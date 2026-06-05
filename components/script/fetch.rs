@@ -212,7 +212,7 @@ pub(crate) fn Fetch(
     input: RequestInfo,
     init: RootedTraceableBox<RequestInit>,
     cx: &mut CurrentRealm,
-) -> Rc<Promise> {
+) -> PromiseRoot {
     // Step 1. Let p be a new promise.
     let promise = Promise::new_in_realm(cx);
 

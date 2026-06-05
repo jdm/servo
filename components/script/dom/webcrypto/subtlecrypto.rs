@@ -369,7 +369,7 @@ impl SubtleCryptoMethods<crate::DomTypeHolder> for SubtleCrypto {
         algorithm: AlgorithmIdentifier,
         key: &CryptoKey,
         data: ArrayBufferViewOrArrayBuffer,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         // Step 1. Let algorithm and key be the algorithm and key parameters passed to the
         // encrypt() method, respectively.
         // NOTE: We did that in method parameter.
@@ -456,7 +456,7 @@ impl SubtleCryptoMethods<crate::DomTypeHolder> for SubtleCrypto {
         algorithm: AlgorithmIdentifier,
         key: &CryptoKey,
         data: ArrayBufferViewOrArrayBuffer,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         // Step 1. Let algorithm and key be the algorithm and key parameters passed to the
         // decrypt() method, respectively.
         // NOTE: We did that in method parameter.
@@ -543,7 +543,7 @@ impl SubtleCryptoMethods<crate::DomTypeHolder> for SubtleCrypto {
         algorithm: AlgorithmIdentifier,
         key: &CryptoKey,
         data: ArrayBufferViewOrArrayBuffer,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         // Step 1. Let algorithm and key be the algorithm and key parameters passed to the sign()
         // method, respectively.
         // NOTE: We did that in method parameter.
@@ -630,7 +630,7 @@ impl SubtleCryptoMethods<crate::DomTypeHolder> for SubtleCrypto {
         key: &CryptoKey,
         signature: ArrayBufferViewOrArrayBuffer,
         data: ArrayBufferViewOrArrayBuffer,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         // Step 1. Let algorithm and key be the algorithm and key parameters passed to the verify()
         // method, respectively.
         // NOTE: We did that in method parameter.
@@ -721,7 +721,7 @@ impl SubtleCryptoMethods<crate::DomTypeHolder> for SubtleCrypto {
         cx: &mut CurrentRealm,
         algorithm: AlgorithmIdentifier,
         data: ArrayBufferViewOrArrayBuffer,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         // Step 1. Let algorithm be the algorithm parameter passed to the digest() method.
         // NOTE: We did that in method parameter.
 
@@ -789,7 +789,7 @@ impl SubtleCryptoMethods<crate::DomTypeHolder> for SubtleCrypto {
         algorithm: AlgorithmIdentifier,
         extractable: bool,
         key_usages: Vec<KeyUsage>,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         // Step 1. Let algorithm, extractable and usages be the algorithm, extractable and
         // keyUsages parameters passed to the generateKey() method, respectively.
 
@@ -894,7 +894,7 @@ impl SubtleCryptoMethods<crate::DomTypeHolder> for SubtleCrypto {
         derived_key_type: AlgorithmIdentifier,
         extractable: bool,
         usages: Vec<KeyUsage>,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         // Step 1. Let algorithm, baseKey, derivedKeyType, extractable and usages be the algorithm,
         // baseKey, derivedKeyType, extractable and keyUsages parameters passed to the deriveKey()
         // method, respectively.
@@ -1042,7 +1042,7 @@ impl SubtleCryptoMethods<crate::DomTypeHolder> for SubtleCrypto {
         algorithm: AlgorithmIdentifier,
         base_key: &CryptoKey,
         length: Option<u32>,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         // Step 1. Let algorithm, baseKey and length, be the algorithm, baseKey and length
         // parameters passed to the deriveBits() method, respectively.
         // NOTE: We did that in method parameter.
@@ -1124,7 +1124,7 @@ impl SubtleCryptoMethods<crate::DomTypeHolder> for SubtleCrypto {
         algorithm: AlgorithmIdentifier,
         extractable: bool,
         key_usages: Vec<KeyUsage>,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         // Step 1. Let format, algorithm, extractable and usages, be the format, algorithm,
         // extractable and keyUsages parameters passed to the importKey() method, respectively.
 
@@ -1263,7 +1263,7 @@ impl SubtleCryptoMethods<crate::DomTypeHolder> for SubtleCrypto {
     }
 
     /// <https://w3c.github.io/webcrypto/#SubtleCrypto-method-exportKey>
-    fn ExportKey(&self, cx: &mut CurrentRealm, format: KeyFormat, key: &CryptoKey) -> Rc<Promise> {
+    fn ExportKey(&self, cx: &mut CurrentRealm, format: KeyFormat, key: &CryptoKey) -> PromiseRoot {
         // Step 1. Let format and key be the format and key parameters passed to the exportKey()
         // method, respectively.
         // NOTE: We did that in method parameter.
@@ -1354,7 +1354,7 @@ impl SubtleCryptoMethods<crate::DomTypeHolder> for SubtleCrypto {
         key: &CryptoKey,
         wrapping_key: &CryptoKey,
         algorithm: AlgorithmIdentifier,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         // Step 1. Let format, key, wrappingKey and algorithm be the format, key, wrappingKey and
         // wrapAlgorithm parameters passed to the wrapKey() method, respectively.
         // NOTE: We did that in method parameter.
@@ -1531,7 +1531,7 @@ impl SubtleCryptoMethods<crate::DomTypeHolder> for SubtleCrypto {
         unwrapped_key_algorithm: AlgorithmIdentifier,
         extractable: bool,
         usages: Vec<KeyUsage>,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         // Step 1. Let format, unwrappingKey, algorithm, unwrappedKeyAlgorithm, extractable and
         // usages, be the format, unwrappingKey, unwrapAlgorithm, unwrappedKeyAlgorithm,
         // extractable and keyUsages parameters passed to the unwrapKey() method, respectively.
@@ -1716,7 +1716,7 @@ impl SubtleCryptoMethods<crate::DomTypeHolder> for SubtleCrypto {
         shared_key_algorithm: AlgorithmIdentifier,
         extractable: bool,
         usages: Vec<KeyUsage>,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         // Step 1. Let encapsulationAlgorithm, encapsulationKey, sharedKeyAlgorithm, extractable
         // and usages be the encapsulationAlgorithm, encapsulationKey, sharedKeyAlgorithm,
         // extractable and keyUsages parameters passed to the encapsulateKey() method,
@@ -1859,7 +1859,7 @@ impl SubtleCryptoMethods<crate::DomTypeHolder> for SubtleCrypto {
         cx: &mut CurrentRealm,
         encapsulation_algorithm: AlgorithmIdentifier,
         encapsulation_key: &CryptoKey,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         // Step 1. Let encapsulationAlgorithm and encapsulationKey be the encapsulationAlgorithm
         // and encapsulationKey parameters passed to the encapsulateBits() method, respectively.
 
@@ -1951,7 +1951,7 @@ impl SubtleCryptoMethods<crate::DomTypeHolder> for SubtleCrypto {
         shared_key_algorithm: AlgorithmIdentifier,
         extractable: bool,
         usages: Vec<KeyUsage>,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         // Step 1. Let decapsulationAlgorithm, decapsulationKey, sharedKeyAlgorithm, extractable
         // and usages be the decapsulationAlgorithm, decapsulationKey, sharedKeyAlgorithm,
         // extractable and keyUsages parameters passed to the decapsulateKey() method,
@@ -2090,7 +2090,7 @@ impl SubtleCryptoMethods<crate::DomTypeHolder> for SubtleCrypto {
         decapsulation_algorithm: AlgorithmIdentifier,
         decapsulation_key: &CryptoKey,
         ciphertext: ArrayBufferViewOrArrayBuffer,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         // Step 1. Let decapsulationAlgorithm and decapsulationKey be the decapsulationAlgorithm
         // and decapsulationKey parameters passed to the decapsulateBits() method, respectively.
 
@@ -2187,7 +2187,7 @@ impl SubtleCryptoMethods<crate::DomTypeHolder> for SubtleCrypto {
         cx: &mut CurrentRealm,
         key: &CryptoKey,
         usages: Vec<KeyUsage>,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         // Step 1. Let key and usages be the key and keyUsages parameters passed to the
         // getPublicKey() method, respectively.
 

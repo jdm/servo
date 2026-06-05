@@ -329,7 +329,7 @@ impl ServiceWorkerContainerMethods<crate::DomTypeHolder> for ServiceWorkerContai
         realm: &mut CurrentRealm,
         script_url: USVString,
         options: &RegistrationOptions,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         let can_gc = CanGc::from_cx(realm);
         // A: Step 2.
         let global = self.global();
@@ -463,7 +463,7 @@ impl ServiceWorkerContainerMethods<crate::DomTypeHolder> for ServiceWorkerContai
     }
 
     /// <https://w3c.github.io/ServiceWorker/#navigator-service-worker-getRegistration>
-    fn GetRegistration(&self, realm: &mut CurrentRealm, client_url: USVString) -> Rc<Promise> {
+    fn GetRegistration(&self, realm: &mut CurrentRealm, client_url: USVString) -> PromiseRoot {
         // Step 1: Let client be this’s service worker client.
         let global = self.global();
 

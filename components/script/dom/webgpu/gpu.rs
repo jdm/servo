@@ -54,7 +54,7 @@ impl GPUMethods<crate::DomTypeHolder> for GPU {
         options: &GPURequestAdapterOptions,
         comp: InRealm,
         can_gc: CanGc,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         let global = &self.global();
         let promise = Promise::new_in_current_realm(comp, can_gc);
         let task_source = global.task_manager().dom_manipulation_task_source();

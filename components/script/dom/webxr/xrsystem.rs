@@ -115,7 +115,7 @@ impl Convert<SessionMode> for XRSessionMode {
 
 impl XRSystemMethods<crate::DomTypeHolder> for XRSystem {
     /// <https://immersive-web.github.io/webxr/#dom-xr-issessionsupported>
-    fn IsSessionSupported(&self, mode: XRSessionMode, can_gc: CanGc) -> Rc<Promise> {
+    fn IsSessionSupported(&self, mode: XRSessionMode, can_gc: CanGc) -> PromiseRoot {
         // XXXManishearth this should select an XR device first
         let promise = Promise::new(&self.global(), can_gc);
         let mut trusted = Some(TrustedPromise::new(promise.clone()));
@@ -162,7 +162,7 @@ impl XRSystemMethods<crate::DomTypeHolder> for XRSystem {
         init: RootedTraceableBox<XRSessionInit>,
         comp: InRealm,
         can_gc: CanGc,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         let global = self.global();
         let window = global.as_window();
         let promise = Promise::new_in_current_realm(comp, can_gc);

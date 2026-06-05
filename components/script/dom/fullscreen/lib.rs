@@ -35,7 +35,7 @@ use crate::task_source::TaskSourceName;
 
 impl Document {
     /// <https://fullscreen.spec.whatwg.org/#dom-element-requestfullscreen>
-    pub(crate) fn enter_fullscreen(&self, pending: &Element, can_gc: CanGc) -> Rc<Promise> {
+    pub(crate) fn enter_fullscreen(&self, pending: &Element, can_gc: CanGc) -> PromiseRoot {
         // Step 1
         // > Let pendingDoc be this’s node document.
         // `Self` is the pending document.
@@ -152,7 +152,7 @@ impl Document {
     }
 
     /// <https://fullscreen.spec.whatwg.org/#exit-fullscreen>
-    pub(crate) fn exit_fullscreen(&self, can_gc: CanGc) -> Rc<Promise> {
+    pub(crate) fn exit_fullscreen(&self, can_gc: CanGc) -> PromiseRoot {
         let global = self.global();
 
         // Step 1

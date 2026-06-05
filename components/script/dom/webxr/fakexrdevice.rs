@@ -305,7 +305,7 @@ impl FakeXRDeviceMethods<crate::DomTypeHolder> for FakeXRDevice {
     }
 
     /// <https://immersive-web.github.io/webxr-test-api/#dom-fakexrdevice-disconnect>
-    fn Disconnect(&self, can_gc: CanGc) -> Rc<Promise> {
+    fn Disconnect(&self, can_gc: CanGc) -> PromiseRoot {
         let global = self.global();
         let p = Promise::new(&global, can_gc);
         let mut trusted = Some(TrustedPromise::new(p.clone()));

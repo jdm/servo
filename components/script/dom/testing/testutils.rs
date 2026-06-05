@@ -22,7 +22,7 @@ pub(crate) struct TestUtils {
 impl TestUtilsMethods<crate::DomTypeHolder> for TestUtils {
     /// <https://testutils.spec.whatwg.org/#dom-testutils-gc>
     #[expect(unsafe_code)]
-    fn Gc(global: &GlobalScope) -> Rc<Promise> {
+    fn Gc(global: &GlobalScope) -> PromiseRoot {
         // 1. Let p be a new promise.
         let promise = Promise::new(global, CanGc::deprecated_note());
         let trusted = TrustedPromise::new(promise.clone());

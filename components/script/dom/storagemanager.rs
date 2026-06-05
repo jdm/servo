@@ -127,7 +127,7 @@ impl StorageManagerEstimateResponseHandler {
 
 impl StorageManagerMethods<crate::DomTypeHolder> for StorageManager {
     /// <https://storage.spec.whatwg.org/#dom-storagemanager-persisted>
-    fn Persisted(&self, comp: InRealm, can_gc: CanGc) -> Rc<Promise> {
+    fn Persisted(&self, comp: InRealm, can_gc: CanGc) -> PromiseRoot {
         // Step 1. Let promise be a new promise.
         let promise = Promise::new_in_current_realm(comp, can_gc);
         // Step 2. Let global be this’s relevant global object.
@@ -172,7 +172,7 @@ impl StorageManagerMethods<crate::DomTypeHolder> for StorageManager {
     }
 
     /// <https://storage.spec.whatwg.org/#dom-storagemanager-persist>
-    fn Persist(&self, comp: InRealm, can_gc: CanGc) -> Rc<Promise> {
+    fn Persist(&self, comp: InRealm, can_gc: CanGc) -> PromiseRoot {
         // Step 1. Let promise be a new promise.
         let promise = Promise::new_in_current_realm(comp, can_gc);
         // Step 2. Let global be this’s relevant global object.
@@ -228,7 +228,7 @@ impl StorageManagerMethods<crate::DomTypeHolder> for StorageManager {
     }
 
     /// <https://storage.spec.whatwg.org/#dom-storagemanager-estimate>
-    fn Estimate(&self, comp: InRealm, can_gc: CanGc) -> Rc<Promise> {
+    fn Estimate(&self, comp: InRealm, can_gc: CanGc) -> PromiseRoot {
         // Step 1. Let promise be a new promise.
         let promise = Promise::new_in_current_realm(comp, can_gc);
         // Step 2. Let global be this’s relevant global object.

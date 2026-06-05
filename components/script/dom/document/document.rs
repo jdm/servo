@@ -6365,7 +6365,7 @@ impl DocumentMethods<crate::DomTypeHolder> for Document {
     }
 
     /// <https://fullscreen.spec.whatwg.org/#dom-document-exitfullscreen>
-    fn ExitFullscreen(&self, can_gc: CanGc) -> Rc<Promise> {
+    fn ExitFullscreen(&self, can_gc: CanGc) -> PromiseRoot {
         self.exit_fullscreen(can_gc)
     }
 

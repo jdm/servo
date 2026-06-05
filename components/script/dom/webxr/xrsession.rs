@@ -839,7 +839,7 @@ impl XRSessionMethods<crate::DomTypeHolder> for XRSession {
         ty: XRReferenceSpaceType,
         comp: InRealm,
         can_gc: CanGc,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         let p = Promise::new_in_current_realm(comp, can_gc);
 
         // https://immersive-web.github.io/webxr/#create-a-reference-space
@@ -900,7 +900,7 @@ impl XRSessionMethods<crate::DomTypeHolder> for XRSession {
     }
 
     /// <https://immersive-web.github.io/webxr/#dom-xrsession-end>
-    fn End(&self, cx: &mut js::context::JSContext) -> Rc<Promise> {
+    fn End(&self, cx: &mut js::context::JSContext) -> PromiseRoot {
         let global = self.global();
         let p = Promise::new2(cx, &global);
         if self.ended.get() && self.end_promises.borrow().is_empty() {
@@ -932,7 +932,7 @@ impl XRSessionMethods<crate::DomTypeHolder> for XRSession {
     }
 
     /// <https://immersive-web.github.io/hit-test/#dom-xrsession-requesthittestsource>
-    fn RequestHitTestSource(&self, options: &XRHitTestOptionsInit, can_gc: CanGc) -> Rc<Promise> {
+    fn RequestHitTestSource(&self, options: &XRHitTestOptionsInit, can_gc: CanGc) -> PromiseRoot {
         let p = Promise::new(&self.global(), can_gc);
 
         if !self
@@ -1044,7 +1044,7 @@ impl XRSessionMethods<crate::DomTypeHolder> for XRSession {
         rate: Finite<f32>,
         comp: InRealm,
         can_gc: CanGc,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         let promise = Promise::new_in_current_realm(comp, can_gc);
         {
             let session = self.session.borrow();

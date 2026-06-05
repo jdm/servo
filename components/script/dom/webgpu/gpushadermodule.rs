@@ -152,7 +152,7 @@ impl GPUShaderModuleMethods<crate::DomTypeHolder> for GPUShaderModule {
     }
 
     /// <https://gpuweb.github.io/gpuweb/#dom-gpushadermodule-getcompilationinfo>
-    fn GetCompilationInfo(&self) -> Rc<Promise> {
+    fn GetCompilationInfo(&self) -> PromiseRoot {
         self.compilation_info_promise.clone()
     }
 }

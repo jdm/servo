@@ -21,13 +21,13 @@ pub(crate) struct WindowClient {
 
 impl WindowClientMethods<crate::DomTypeHolder> for WindowClient {
     /// <https://w3c.github.io/ServiceWorker/#dom-windowclient-focus>
-    fn Focus(&self, cx: &mut JSContext) -> Rc<Promise> {
+    fn Focus(&self, cx: &mut JSContext) -> PromiseRoot {
         // TODO: Implement
         Promise::new(&self.global(), CanGc::from_cx(cx))
     }
 
     /// <https://w3c.github.io/ServiceWorker/#dom-windowclient-navigate>
-    fn Navigate(&self, cx: &mut JSContext, _url: USVString) -> Rc<Promise> {
+    fn Navigate(&self, cx: &mut JSContext, _url: USVString) -> PromiseRoot {
         // TODO: Implement
         Promise::new(&self.global(), CanGc::from_cx(cx))
     }

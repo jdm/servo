@@ -105,7 +105,7 @@ impl TrustedPromise {
     /// Obtain a usable DOM Promise from a pinned `TrustedPromise` value. Fails if used on
     /// a different thread than the original value from which this `TrustedPromise` was
     /// obtained.
-    pub(crate) fn root(self) -> Rc<Promise> {
+    pub(crate) fn root(self) -> PromiseRoot {
         LIVE_REFERENCES.with(|r| {
             let live_references = &*r.borrow();
             assert_eq!(

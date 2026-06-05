@@ -286,7 +286,7 @@ impl ImageBitmap {
         sh: Option<i32>,
         options: &ImageBitmapOptions,
         realm: &mut CurrentRealm,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         let can_gc = CanGc::from_cx(realm);
         let p = Promise::new_in_realm(realm);
 

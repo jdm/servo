@@ -1026,11 +1026,11 @@ impl TestBindingMethods<crate::DomTypeHolder> for TestBinding {
         Record::new()
     }
 
-    fn ReturnResolvedPromise(&self, cx: SafeJSContext, v: HandleValue) -> Rc<Promise> {
+    fn ReturnResolvedPromise(&self, cx: SafeJSContext, v: HandleValue) -> PromiseRoot {
         Promise::new_resolved(&self.global(), cx, v, CanGc::deprecated_note())
     }
 
-    fn ReturnRejectedPromise(&self, cx: SafeJSContext, v: HandleValue) -> Rc<Promise> {
+    fn ReturnRejectedPromise(&self, cx: SafeJSContext, v: HandleValue) -> PromiseRoot {
         Promise::new_rejected(&self.global(), cx, v, CanGc::deprecated_note())
     }
 
@@ -1063,7 +1063,7 @@ impl TestBindingMethods<crate::DomTypeHolder> for TestBinding {
         realm: &mut CurrentRealm,
         resolve: Option<Rc<SimpleCallback>>,
         reject: Option<Rc<SimpleCallback>>,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         let global = self.global();
         let handler = PromiseNativeHandler::new(
             &global,
@@ -1096,7 +1096,7 @@ impl TestBindingMethods<crate::DomTypeHolder> for TestBinding {
         }
     }
 
-    fn PromiseAttribute(&self, comp: InRealm, can_gc: CanGc) -> Rc<Promise> {
+    fn PromiseAttribute(&self, comp: InRealm, can_gc: CanGc) -> PromiseRoot {
         Promise::new_in_current_realm(comp, can_gc)
     }
 
@@ -1151,7 +1151,7 @@ impl TestBindingMethods<crate::DomTypeHolder> for TestBinding {
         Err(Error::Type(c"test".to_owned()))
     }
 
-    fn MethodInternalThrowToRejectPromise(&self, _arg: u64) -> Rc<Promise> {
+    fn MethodInternalThrowToRejectPromise(&self, _arg: u64) -> PromiseRoot {
         unreachable!("Method should already throw")
     }
 
@@ -1159,7 +1159,7 @@ impl TestBindingMethods<crate::DomTypeHolder> for TestBinding {
         Err(Error::Type(c"test".to_owned()))
     }
 
-    fn StaticInternalThrowToRejectPromise(_: &GlobalScope, _arg: u64) -> Rc<Promise> {
+    fn StaticInternalThrowToRejectPromise(_: &GlobalScope, _arg: u64) -> PromiseRoot {
         unreachable!("Method should already throw")
     }
 

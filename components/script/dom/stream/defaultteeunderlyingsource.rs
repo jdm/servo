@@ -103,7 +103,7 @@ impl DefaultTeeUnderlyingSource {
 
     /// <https://streams.spec.whatwg.org/#abstract-opdef-readablestreamdefaulttee>
     /// Let pullAlgorithm be the following steps:
-    pub(crate) fn pull_algorithm(&self, cx: &mut js::context::JSContext) -> Rc<Promise> {
+    pub(crate) fn pull_algorithm(&self, cx: &mut js::context::JSContext) -> PromiseRoot {
         // If reading is true,
         if self.reading.get() {
             // Set readAgain to true.

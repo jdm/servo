@@ -99,7 +99,7 @@ impl Clone for PromiseRoot {
 }
 
 impl PromiseRoot {
-    fn into_traced(self) -> Rc<Promise> {
+    fn into_traced(self) -> PromiseRoot {
         self.promise
     }
 }

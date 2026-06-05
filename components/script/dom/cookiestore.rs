@@ -183,7 +183,7 @@ fn cookie_to_list_item(cookie: Cookie) -> CookieListItem {
 
 impl CookieStoreMethods<crate::DomTypeHolder> for CookieStore {
     /// <https://cookiestore.spec.whatwg.org/#dom-cookiestore-get>
-    fn Get(&self, cx: &mut JSContext, name: USVString) -> Rc<Promise> {
+    fn Get(&self, cx: &mut JSContext, name: USVString) -> PromiseRoot {
         // 1. Let settings be this’s relevant settings object.
         let global = self.global();
 
@@ -224,7 +224,7 @@ impl CookieStoreMethods<crate::DomTypeHolder> for CookieStore {
     }
 
     /// <https://cookiestore.spec.whatwg.org/#dom-cookiestore-get-options>
-    fn Get_(&self, cx: &mut JSContext, options: &CookieStoreGetOptions) -> Rc<Promise> {
+    fn Get_(&self, cx: &mut JSContext, options: &CookieStoreGetOptions) -> PromiseRoot {
         // 1. Let settings be this’s relevant settings object.
         let global = self.global();
 
@@ -312,7 +312,7 @@ impl CookieStoreMethods<crate::DomTypeHolder> for CookieStore {
     }
 
     /// <https://cookiestore.spec.whatwg.org/#dom-cookiestore-getall>
-    fn GetAll(&self, cx: &mut JSContext, name: USVString) -> Rc<Promise> {
+    fn GetAll(&self, cx: &mut JSContext, name: USVString) -> PromiseRoot {
         // 1. Let settings be this’s relevant settings object.
         let global = self.global();
 
@@ -353,7 +353,7 @@ impl CookieStoreMethods<crate::DomTypeHolder> for CookieStore {
     }
 
     /// <https://cookiestore.spec.whatwg.org/#dom-cookiestore-getall-options>
-    fn GetAll_(&self, cx: &mut JSContext, options: &CookieStoreGetOptions) -> Rc<Promise> {
+    fn GetAll_(&self, cx: &mut JSContext, options: &CookieStoreGetOptions) -> PromiseRoot {
         // 1. Let settings be this’s relevant settings object.
         let global = self.global();
 
@@ -432,7 +432,7 @@ impl CookieStoreMethods<crate::DomTypeHolder> for CookieStore {
     }
 
     /// <https://cookiestore.spec.whatwg.org/#dom-cookiestore-set>
-    fn Set(&self, cx: &mut JSContext, name: USVString, value: USVString) -> Rc<Promise> {
+    fn Set(&self, cx: &mut JSContext, name: USVString, value: USVString) -> PromiseRoot {
         // 1. Let settings be this’s relevant settings object.
         let global = self.global();
 
@@ -489,7 +489,7 @@ impl CookieStoreMethods<crate::DomTypeHolder> for CookieStore {
     }
 
     /// <https://cookiestore.spec.whatwg.org/#dom-cookiestore-set-options>
-    fn Set_(&self, cx: &mut JSContext, options: &CookieInit) -> Rc<Promise> {
+    fn Set_(&self, cx: &mut JSContext, options: &CookieInit) -> PromiseRoot {
         // 1. Let settings be this’s relevant settings object.
         let global = self.global();
 
@@ -539,7 +539,7 @@ impl CookieStoreMethods<crate::DomTypeHolder> for CookieStore {
     }
 
     /// <https://cookiestore.spec.whatwg.org/#dom-cookiestore-delete>
-    fn Delete(&self, cx: &mut JSContext, name: USVString) -> Rc<Promise> {
+    fn Delete(&self, cx: &mut JSContext, name: USVString) -> PromiseRoot {
         // 1. Let settings be this’s relevant settings object.
         let global = self.global();
 
@@ -575,7 +575,7 @@ impl CookieStoreMethods<crate::DomTypeHolder> for CookieStore {
     }
 
     /// <https://cookiestore.spec.whatwg.org/#dom-cookiestore-delete-options>
-    fn Delete_(&self, cx: &mut JSContext, options: &CookieStoreDeleteOptions) -> Rc<Promise> {
+    fn Delete_(&self, cx: &mut JSContext, options: &CookieStoreDeleteOptions) -> PromiseRoot {
         // 1. Let settings be this’s relevant settings object.
         let global = self.global();
 

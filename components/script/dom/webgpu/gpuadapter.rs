@@ -190,7 +190,7 @@ impl GPUAdapterMethods<crate::DomTypeHolder> for GPUAdapter {
         descriptor: &GPUDeviceDescriptor,
         comp: InRealm,
         can_gc: CanGc,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         // Step 2
         let promise = Promise::new_in_current_realm(comp, can_gc);
         let callback = callback_promise(

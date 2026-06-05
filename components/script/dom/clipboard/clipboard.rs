@@ -96,7 +96,7 @@ impl Clipboard {
 
 impl ClipboardMethods<crate::DomTypeHolder> for Clipboard {
     /// <https://w3c.github.io/clipboard-apis/#dom-clipboard-readtext>
-    fn ReadText(&self, realm: &mut CurrentRealm) -> Rc<Promise> {
+    fn ReadText(&self, realm: &mut CurrentRealm) -> PromiseRoot {
         // Step 1 Let realm be this's relevant realm.
         let global = self.global();
 
@@ -124,7 +124,7 @@ impl ClipboardMethods<crate::DomTypeHolder> for Clipboard {
     }
 
     /// <https://w3c.github.io/clipboard-apis/#dom-clipboard-writetext>
-    fn WriteText(&self, realm: &mut CurrentRealm, data: DOMString) -> Rc<Promise> {
+    fn WriteText(&self, realm: &mut CurrentRealm, data: DOMString) -> PromiseRoot {
         // Step 1 Let realm be this's relevant realm.
         let global = self.global();
         // Step 2 Let p be a new promise in realm.

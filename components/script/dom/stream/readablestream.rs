@@ -1359,7 +1359,7 @@ impl ReadableStream {
     /// and before `stop_reading`.
     /// Native call to
     /// <https://streams.spec.whatwg.org/#readable-stream-default-reader-read>
-    pub(crate) fn read_a_chunk(&self, cx: &mut JSContext) -> Rc<Promise> {
+    pub(crate) fn read_a_chunk(&self, cx: &mut JSContext) -> PromiseRoot {
         match self.reader.borrow().as_ref() {
             Some(ReaderType::Default(reader)) => {
                 let Some(reader) = reader.get() else {
@@ -1616,7 +1616,7 @@ impl ReadableStream {
         cx: &mut JSContext,
         global: &GlobalScope,
         reason: SafeHandleValue,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         // Set stream.[[disturbed]] to true.
         self.disturbed.set(true);
 
@@ -1904,7 +1904,7 @@ impl ReadableStream {
         prevent_abort: bool,
         prevent_cancel: bool,
         signal: Option<&AbortSignal>,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         // Assert: source implements ReadableStream.
         // Assert: dest implements WritableStream.
         // Assert: prevent_close, prevent_abort, and prevent_cancel are all booleans.
@@ -2192,7 +2192,7 @@ impl ReadableStreamMethods<crate::DomTypeHolder> for ReadableStream {
     }
 
     /// <https://streams.spec.whatwg.org/#rs-cancel>
-    fn Cancel(&self, cx: &mut JSContext, reason: SafeHandleValue) -> Rc<Promise> {
+    fn Cancel(&self, cx: &mut JSContext, reason: SafeHandleValue) -> PromiseRoot {
         let global = self.global();
         if self.is_locked() {
             // If ! IsReadableStreamLocked(this) is true,
@@ -2242,7 +2242,7 @@ impl ReadableStreamMethods<crate::DomTypeHolder> for ReadableStream {
         cx: &mut CurrentRealm,
         destination: &WritableStream,
         options: &StreamPipeOptions,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         let global = self.global();
 
         // If ! IsReadableStreamLocked(this) is true,

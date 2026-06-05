@@ -564,7 +564,7 @@ impl ReadableStreamDefaultController {
         cx: &mut JSContext,
         global: &GlobalScope,
         reason: SafeHandleValue,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         // Perform ! ResetQueue(this).
         self.queue.reset();
 

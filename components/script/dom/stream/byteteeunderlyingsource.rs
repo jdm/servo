@@ -327,7 +327,7 @@ impl ByteTeeUnderlyingSource {
         &self,
         cx: &mut JSContext,
         byte_tee_pull_algorithm: Option<ByteTeePullAlgorithm>,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         let pull_algorithm =
             byte_tee_pull_algorithm.unwrap_or(self.byte_tee_pull_algorithm.clone());
 

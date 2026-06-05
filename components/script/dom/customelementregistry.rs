@@ -640,7 +640,7 @@ impl CustomElementRegistryMethods<crate::DomTypeHolder> for CustomElementRegistr
     }
 
     /// <https://html.spec.whatwg.org/multipage/#dom-customelementregistry-whendefined>
-    fn WhenDefined(&self, name: DOMString, comp: InRealm, can_gc: CanGc) -> Rc<Promise> {
+    fn WhenDefined(&self, name: DOMString, comp: InRealm, can_gc: CanGc) -> PromiseRoot {
         let name = LocalName::from(name);
 
         // Step 1

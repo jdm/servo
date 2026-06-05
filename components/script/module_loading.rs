@@ -86,7 +86,7 @@ pub(crate) fn load_requested_modules(
     cx: &mut CurrentRealm,
     module: Rc<ModuleTree>,
     load_state: Option<Rc<LoadState>>,
-) -> Rc<Promise> {
+) -> PromiseRoot {
     // Step 1. If hostDefined is not present, let hostDefined be empty.
     //
     // Not required, since we implement it as an `Option`

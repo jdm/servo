@@ -67,7 +67,7 @@ impl TestWorkletMethods<crate::DomTypeHolder> for TestWorklet {
         realm: &mut CurrentRealm,
         module_url: USVString,
         options: &WorkletOptions,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         self.worklet.AddModule(realm, module_url, options)
     }
 

@@ -108,7 +108,7 @@ impl FontFaceSet {
 
 impl FontFaceSetMethods<crate::DomTypeHolder> for FontFaceSet {
     /// <https://drafts.csswg.org/css-font-loading/#dom-fontfaceset-ready>
-    fn Ready(&self) -> Rc<Promise> {
+    fn Ready(&self) -> PromiseRoot {
         self.promise.clone()
     }
 
@@ -164,7 +164,7 @@ impl FontFaceSetMethods<crate::DomTypeHolder> for FontFaceSet {
         cx: &mut js::context::JSContext,
         _font: DOMString,
         _text: DOMString,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         // Step 1. Let font face set be the FontFaceSet object this method was called on. Let
         // promise be a newly-created promise object.
         let promise = Promise::new2(cx, &self.global());

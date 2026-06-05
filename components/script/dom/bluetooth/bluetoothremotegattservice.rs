@@ -92,7 +92,7 @@ impl BluetoothRemoteGATTServiceMethods<crate::DomTypeHolder> for BluetoothRemote
         &self,
         cx: &mut CurrentRealm,
         characteristic: BluetoothCharacteristicUUID,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         let is_connected = self.Device().get_gatt(cx).Connected();
         get_gatt_children(
             cx,
@@ -111,7 +111,7 @@ impl BluetoothRemoteGATTServiceMethods<crate::DomTypeHolder> for BluetoothRemote
         &self,
         cx: &mut CurrentRealm,
         characteristic: Option<BluetoothCharacteristicUUID>,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         let is_connected = self.Device().get_gatt(cx).Connected();
         get_gatt_children(
             cx,
@@ -130,7 +130,7 @@ impl BluetoothRemoteGATTServiceMethods<crate::DomTypeHolder> for BluetoothRemote
         &self,
         cx: &mut CurrentRealm,
         service: BluetoothServiceUUID,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         let is_connected = self.Device().get_gatt(cx).Connected();
         get_gatt_children(
             cx,
@@ -149,7 +149,7 @@ impl BluetoothRemoteGATTServiceMethods<crate::DomTypeHolder> for BluetoothRemote
         &self,
         cx: &mut CurrentRealm,
         service: Option<BluetoothServiceUUID>,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         let is_connected = self.Device().get_gatt(cx).Connected();
         get_gatt_children(
             cx,

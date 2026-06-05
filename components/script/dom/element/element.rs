@@ -3940,7 +3940,7 @@ impl ElementMethods<crate::DomTypeHolder> for Element {
     }
 
     /// <https://fullscreen.spec.whatwg.org/#dom-element-requestfullscreen>
-    fn RequestFullscreen(&self, can_gc: CanGc) -> Rc<Promise> {
+    fn RequestFullscreen(&self, can_gc: CanGc) -> PromiseRoot {
         let doc = self.owner_document();
         doc.enter_fullscreen(self, can_gc)
     }

@@ -68,7 +68,7 @@ impl ServoInternals {
 
 impl ServoInternalsMethods<crate::DomTypeHolder> for ServoInternals {
     /// <https://servo.org/internal-no-spec>
-    fn ReportMemory(&self, comp: InRealm, can_gc: CanGc) -> Rc<Promise> {
+    fn ReportMemory(&self, comp: InRealm, can_gc: CanGc) -> PromiseRoot {
         let global = &self.global();
         let promise = Promise::new_in_current_realm(comp, can_gc);
         let task_source = global.task_manager().dom_manipulation_task_source();

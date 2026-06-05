@@ -197,7 +197,7 @@ impl ServiceWorkerRegistrationMethods<crate::DomTypeHolder> for ServiceWorkerReg
     }
 
     /// <https://w3c.github.io/ServiceWorker/#dom-serviceworkerregistration-unregister>
-    fn Unregister(&self, cx: &mut JSContext) -> Rc<Promise> {
+    fn Unregister(&self, cx: &mut JSContext) -> PromiseRoot {
         // Step 1: Let registration be the service worker registration.
         // Note: `self` is the registration.
 

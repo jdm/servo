@@ -69,7 +69,7 @@ impl XRTest {
 
 impl XRTestMethods<crate::DomTypeHolder> for XRTest {
     /// <https://github.com/immersive-web/webxr-test-api/blob/master/explainer.md>
-    fn SimulateDeviceConnection(&self, init: &FakeXRDeviceInit, can_gc: CanGc) -> Rc<Promise> {
+    fn SimulateDeviceConnection(&self, init: &FakeXRDeviceInit, can_gc: CanGc) -> PromiseRoot {
         let global = self.global();
         let p = Promise::new(&global, can_gc);
 
@@ -185,7 +185,7 @@ impl XRTestMethods<crate::DomTypeHolder> for XRTest {
     }
 
     /// <https://github.com/immersive-web/webxr-test-api/blob/master/explainer.md>
-    fn DisconnectAllDevices(&self, can_gc: CanGc) -> Rc<Promise> {
+    fn DisconnectAllDevices(&self, can_gc: CanGc) -> PromiseRoot {
         // XXXManishearth implement device disconnection and session ending
         let global = self.global();
         let p = Promise::new(&global, can_gc);

@@ -139,7 +139,7 @@ impl WorkletMethods<crate::DomTypeHolder> for Worklet {
         realm: &mut CurrentRealm,
         module_url: USVString,
         options: &WorkletOptions,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         // Step 1.
         let promise = Promise::new_in_realm(realm);
 

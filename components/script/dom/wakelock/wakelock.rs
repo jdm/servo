@@ -45,7 +45,7 @@ impl WakeLock {
 
 impl WakeLockMethods<crate::DomTypeHolder> for WakeLock {
     /// <https://w3c.github.io/screen-wake-lock/#the-request-method>
-    fn Request(&self, cx: &mut CurrentRealm, _type_: WakeLockType) -> Rc<Promise> {
+    fn Request(&self, cx: &mut CurrentRealm, _type_: WakeLockType) -> PromiseRoot {
         let global = GlobalScope::from_current_realm(cx);
         let promise = Promise::new_in_realm(cx);
 

@@ -641,7 +641,7 @@ impl ReadableStreamDefaultReaderMethods<crate::DomTypeHolder> for ReadableStream
     }
 
     /// <https://streams.spec.whatwg.org/#default-reader-read>
-    fn Read(&self, cx: &mut js::context::JSContext) -> Rc<Promise> {
+    fn Read(&self, cx: &mut js::context::JSContext) -> PromiseRoot {
         // If this.[[stream]] is undefined, return a promise rejected with a TypeError exception.
         if self.stream.get().is_none() {
             rooted!(&in(cx) let mut error = UndefinedValue());
@@ -695,18 +695,18 @@ impl ReadableStreamDefaultReaderMethods<crate::DomTypeHolder> for ReadableStream
     }
 
     /// <https://streams.spec.whatwg.org/#generic-reader-closed>
-    fn Closed(&self) -> Rc<Promise> {
+    fn Closed(&self) -> PromiseRoot {
         self.closed()
     }
 
     /// <https://streams.spec.whatwg.org/#generic-reader-cancel>
-    fn Cancel(&self, cx: &mut js::context::JSContext, reason: SafeHandleValue) -> Rc<Promise> {
+    fn Cancel(&self, cx: &mut js::context::JSContext, reason: SafeHandleValue) -> PromiseRoot {
         self.generic_cancel(cx, &self.global(), reason)
     }
 }
 
 impl ReadableStreamGenericReader for ReadableStreamDefaultReader {
-    fn get_closed_promise(&self) -> Rc<Promise> {
+    fn get_closed_promise(&self) -> PromiseRoot {
         self.closed_promise.borrow().clone()
     }
 

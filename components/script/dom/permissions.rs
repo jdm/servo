@@ -94,7 +94,7 @@ impl Permissions {
         op: Operation,
         permissionDesc: *mut JSObject,
         promise: Option<Rc<Promise>>,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         // (Query, Request) Step 3.
         let p = match promise {
             Some(promise) => promise,
@@ -201,7 +201,7 @@ impl Permissions {
 #[expect(non_snake_case)]
 impl PermissionsMethods<crate::DomTypeHolder> for Permissions {
     /// <https://w3c.github.io/permissions/#dom-permissions-query>
-    fn Query(&self, cx: &mut js::context::JSContext, permissionDesc: *mut JSObject) -> Rc<Promise> {
+    fn Query(&self, cx: &mut js::context::JSContext, permissionDesc: *mut JSObject) -> PromiseRoot {
         self.manipulate(cx, Operation::Query, permissionDesc, None)
     }
 
@@ -210,7 +210,7 @@ impl PermissionsMethods<crate::DomTypeHolder> for Permissions {
         &self,
         cx: &mut js::context::JSContext,
         permissionDesc: *mut JSObject,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         self.manipulate(cx, Operation::Request, permissionDesc, None)
     }
 
@@ -219,7 +219,7 @@ impl PermissionsMethods<crate::DomTypeHolder> for Permissions {
         &self,
         cx: &mut js::context::JSContext,
         permissionDesc: *mut JSObject,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         self.manipulate(cx, Operation::Revoke, permissionDesc, None)
     }
 }
