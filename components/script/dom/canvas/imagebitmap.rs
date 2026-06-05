@@ -27,7 +27,7 @@ use crate::dom::bindings::serializable::Serializable;
 use crate::dom::bindings::structuredclone::StructuredData;
 use crate::dom::bindings::transferable::Transferable;
 use crate::dom::globalscope::GlobalScope;
-use crate::dom::types::{Promise, PromiseRoot};
+use crate::dom::promise::{Promise, PromiseRoot};
 use crate::script_runtime::CanGc;
 
 #[dom_struct]
@@ -321,8 +321,8 @@ impl ImageBitmap {
 
         // The promise with image bitmap should be fulfilled on the bitmap task source.
         let fullfill_promise_on_bitmap_task_source =
-            |promise: &Rc<Promise>, image_bitmap: &ImageBitmap| {
-                let trusted_promise = TrustedPromise::new(promise.clone());
+            |promise: &PromiseRoot, image_bitmap: &ImageBitmap| {
+                let trusted_promise = TrustedPromise::new(promise);
                 let trusted_image_bitmap = Trusted::new(image_bitmap);
 
                 global_scope.task_manager().bitmap_task_source().queue(
@@ -337,8 +337,8 @@ impl ImageBitmap {
 
         // The promise with "InvalidStateError" DOMException should be rejected
         // on the bitmap task source.
-        let reject_promise_on_bitmap_task_source = |promise: &Rc<Promise>| {
-            let trusted_promise = TrustedPromise::new(promise.clone());
+        let reject_promise_on_bitmap_task_source = |promise: &PromiseRoot| {
+            let trusted_promise = TrustedPromise::new(promise);
 
             global_scope.task_manager().bitmap_task_source().queue(
                 task!(reject_promise: move |cx| {

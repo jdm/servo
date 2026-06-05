@@ -139,7 +139,7 @@ impl ClipboardMethods<crate::DomTypeHolder> for Clipboard {
         // to reject p with "NotAllowedError" DOMException in realm.
         // Step 3.2.2 Abort these steps.
 
-        let trusted_promise = TrustedPromise::new(p.clone());
+        let trusted_promise = TrustedPromise::new(&p);
         let bytes = Vec::from(data);
 
         // Step 3.3 Queue a global task on the clipboard task source,
@@ -210,7 +210,7 @@ impl RoutedPromiseListener<Result<String, String>> for Clipboard {
                 GlobalScope::get_cx(),
                 DOMString::from(text),
                 CanGc::from_cx(cx),
-            ),
+            ).into_traced(),
         };
 
         // Step 3.4.1.1.4 If representation’s MIME type essence is "text/plain", then:

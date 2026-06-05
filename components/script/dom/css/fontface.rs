@@ -196,7 +196,7 @@ impl FontFace {
         Self {
             reflector: Reflector::new(),
             font_face_set: MutNullableDom::default(),
-            font_status_promise,
+            font_status_promise.into_traced(),
             family_name: DomRefCell::default(),
             urls: Default::default(),
             descriptors: DomRefCell::new(FontFaceDescriptors {
@@ -648,12 +648,12 @@ impl FontFaceMethods<crate::DomTypeHolder> for FontFace {
         // Step 3. Set font face’s status attribute to "loading", return font face’s
         // [[FontStatusPromise]], and continue executing the rest of this algorithm asynchronously.
         self.status.set(FontFaceLoadStatus::Loading);
-        self.font_status_promise.clone()
+        self.font_status_promise.duplicate()
     }
 
     /// <https://drafts.csswg.org/css-font-loading/#dom-fontface-loaded>
     fn Loaded(&self) -> PromiseRoot {
-        self.font_status_promise.clone()
+        self.font_status_promise.duplicate()
     }
 
     /// <https://drafts.csswg.org/css-font-loading/#font-face-constructor>

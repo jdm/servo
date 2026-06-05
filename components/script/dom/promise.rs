@@ -99,8 +99,17 @@ impl Clone for PromiseRoot {
 }
 
 impl PromiseRoot {
-    fn into_traced(self) -> PromiseRoot {
-        self.promise
+    pub(crate) fn as_traced(&self) -> &Rc<Promise> {
+        &self.promise
+    }
+
+    pub(crate) fn to_traced(&self) -> Rc<Promise> {
+        self.promise.clone()
+    }
+
+    pub(crate) fn into_traced(self) -> Rc<Promise> {
+        let Self { promise, .. } = self;
+        promise
     }
 }
 

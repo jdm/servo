@@ -90,11 +90,11 @@ impl TrustedPromise {
     /// Create a new `TrustedPromise` instance from an existing DOM object. The object will
     /// be prevented from being GCed for the duration of the resulting `TrustedPromise` object's
     /// lifetime.
-    pub(crate) fn new(promise: Rc<Promise>) -> TrustedPromise {
+    pub(crate) fn new(promise: &PromiseRoot) -> TrustedPromise {
         LIVE_REFERENCES.with(|r| {
             let live_references = &*r.borrow();
-            let ptr = &raw const *promise;
-            live_references.addref_promise(promise);
+            let ptr = &raw const **promise;
+            live_references.addref_promise(promise.as_traced().clone());
             TrustedPromise {
                 dom_object: ptr,
                 owner_thread: (live_references) as *const _ as *const libc::c_void,
@@ -127,7 +127,7 @@ impl TrustedPromise {
                     if entry.get().is_empty() {
                         entry.remove();
                     }
-                    promise
+                    promise.duplicate()
                 },
                 Vacant(_) => unreachable!(),
             }

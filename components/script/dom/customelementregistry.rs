@@ -670,10 +670,10 @@ impl CustomElementRegistryMethods<crate::DomTypeHolder> for CustomElementRegistr
         }
 
         // Steps 3, 4, 5, 6
-        let existing_promise = self.when_defined.borrow().get(&name).cloned();
+        let existing_promise = self.when_defined.borrow().get(&name).map(Promise::duplicate);
         existing_promise.unwrap_or_else(|| {
             let promise = Promise::new_in_current_realm(comp, can_gc);
-            self.when_defined.borrow_mut().insert(name, promise.clone());
+            self.when_defined.borrow_mut().insert(name, promise.to_traced());
             promise
         })
     }

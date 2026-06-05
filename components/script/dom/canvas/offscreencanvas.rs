@@ -548,7 +548,7 @@ impl OffscreenCanvasMethods<crate::DomTypeHolder> for OffscreenCanvas {
         // Step 7.2. Queue a global task on the canvas blob serialization task
         // source given global to run these steps:
         let trusted_this = Trusted::new(self);
-        let trusted_promise = TrustedPromise::new(promise.clone());
+        let trusted_promise = TrustedPromise::new(&promise);
 
         let image_type = EncodedImageType::from(&options.type_.str() as &str);
         let quality = options.quality;

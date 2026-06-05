@@ -131,7 +131,7 @@ where
         // JSAutoRealm needs to be manually made.
         // Otherwise, Servo will crash.
         match response {
-            Ok(response) => self.receiver.root().handle_response(cx, response, &promise),
+            Ok(response) => self.receiver.root().handle_response(cx, response, promise.as_traced()),
             // https://webbluetoothcg.github.io/web-bluetooth/#dom-bluetooth-requestdevice
             // Step 3 - 4.
             Err(error) => promise.reject_error(error.convert(), CanGc::from_cx(cx)),
@@ -170,7 +170,7 @@ impl Bluetooth {
     fn request_bluetooth_devices(
         &self,
         cx: &mut js::context::JSContext,
-        p: &Rc<Promise>,
+        p: &PromiseRoot,
         filters: &Option<Vec<BluetoothLEScanFilterInit>>,
         optional_services: &[BluetoothServiceUUID],
         sender: GenericCallback<BluetoothResponseResult>,
@@ -245,7 +245,7 @@ impl Bluetooth {
 }
 
 pub(crate) fn response_async<T: AsyncBluetoothListener + DomObject + 'static>(
-    promise: &Rc<Promise>,
+    promise: &PromiseRoot,
     receiver: &T,
 ) -> GenericCallback<BluetoothResponseResult> {
     let task_source = receiver
@@ -254,7 +254,7 @@ pub(crate) fn response_async<T: AsyncBluetoothListener + DomObject + 'static>(
         .networking_task_source()
         .to_sendable();
     let context = Arc::new(Mutex::new(BluetoothContext {
-        promise: Some(TrustedPromise::new(promise.clone())),
+        promise: Some(TrustedPromise::new(&promise)),
         receiver: Trusted::new(receiver),
     }));
     GenericCallback::new(move |message| {
@@ -645,7 +645,7 @@ impl PermissionAlgorithm for Bluetooth {
     /// <https://webbluetoothcg.github.io/web-bluetooth/#query-the-bluetooth-permission>
     fn permission_query(
         cx: &mut js::context::JSContext,
-        promise: &Rc<Promise>,
+        promise: &PromiseRoot,
         descriptor: &BluetoothPermissionDescriptor,
         status: &BluetoothPermissionResult,
     ) {
@@ -735,7 +735,7 @@ impl PermissionAlgorithm for Bluetooth {
     /// <https://webbluetoothcg.github.io/web-bluetooth/#request-the-bluetooth-permission>
     fn permission_request(
         cx: &mut js::context::JSContext,
-        promise: &Rc<Promise>,
+        promise: &PromiseRoot,
         descriptor: &BluetoothPermissionDescriptor,
         status: &BluetoothPermissionResult,
     ) {
@@ -749,7 +749,7 @@ impl PermissionAlgorithm for Bluetooth {
         let bluetooth = status.get_bluetooth();
         bluetooth.request_bluetooth_devices(
             cx,
-            promise,
+            &promise,
             &descriptor.filters,
             &descriptor.optionalServices,
             sender,

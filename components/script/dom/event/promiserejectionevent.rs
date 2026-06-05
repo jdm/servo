@@ -48,7 +48,7 @@ impl PromiseRejectionEvent {
         type_: Atom,
         bubbles: EventBubbles,
         cancelable: EventCancelable,
-        promise: Rc<Promise>,
+        promise: PromiseRoot,
         reason: HandleValue,
         can_gc: CanGc,
     ) -> DomRoot<Self> {

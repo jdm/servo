@@ -216,7 +216,7 @@ impl CookieStoreMethods<crate::DomTypeHolder> for CookieStore {
         if res.is_err() {
             error!("Failed to send cookiestore message to resource threads");
         } else {
-            self.in_flight.borrow_mut().push_back(p.clone());
+            self.in_flight.borrow_mut().push_back(p.to_traced());
         }
 
         // 7. Return p.
@@ -305,7 +305,7 @@ impl CookieStoreMethods<crate::DomTypeHolder> for CookieStore {
         if res.is_err() {
             error!("Failed to send cookiestore message to resource threads");
         } else {
-            self.in_flight.borrow_mut().push_back(p.clone());
+            self.in_flight.borrow_mut().push_back(p.to_traced());
         }
 
         p
@@ -345,7 +345,7 @@ impl CookieStoreMethods<crate::DomTypeHolder> for CookieStore {
         if res.is_err() {
             error!("Failed to send cookiestore message to resource threads");
         } else {
-            self.in_flight.borrow_mut().push_back(p.clone());
+            self.in_flight.borrow_mut().push_back(p.to_traced());
         }
 
         // 7. Return p.
@@ -424,7 +424,7 @@ impl CookieStoreMethods<crate::DomTypeHolder> for CookieStore {
         if res.is_err() {
             error!("Failed to send cookiestore message to resource threads");
         } else {
-            self.in_flight.borrow_mut().push_back(p.clone());
+            self.in_flight.borrow_mut().push_back(p.to_traced());
         }
 
         // 8. Return p
@@ -481,7 +481,7 @@ impl CookieStoreMethods<crate::DomTypeHolder> for CookieStore {
         if res.is_err() {
             error!("Failed to send cookiestore message to resource threads");
         } else {
-            self.in_flight.borrow_mut().push_back(p.clone());
+            self.in_flight.borrow_mut().push_back(p.to_traced());
         }
 
         // 7. Return p.
@@ -531,7 +531,7 @@ impl CookieStoreMethods<crate::DomTypeHolder> for CookieStore {
         if res.is_err() {
             error!("Failed to send cookiestore message to resource threads");
         } else {
-            self.in_flight.borrow_mut().push_back(p.clone());
+            self.in_flight.borrow_mut().push_back(p.to_traced());
         }
 
         // 7. Return p
@@ -567,7 +567,7 @@ impl CookieStoreMethods<crate::DomTypeHolder> for CookieStore {
         if res.is_err() {
             error!("Failed to send cookiestore message to resource threads");
         } else {
-            self.in_flight.borrow_mut().push_back(p.clone());
+            self.in_flight.borrow_mut().push_back(p.to_traced());
         }
 
         // 7. Return p.
@@ -603,7 +603,7 @@ impl CookieStoreMethods<crate::DomTypeHolder> for CookieStore {
         if res.is_err() {
             error!("Failed to send cookiestore message to resource threads");
         } else {
-            self.in_flight.borrow_mut().push_back(p.clone());
+            self.in_flight.borrow_mut().push_back(p.to_traced());
         }
 
         // 7. Return p.

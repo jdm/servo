@@ -132,7 +132,7 @@ impl Document {
 
         let trusted_pending = Trusted::new(pending);
         let trusted_pending_doc = Trusted::new(self);
-        let trusted_promise = TrustedPromise::new(promise.clone());
+        let trusted_promise = TrustedPromise::new(&promise);
         let handler = ElementPerformFullscreenEnter::new(
             trusted_pending,
             trusted_pending_doc,

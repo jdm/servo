@@ -2244,7 +2244,7 @@ impl GlobalScope {
     pub(crate) fn read_file_async(
         &self,
         id: Uuid,
-        promise: Rc<Promise>,
+        promise: PromiseRoot,
         callback: FileListenerCallback,
     ) {
         let recv = self.send_msg(id);

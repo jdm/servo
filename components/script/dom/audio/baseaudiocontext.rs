@@ -168,10 +168,10 @@ impl BaseAudioContext {
         self.state.get() == AudioContextState::Suspended
     }
 
-    fn push_pending_resume_promise(&self, promise: &Rc<Promise>) {
+    fn push_pending_resume_promise(&self, promise: &PromiseRoot) {
         self.pending_resume_promises
             .borrow_mut()
-            .push(promise.clone());
+            .push(promise.as_traced().clone());
     }
 
     /// Takes the pending resume promises.
@@ -487,7 +487,7 @@ impl BaseAudioContextMethods<crate::DomTypeHolder> for BaseAudioContext {
             self.decode_resolvers.borrow_mut().insert(
                 uuid.clone(),
                 DecodeResolver {
-                    promise: promise.clone(),
+                    promise: promise.as_traced().clone(),
                     success_callback: decode_success_callback,
                     error_callback: decode_error_callback,
                 },

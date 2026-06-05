@@ -621,7 +621,7 @@ struct QueueTaskHandler {
 impl Callback for QueueTaskHandler {
     fn callback(&self, cx: &mut CurrentRealm, _: HandleValue) {
         let global = GlobalScope::from_current_realm(cx);
-        let promise = TrustedPromise::new(self.promise.clone());
+        let promise = TrustedPromise::new(&self.promise.duplicate());
 
         global.task_manager().networking_task_source().queue(
             task!(continue_module_loading: move |cx| {
@@ -907,7 +907,7 @@ pub(crate) unsafe extern "C" fn host_import_module_dynamically(
     let specifier = unsafe { jsstr_to_string(cx.raw_cx(), NonNull::new(jsstr).unwrap()) };
 
     let mut realm = CurrentRealm::assert(cx);
-    let payload = Payload::PromiseRecord(promise);
+    let payload = Payload::PromiseRecord(promise.to_traced());
     host_load_imported_module(
         &mut realm,
         None,
@@ -1526,7 +1526,7 @@ pub(crate) fn fetch_a_single_module_script(
             // to run onComplete.
             let continue_loading_handler = PromiseNativeHandler::new(
                 global,
-                Some(Box::new(QueueTaskHandler { promise })),
+                Some(Box::new(QueueTaskHandler { promise: promise.to_traced() })),
                 None,
                 CanGc::from_cx(cx),
             );
@@ -1542,7 +1542,7 @@ pub(crate) fn fetch_a_single_module_script(
 
         promise.append_native_handler(cx, &handler);
 
-        let prev = pending.borrow_mut().replace(promise);
+        let prev = pending.borrow_mut().replace(promise.as_traced().clone());
         assert!(prev.is_none());
 
         // Step 7. Set moduleMap[(url, moduleType)] to "fetching".

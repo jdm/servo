@@ -40,7 +40,7 @@ pub(crate) fn callback_promise<
     R: Serialize + DeserializeOwned + Send + 'static,
     T: RoutedPromiseListener<R> + DomObject + 'static,
 >(
-    promise: &Rc<Promise>,
+    promise: &PromiseRoot,
     receiver: &T,
     task_source: TaskSource,
 ) -> GenericCallback<R> {

@@ -295,7 +295,7 @@ impl ClipboardItemMethods<crate::DomTypeHolder> for ClipboardItem {
                     type_: representation.mime_type.to_string(),
                 });
                 let rejection_handler =
-                    Box::new(RepresentationDataPromiseRejectionHandler { promise: p.clone() });
+                    Box::new(RepresentationDataPromiseRejectionHandler { promise: p.to_traced() });
 
                 let handler = PromiseNativeHandler::new(
                     &global,

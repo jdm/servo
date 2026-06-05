@@ -41,7 +41,7 @@ use crate::dom::element::Element;
 use crate::dom::html::htmlstyleelement::HTMLStyleElement;
 use crate::dom::medialist::MediaList;
 use crate::dom::node::NodeTraits;
-use crate::dom::types::Promise;
+use crate::dom::promise::{Promise, PromiseRoot};
 use crate::dom::window::Window;
 use crate::script_runtime::CanGc;
 use crate::test::TrustedPromise;
@@ -501,7 +501,7 @@ impl CSSStyleSheetMethods<crate::DomTypeHolder> for CSSStyleSheet {
 
         // Step 4. In parallel, do these steps:
         let trusted_sheet = Trusted::new(self);
-        let trusted_promise = TrustedPromise::new(promise.clone());
+        let trusted_promise = TrustedPromise::new(&promise);
 
         self.global()
             .task_manager()

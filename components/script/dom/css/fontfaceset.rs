@@ -41,7 +41,7 @@ impl FontFaceSet {
     fn new_inherited(cx: &mut JSContext, global: &GlobalScope) -> Self {
         FontFaceSet {
             target: EventTarget::new_inherited(),
-            promise: Promise::new2(cx, global),
+            promise: Promise::new2(cx, global).into_traced(),
             set_entries: Default::default(),
         }
     }
@@ -109,7 +109,7 @@ impl FontFaceSet {
 impl FontFaceSetMethods<crate::DomTypeHolder> for FontFaceSet {
     /// <https://drafts.csswg.org/css-font-loading/#dom-fontfaceset-ready>
     fn Ready(&self) -> PromiseRoot {
-        self.promise.clone()
+        self.promise.duplicate()
     }
 
     /// <https://drafts.csswg.org/css-font-loading/#dom-fontfaceset-add>
@@ -174,7 +174,7 @@ impl FontFaceSetMethods<crate::DomTypeHolder> for FontFaceSet {
         // the found faces flag). If a syntax error was returned, reject promise with a SyntaxError
         // exception and terminate these steps.
 
-        let trusted = TrustedPromise::new(promise.clone());
+        let trusted = TrustedPromise::new(&promise);
         // Step 4. Queue a task to run the following steps synchronously:
         self.global()
             .task_manager()

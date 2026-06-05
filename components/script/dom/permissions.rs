@@ -44,13 +44,13 @@ pub(crate) trait PermissionAlgorithm {
     ) -> Result<Self::Descriptor, Error>;
     fn permission_query(
         cx: &mut js::context::JSContext,
-        promise: &Rc<Promise>,
+        promise: &PromiseRoot,
         descriptor: &Self::Descriptor,
         status: &Self::Status,
     );
     fn permission_request(
         cx: &mut js::context::JSContext,
-        promise: &Rc<Promise>,
+        promise: &PromiseRoot,
         descriptor: &Self::Descriptor,
         status: &Self::Status,
     );
