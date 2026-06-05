@@ -20,7 +20,7 @@ use crate::dom::bluetooth::{AsyncBluetoothListener, get_gatt_children, response_
 use crate::dom::bluetoothdevice::BluetoothDevice;
 use crate::dom::bluetoothuuid::{BluetoothServiceUUID, BluetoothUUID};
 use crate::dom::globalscope::GlobalScope;
-use crate::dom::promise::Promise;
+use crate::dom::promise::{Promise, PromiseRoot};
 use crate::script_runtime::CanGc;
 
 // https://webbluetoothcg.github.io/web-bluetooth/#bluetoothremotegattserver
@@ -73,7 +73,7 @@ impl BluetoothRemoteGATTServerMethods<crate::DomTypeHolder> for BluetoothRemoteG
     }
 
     // https://webbluetoothcg.github.io/web-bluetooth/#dom-bluetoothremotegattserver-connect
-    fn Connect(&self, cx: &mut CurrentRealm) -> Rc<Promise> {
+    fn Connect(&self, cx: &mut CurrentRealm) -> PromiseRoot {
         // Step 1.
         let p = Promise::new_in_realm(cx);
         let sender = response_async(&p, self);
@@ -117,7 +117,7 @@ impl BluetoothRemoteGATTServerMethods<crate::DomTypeHolder> for BluetoothRemoteG
         &self,
         cx: &mut CurrentRealm,
         service: BluetoothServiceUUID,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         let is_connected = self.Device().get_gatt(cx).Connected();
         // Step 1 - 2.
         get_gatt_children(
@@ -137,7 +137,7 @@ impl BluetoothRemoteGATTServerMethods<crate::DomTypeHolder> for BluetoothRemoteG
         &self,
         cx: &mut CurrentRealm,
         service: Option<BluetoothServiceUUID>,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         // Step 1 - 2.
         get_gatt_children(
             cx,

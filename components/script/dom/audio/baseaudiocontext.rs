@@ -66,7 +66,7 @@ use crate::dom::bindings::reflector::DomGlobal;
 use crate::dom::bindings::root::{DomRoot, MutNullableDom};
 use crate::dom::domexception::{DOMErrorName, DOMException};
 use crate::dom::eventtarget::EventTarget;
-use crate::dom::promise::Promise;
+use crate::dom::promise::{Promise, PromiseRoot};
 use crate::realms::InRealm;
 use crate::script_runtime::CanGc;
 
@@ -287,7 +287,7 @@ impl BaseAudioContextMethods<crate::DomTypeHolder> for BaseAudioContext {
     }
 
     /// <https://webaudio.github.io/web-audio-api/#dom-baseaudiocontext-resume>
-    fn Resume(&self, comp: InRealm, can_gc: CanGc) -> Rc<Promise> {
+    fn Resume(&self, comp: InRealm, can_gc: CanGc) -> PromiseRoot {
         // Step 1.
         let promise = Promise::new_in_current_realm(comp, can_gc);
 
@@ -475,7 +475,7 @@ impl BaseAudioContextMethods<crate::DomTypeHolder> for BaseAudioContext {
         decode_error_callback: Option<Rc<DecodeErrorCallback>>,
         comp: InRealm,
         can_gc: CanGc,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         // Step 1.
         let promise = Promise::new_in_current_realm(comp, can_gc);
 

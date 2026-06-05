@@ -12,7 +12,7 @@
 //! (ie. address equality for the native objects is meaningless).
 
 use std::cell::{Cell, RefCell};
-use std::ops::DerefMut;
+use std::ops::{Deref, DerefMut};
 use std::ptr;
 use std::rc::Rc;
 
@@ -50,7 +50,62 @@ use crate::realms::{InRealm, enter_auto_realm, enter_realm};
 use crate::script_runtime::{CanGc, JSContext as SafeJSContext};
 use crate::script_thread::ScriptThread;
 
+/*#[must_root]
+struct BasePromise(Rc<Reflector>);
+
+#[must_root]
+struct HeapPromise(BasePromise);
+
+#[allow_unrooted_interior]
+struct StackPromise {
+    promise: BasePromise,
+    permanent_js_root: Box<Heap<JSVal>>,
+}
+
+struct HTMLMediaElement {
+    pending_promises: DomRefCell<Vec<HeapPromise>>,
+}
+
+impl HTMLMediaElement {
+    fn Play() -> StackPromise {}
+}
+
+impl TestBinding {
+    fn AcceptPromise(&self, _promise: &BasePromise) {}
+}*/
+
 #[dom_struct]
+#[cfg_attr(crown, crown::unrooted_must_root_lint::allow_unrooted_in_rc)]
+pub(crate) struct Promise {
+    reflector: Reflector,
+}
+
+impl script_bindings::interfaces::PromiseHelpers<crate::DomTypeHolder> for Promise {
+    type StackRoot = PromiseRoot;
+}
+
+pub(crate) struct PromiseRoot {
+    promise: Rc<Promise>,
+    permanent_js_root: Box<Heap<JSVal>>,
+}
+
+impl Clone for PromiseRoot {
+    fn clone(&self) -> Self {
+        Self {
+            promise: self.promise.clone(),
+            permanent_js_root: Heap::boxed(self.permanent_js_root.get())
+        }
+    }
+}
+
+impl PromiseRoot {
+    fn into_traced(self) -> Rc<Promise> {
+        self.promise
+    }
+}
+
+
+/*#[dom_struct]
 #[cfg_attr(crown, crown::unrooted_must_root_lint::allow_unrooted_in_rc)]
 pub(crate) struct Promise {
     reflector: Reflector,
@@ -60,17 +115,17 @@ pub(crate) struct Promise {
     /// while native code could still interact with its native representation.
     #[ignore_malloc_size_of = "SM handles JS values"]
     permanent_js_root: Heap<JSVal>,
-}
+}*/
 
-/// Private helper to enable adding new methods to `Rc<Promise>`.
+/*/// Private helper to enable adding new methods to `Rc<Promise>`.
 trait PromiseHelper {
     fn initialize(&self, cx: SafeJSContext);
-}
+}*/
 
-impl PromiseHelper for Rc<Promise> {
+impl PromiseRoot {
     #[expect(unsafe_code)]
     fn initialize(&self, cx: SafeJSContext) {
-        let obj = self.reflector().get_jsobject();
+        let obj = self.promise.reflector().get_jsobject();
         self.permanent_js_root.set(ObjectValue(*obj));
         unsafe {
             assert!(AddRawValueRoot(
@@ -85,7 +140,7 @@ impl PromiseHelper for Rc<Promise> {
 // Promise objects are stored inside Rc values, so Drop is run when the last Rc is dropped,
 // rather than when SpiderMonkey runs a GC. This makes it safe to interact with the JS engine unlike
 // Drop implementations for other DOM types.
-impl Drop for Promise {
+impl Drop for PromiseRoot {
     #[expect(unsafe_code)]
     fn drop(&mut self) {
         unsafe {
@@ -98,21 +153,28 @@ impl Drop for Promise {
     }
 }
 
+impl Deref for PromiseRoot {
+    type Target = Promise;
+    fn deref(&self) -> &Promise {
+        &self.promise
+    }
+}
+
 impl Promise {
-    pub(crate) fn new(global: &GlobalScope, can_gc: CanGc) -> Rc<Promise> {
+    pub(crate) fn new(global: &GlobalScope, can_gc: CanGc) -> PromiseRoot {
         let realm = enter_realm(global);
         let comp = InRealm::Entered(&realm);
         Promise::new_in_current_realm(comp, can_gc)
     }
 
-    pub(crate) fn new_in_current_realm(_comp: InRealm, can_gc: CanGc) -> Rc<Promise> {
+    pub(crate) fn new_in_current_realm(_comp: InRealm, can_gc: CanGc) -> PromiseRoot {
         let cx = GlobalScope::get_cx();
         rooted!(in(*cx) let mut obj = ptr::null_mut::<JSObject>());
         Promise::create_js_promise(cx, obj.handle_mut(), can_gc);
         Promise::new_with_js_promise(obj.handle(), cx)
     }
 
-    pub(crate) fn new2(cx: &mut js::context::JSContext, global: &GlobalScope) -> Rc<Promise> {
+    pub(crate) fn new2(cx: &mut js::context::JSContext, global: &GlobalScope) -> PromiseRoot {
         let mut realm = AutoRealm::new(
             cx,
             std::ptr::NonNull::new(global.reflector().get_jsobject().get()).unwrap(),
@@ -121,28 +183,29 @@ impl Promise {
         Promise::new_in_realm(&mut current_realm)
     }
 
-    pub(crate) fn new_in_realm(current_realm: &mut CurrentRealm) -> Rc<Promise> {
+    pub(crate) fn new_in_realm(current_realm: &mut CurrentRealm) -> PromiseRoot {
         let cx = current_realm.deref_mut();
         rooted!(&in(cx) let mut obj = ptr::null_mut::<JSObject>());
         Promise::create_js_promise(cx.into(), obj.handle_mut(), CanGc::from_cx(cx));
         Promise::new_with_js_promise(obj.handle(), cx.into())
     }
 
-    pub(crate) fn duplicate(&self) -> Rc<Promise> {
+    pub(crate) fn duplicate(&self) -> PromiseRoot {
         let cx = GlobalScope::get_cx();
         Promise::new_with_js_promise(self.reflector().get_jsobject(), cx)
     }
 
     #[expect(unsafe_code)]
     #[cfg_attr(crown, expect(crown::unrooted_must_root))]
-    pub(crate) fn new_with_js_promise(obj: HandleObject, cx: SafeJSContext) -> Rc<Promise> {
+    pub(crate) fn new_with_js_promise(obj: HandleObject, cx: SafeJSContext) -> PromiseRoot {
         unsafe {
             assert!(IsPromiseObject(obj));
-            let promise = Promise {
-                reflector: Reflector::new(),
+            let promise = PromiseRoot {
+                promise: Rc::new(Promise {
+                    reflector: Reflector::new(),
+                }),
                 permanent_js_root: Heap::default(),
             };
-            let promise = Rc::new(promise);
             promise.init_reflector_without_associated_memory(obj.get());
             promise.initialize(cx);
             promise
@@ -181,7 +244,7 @@ impl Promise {
         cx: SafeJSContext,
         value: impl SafeToJSValConvertible,
         can_gc: CanGc,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         let _ac = JSAutoRealm::new(*cx, global.reflector().get_jsobject().get());
         rooted!(in(*cx) let mut rval = UndefinedValue());
         value.safe_to_jsval(cx, rval.handle_mut(), can_gc);
@@ -198,7 +261,7 @@ impl Promise {
         cx: SafeJSContext,
         value: impl SafeToJSValConvertible,
         can_gc: CanGc,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         let _ac = JSAutoRealm::new(*cx, global.reflector().get_jsobject().get());
         rooted!(in(*cx) let mut rval = UndefinedValue());
         value.safe_to_jsval(cx, rval.handle_mut(), can_gc);
@@ -632,7 +695,7 @@ pub(crate) fn wait_for_all_promise(
     cx: &mut CurrentRealm,
     global: &GlobalScope,
     promises: Vec<Rc<Promise>>,
-) -> Rc<Promise> {
+) -> PromiseRoot {
     // Let promise be a new promise of type Promise<sequence<T>> in realm.
     let promise = Promise::new2(cx, global);
     let success_promise = promise.clone();

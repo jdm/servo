@@ -42,7 +42,7 @@ use crate::dom::file::File;
 use crate::dom::formdata::FormData;
 use crate::dom::globalscope::GlobalScope;
 use crate::dom::html::htmlformelement::{encode_multipart_form_data, generate_boundary};
-use crate::dom::promise::Promise;
+use crate::dom::promise::{Promise, PromiseRoot};
 use crate::dom::promisenativehandler::{Callback, PromiseNativeHandler};
 use crate::dom::readablestream::{ReadableStream, get_read_promise_bytes, get_read_promise_done};
 use crate::dom::urlsearchparams::URLSearchParams;
@@ -691,7 +691,7 @@ pub(crate) fn consume_body<T: BodyMixin + DomObject>(
     cx: &mut js::context::JSContext,
     object: &T,
     body_type: BodyType,
-) -> Rc<Promise> {
+) -> PromiseRoot {
     let global = object.global();
 
     // Enter the realm of the object whose body is being consumed.

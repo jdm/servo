@@ -33,7 +33,7 @@ use crate::dom::bindings::root::DomRoot;
 use crate::dom::html::htmlmediaelement::HTMLMediaElement;
 use crate::dom::mediastream::MediaStream;
 use crate::dom::mediastreamtrack::MediaStreamTrack;
-use crate::dom::promise::Promise;
+use crate::dom::promise::{Promise, PromiseRoot};
 use crate::dom::window::Window;
 use crate::script_runtime::CanGc;
 
@@ -141,7 +141,7 @@ impl AudioContextMethods<crate::DomTypeHolder> for AudioContext {
     }
 
     /// <https://webaudio.github.io/web-audio-api/#dom-audiocontext-suspend>
-    fn Suspend(&self, cx: &mut CurrentRealm) -> Rc<Promise> {
+    fn Suspend(&self, cx: &mut CurrentRealm) -> PromiseRoot {
         // Step 1.
         let promise = Promise::new_in_realm(cx);
 
@@ -197,7 +197,7 @@ impl AudioContextMethods<crate::DomTypeHolder> for AudioContext {
     }
 
     /// <https://webaudio.github.io/web-audio-api/#dom-audiocontext-close>
-    fn Close(&self, cx: &mut CurrentRealm) -> Rc<Promise> {
+    fn Close(&self, cx: &mut CurrentRealm) -> PromiseRoot {
         // Step 1.
         let promise = Promise::new_in_realm(cx);
 

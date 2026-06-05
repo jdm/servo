@@ -29,7 +29,7 @@ use crate::dom::bindings::refcounted::Trusted;
 use crate::dom::bindings::reflector::DomGlobal;
 use crate::dom::bindings::root::DomRoot;
 use crate::dom::event::{Event, EventBubbles, EventCancelable};
-use crate::dom::promise::Promise;
+use crate::dom::promise::{Promise, PromiseRoot};
 use crate::dom::window::Window;
 use crate::realms::InRealm;
 use crate::script_runtime::CanGc;
@@ -144,7 +144,7 @@ impl OfflineAudioContextMethods<crate::DomTypeHolder> for OfflineAudioContext {
     }
 
     /// <https://webaudio.github.io/web-audio-api/#dom-offlineaudiocontext-startrendering>
-    fn StartRendering(&self, comp: InRealm, can_gc: CanGc) -> Rc<Promise> {
+    fn StartRendering(&self, comp: InRealm, can_gc: CanGc) -> PromiseRoot {
         let promise = Promise::new_in_current_realm(comp, can_gc);
         if self.rendering_started.get() {
             promise.reject_error(Error::InvalidState(None), can_gc);

@@ -30,7 +30,7 @@ use crate::dom::bindings::serializable::Serializable;
 use crate::dom::bindings::str::DOMString;
 use crate::dom::bindings::structuredclone::StructuredData;
 use crate::dom::globalscope::GlobalScope;
-use crate::dom::promise::Promise;
+use crate::dom::promise::PromiseRoot;
 use crate::dom::stream::readablestream::ReadableStream;
 use crate::script_runtime::CanGc;
 
@@ -313,7 +313,7 @@ impl BlobMethods<crate::DomTypeHolder> for Blob {
     }
 
     /// <https://w3c.github.io/FileAPI/#text-method-algo>
-    fn Text(&self, cx: &mut CurrentRealm) -> Rc<Promise> {
+    fn Text(&self, cx: &mut CurrentRealm) -> PromiseRoot {
         let global = self.global();
         let p = Promise::new_in_realm(cx);
         let id = self.get_blob_url_id();
@@ -335,7 +335,7 @@ impl BlobMethods<crate::DomTypeHolder> for Blob {
     }
 
     /// <https://w3c.github.io/FileAPI/#arraybuffer-method-algo>
-    fn ArrayBuffer(&self, cx: &mut CurrentRealm) -> Rc<Promise> {
+    fn ArrayBuffer(&self, cx: &mut CurrentRealm) -> PromiseRoot {
         let promise = Promise::new_in_realm(cx);
 
         // 1. Let stream be the result of calling get stream on this.
@@ -378,7 +378,7 @@ impl BlobMethods<crate::DomTypeHolder> for Blob {
     }
 
     /// <https://w3c.github.io/FileAPI/#dom-blob-bytes>
-    fn Bytes(&self, cx: &mut CurrentRealm) -> Rc<Promise> {
+    fn Bytes(&self, cx: &mut CurrentRealm) -> PromiseRoot {
         let p = Promise::new_in_realm(cx);
 
         // 1. Let stream be the result of calling get stream on this.

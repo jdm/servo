@@ -33,7 +33,7 @@ use crate::dom::bluetoothuuid::{BluetoothServiceUUID, BluetoothUUID, UUID};
 use crate::dom::eventtarget::EventTarget;
 use crate::dom::globalscope::GlobalScope;
 use crate::dom::permissions::{descriptor_permission_state, PermissionAlgorithm};
-use crate::dom::promise::Promise;
+use crate::dom::promise::{Promise, PromiseRoot};
 use crate::script_runtime::CanGc;
 use crate::task::TaskOnce;
 use dom_struct::dom_struct;
@@ -294,7 +294,7 @@ pub(crate) fn get_gatt_children<T, F>(
     instance_id: String,
     connected: bool,
     child_type: GATTType,
-) -> Rc<Promise>
+) -> PromiseRoot
 where
     T: AsyncBluetoothListener + DomObject + 'static,
     F: FnOnce(StringOrUnsignedLong) -> Fallible<UUID>,
@@ -538,7 +538,7 @@ impl Convert<Error> for BluetoothError {
 
 impl BluetoothMethods<crate::DomTypeHolder> for Bluetooth {
     /// <https://webbluetoothcg.github.io/web-bluetooth/#dom-bluetooth-requestdevice>
-    fn RequestDevice(&self, cx: &mut CurrentRealm, option: &RequestDeviceOptions) -> Rc<Promise> {
+    fn RequestDevice(&self, cx: &mut CurrentRealm, option: &RequestDeviceOptions) -> PromiseRoot {
         let p = Promise::new_in_realm(cx);
         // Step 1.
         if (option.filters.is_some() && option.acceptAllDevices) ||
@@ -556,7 +556,7 @@ impl BluetoothMethods<crate::DomTypeHolder> for Bluetooth {
     }
 
     /// <https://webbluetoothcg.github.io/web-bluetooth/#dom-bluetooth-getavailability>
-    fn GetAvailability(&self, cx: &mut CurrentRealm) -> Rc<Promise> {
+    fn GetAvailability(&self, cx: &mut CurrentRealm) -> PromiseRoot {
         let p = Promise::new_in_realm(cx);
         // Step 1. We did not override the method
         // Step 2 - 3. in handle_response

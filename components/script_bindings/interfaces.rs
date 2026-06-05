@@ -112,3 +112,7 @@ pub trait WindowHelpers {
         object: MutableHandleObject,
     );
 }
+
+pub trait PromiseHelpers<D: DomTypes> {
+    type StackRoot: js::conversions::FromJSValConvertible<Config = ()> + js::conversions::ToJSValConvertible + std::ops::Deref<Target = D::Promise>;
+}

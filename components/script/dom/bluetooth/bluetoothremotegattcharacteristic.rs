@@ -30,7 +30,7 @@ use crate::dom::bluetoothremotegattservice::BluetoothRemoteGATTService;
 use crate::dom::bluetoothuuid::{BluetoothDescriptorUUID, BluetoothUUID};
 use crate::dom::eventtarget::EventTarget;
 use crate::dom::globalscope::GlobalScope;
-use crate::dom::promise::Promise;
+use crate::dom::promise::{Promise, PromiseRoot};
 use crate::script_runtime::CanGc;
 
 // Maximum length of an attribute value.
@@ -117,7 +117,7 @@ impl BluetoothRemoteGATTCharacteristicMethods<crate::DomTypeHolder>
         &self,
         cx: &mut CurrentRealm,
         descriptor: BluetoothDescriptorUUID,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         let is_connected = self.Service().Device().get_gatt(cx).Connected();
         get_gatt_children(
             cx,
@@ -136,7 +136,7 @@ impl BluetoothRemoteGATTCharacteristicMethods<crate::DomTypeHolder>
         &self,
         cx: &mut CurrentRealm,
         descriptor: Option<BluetoothDescriptorUUID>,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         let is_connected = self.Service().Device().get_gatt(cx).Connected();
         get_gatt_children(
             cx,
@@ -156,7 +156,7 @@ impl BluetoothRemoteGATTCharacteristicMethods<crate::DomTypeHolder>
     }
 
     /// <https://webbluetoothcg.github.io/web-bluetooth/#dom-bluetoothremotegattcharacteristic-readvalue>
-    fn ReadValue(&self, cx: &mut CurrentRealm) -> Rc<Promise> {
+    fn ReadValue(&self, cx: &mut CurrentRealm) -> PromiseRoot {
         let p = Promise::new_in_realm(cx);
 
         // Step 1.
@@ -193,7 +193,7 @@ impl BluetoothRemoteGATTCharacteristicMethods<crate::DomTypeHolder>
         &self,
         cx: &mut CurrentRealm,
         value: ArrayBufferViewOrArrayBuffer,
-    ) -> Rc<Promise> {
+    ) -> PromiseRoot {
         let p = Promise::new_in_realm(cx);
 
         // Step 1.
@@ -244,7 +244,7 @@ impl BluetoothRemoteGATTCharacteristicMethods<crate::DomTypeHolder>
     }
 
     /// <https://webbluetoothcg.github.io/web-bluetooth/#dom-bluetoothremotegattcharacteristic-startnotifications>
-    fn StartNotifications(&self, cx: &mut CurrentRealm) -> Rc<Promise> {
+    fn StartNotifications(&self, cx: &mut CurrentRealm) -> PromiseRoot {
         let p = Promise::new_in_realm(cx);
 
         // Step 1.
@@ -281,7 +281,7 @@ impl BluetoothRemoteGATTCharacteristicMethods<crate::DomTypeHolder>
     }
 
     /// <https://webbluetoothcg.github.io/web-bluetooth/#dom-bluetoothremotegattcharacteristic-stopnotifications>
-    fn StopNotifications(&self, cx: &mut CurrentRealm) -> Rc<Promise> {
+    fn StopNotifications(&self, cx: &mut CurrentRealm) -> PromiseRoot {
         let p = Promise::new_in_realm(cx);
         let sender = response_async(&p, self);
 
