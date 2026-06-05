@@ -661,7 +661,7 @@ impl TransformStream {
         cx: &mut JSContext,
         global: &GlobalScope,
         chunk: SafeHandleValue,
-    ) -> Fallible<Rc<Promise>> {
+    ) -> Fallible<PromiseRoot> {
         // Assert: stream.[[writable]].[[state]] is "writable".
         assert!(self.writable.get().is_some());
 
@@ -713,7 +713,7 @@ impl TransformStream {
         cx: &mut JSContext,
         global: &GlobalScope,
         reason: SafeHandleValue,
-    ) -> Fallible<Rc<Promise>> {
+    ) -> Fallible<PromiseRoot> {
         // Let controller be stream.[[controller]].
         let controller = self.controller.get().expect("controller is not set");
 
@@ -764,7 +764,7 @@ impl TransformStream {
         &self,
         cx: &mut JSContext,
         global: &GlobalScope,
-    ) -> Fallible<Rc<Promise>> {
+    ) -> Fallible<PromiseRoot> {
         // Let controller be stream.[[controller]].
         let controller = self
             .controller
@@ -821,7 +821,7 @@ impl TransformStream {
         cx: &mut JSContext,
         global: &GlobalScope,
         reason: SafeHandleValue,
-    ) -> Fallible<Rc<Promise>> {
+    ) -> Fallible<PromiseRoot> {
         // Let controller be stream.[[controller]].
         let controller = self
             .controller
@@ -880,7 +880,7 @@ impl TransformStream {
         &self,
         global: &GlobalScope,
         can_gc: CanGc,
-    ) -> Fallible<Rc<Promise>> {
+    ) -> Fallible<PromiseRoot> {
         // Assert: stream.[[backpressure]] is true.
         assert!(self.backpressure.get());
 

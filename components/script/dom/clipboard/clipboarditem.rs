@@ -256,7 +256,7 @@ impl ClipboardItemMethods<crate::DomTypeHolder> for ClipboardItem {
     }
 
     /// <https://w3c.github.io/clipboard-apis/#dom-clipboarditem-gettype>
-    fn GetType(&self, realm: &mut CurrentRealm, type_: DOMString) -> Fallible<Rc<Promise>> {
+    fn GetType(&self, realm: &mut CurrentRealm, type_: DOMString) -> Fallible<PromiseRoot> {
         // Step 1 Let realm be this’s relevant realm.
         let global = self.global();
 

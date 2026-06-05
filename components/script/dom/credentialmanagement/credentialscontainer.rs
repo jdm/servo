@@ -45,7 +45,7 @@ impl CredentialsContainer {
         &self,
         cx: &mut CurrentRealm,
         options: &CredentialRequestOptions<DomTypeHolder>,
-    ) -> Fallible<Rc<Promise>> {
+    ) -> Fallible<PromiseRoot> {
         // Step 1. Let settings be the current settings object.
         let global = GlobalScope::from_current_realm(cx);
         // Step 2. Assert: settings is a secure context.
@@ -68,7 +68,7 @@ impl CredentialsContainer {
         &self,
         cx: &mut CurrentRealm,
         _credential: &Credential,
-    ) -> Fallible<Rc<Promise>> {
+    ) -> Fallible<PromiseRoot> {
         // Step 1. Let settings be the current settings object.
         let global = GlobalScope::from_current_realm(cx);
         // Step 2. Assert: settings is a secure context.
@@ -85,7 +85,7 @@ impl CredentialsContainer {
         &self,
         cx: &mut CurrentRealm,
         _options: &CredentialCreationOptions<DomTypeHolder>,
-    ) -> Fallible<Rc<Promise>> {
+    ) -> Fallible<PromiseRoot> {
         // Step 1. Let settings be the current settings object.
         let global = GlobalScope::from_current_realm(cx);
         // Step 2. Assert: settings is a secure context.
@@ -107,12 +107,12 @@ impl CredentialsContainerMethods<DomTypeHolder> for CredentialsContainer {
         &self,
         cx: &mut CurrentRealm,
         options: &CredentialRequestOptions<DomTypeHolder>,
-    ) -> Fallible<Rc<Promise>> {
+    ) -> Fallible<PromiseRoot> {
         self.request_credential(cx, options)
     }
 
     /// <https://www.w3.org/TR/credential-management-1/#dom-credentialscontainer-store>
-    fn Store(&self, cx: &mut CurrentRealm, credential: &Credential) -> Fallible<Rc<Promise>> {
+    fn Store(&self, cx: &mut CurrentRealm, credential: &Credential) -> Fallible<PromiseRoot> {
         self.store_credential(cx, credential)
     }
 
@@ -121,12 +121,12 @@ impl CredentialsContainerMethods<DomTypeHolder> for CredentialsContainer {
         &self,
         cx: &mut CurrentRealm,
         options: &CredentialCreationOptions<DomTypeHolder>,
-    ) -> Fallible<Rc<Promise>> {
+    ) -> Fallible<PromiseRoot> {
         self.create_credential(cx, options)
     }
 
     /// <https://www.w3.org/TR/credential-management-1/#dom-credentialscontainer-preventsilentaccess>
-    fn PreventSilentAccess(&self) -> Fallible<Rc<Promise>> {
+    fn PreventSilentAccess(&self) -> Fallible<PromiseRoot> {
         Err(Error::NotSupported(None))
     }
 }

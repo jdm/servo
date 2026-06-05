@@ -524,7 +524,7 @@ impl WritableStreamDefaultController {
     }
 
     #[expect(unsafe_code)]
-    fn start_algorithm(&self, cx: &mut JSContext, global: &GlobalScope) -> Fallible<Rc<Promise>> {
+    fn start_algorithm(&self, cx: &mut JSContext, global: &GlobalScope) -> Fallible<PromiseRoot> {
         match &self.underlying_sink_type {
             UnderlyingSinkType::Js {
                 start,

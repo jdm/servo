@@ -180,7 +180,7 @@ impl TransformStreamDefaultController {
         cx: &mut JSContext,
         global: &GlobalScope,
         chunk: SafeHandleValue,
-    ) -> Fallible<Rc<Promise>> {
+    ) -> Fallible<PromiseRoot> {
         // Let transformPromise be the result of performing controller.[[transformAlgorithm]], passing chunk.
         let transform_promise = self.perform_transform(cx, global, chunk)?;
 
@@ -207,7 +207,7 @@ impl TransformStreamDefaultController {
         cx: &mut JSContext,
         global: &GlobalScope,
         chunk: SafeHandleValue,
-    ) -> Fallible<Rc<Promise>> {
+    ) -> Fallible<PromiseRoot> {
         let result = match &self.transformer_type {
             // <https://streams.spec.whatwg.org/#set-up-transform-stream-default-controller-from-transformer>
             TransformerType::Js {
@@ -365,7 +365,7 @@ impl TransformStreamDefaultController {
         cx: &mut JSContext,
         global: &GlobalScope,
         chunk: SafeHandleValue,
-    ) -> Fallible<Rc<Promise>> {
+    ) -> Fallible<PromiseRoot> {
         let result = match &self.transformer_type {
             // <https://streams.spec.whatwg.org/#set-up-transform-stream-default-controller-from-transformer>
             TransformerType::Js {
@@ -446,7 +446,7 @@ impl TransformStreamDefaultController {
         &self,
         cx: &mut JSContext,
         global: &GlobalScope,
-    ) -> Fallible<Rc<Promise>> {
+    ) -> Fallible<PromiseRoot> {
         let result = match &self.transformer_type {
             // <https://streams.spec.whatwg.org/#set-up-transform-stream-default-controller-from-transformer>
             TransformerType::Js {

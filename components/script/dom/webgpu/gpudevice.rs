@@ -549,7 +549,7 @@ impl GPUDeviceMethods<crate::DomTypeHolder> for GPUDevice {
         descriptor: &GPURenderPipelineDescriptor,
         comp: InRealm,
         can_gc: CanGc,
-    ) -> Fallible<Rc<Promise>> {
+    ) -> Fallible<PromiseRoot> {
         let desc = self.parse_render_pipeline(descriptor)?;
         let promise = Promise::new_in_current_realm(comp, can_gc);
         let callback = callback_promise(

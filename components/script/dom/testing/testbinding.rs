@@ -1143,11 +1143,11 @@ impl TestBindingMethods<crate::DomTypeHolder> for TestBinding {
         }
     }
 
-    fn MethodThrowToRejectPromise(&self) -> Fallible<Rc<Promise>> {
+    fn MethodThrowToRejectPromise(&self) -> Fallible<PromiseRoot> {
         Err(Error::Type(c"test".to_owned()))
     }
 
-    fn GetGetterThrowToRejectPromise(&self) -> Fallible<Rc<Promise>> {
+    fn GetGetterThrowToRejectPromise(&self) -> Fallible<PromiseRoot> {
         Err(Error::Type(c"test".to_owned()))
     }
 
@@ -1155,7 +1155,7 @@ impl TestBindingMethods<crate::DomTypeHolder> for TestBinding {
         unreachable!("Method should already throw")
     }
 
-    fn StaticThrowToRejectPromise(_: &GlobalScope) -> Fallible<Rc<Promise>> {
+    fn StaticThrowToRejectPromise(_: &GlobalScope) -> Fallible<PromiseRoot> {
         Err(Error::Type(c"test".to_owned()))
     }
 
