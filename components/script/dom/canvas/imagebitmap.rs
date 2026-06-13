@@ -322,7 +322,7 @@ impl ImageBitmap {
         // The promise with image bitmap should be fulfilled on the bitmap task source.
         let fullfill_promise_on_bitmap_task_source =
             |promise: &PromiseRoot, image_bitmap: &ImageBitmap| {
-                let trusted_promise = TrustedPromise::new(promise);
+                let trusted_promise = TrustedPromise::new(&promise);
                 let trusted_image_bitmap = Trusted::new(image_bitmap);
 
                 global_scope.task_manager().bitmap_task_source().queue(
@@ -338,7 +338,7 @@ impl ImageBitmap {
         // The promise with "InvalidStateError" DOMException should be rejected
         // on the bitmap task source.
         let reject_promise_on_bitmap_task_source = |promise: &PromiseRoot| {
-            let trusted_promise = TrustedPromise::new(promise);
+            let trusted_promise = TrustedPromise::new(&promise);
 
             global_scope.task_manager().bitmap_task_source().queue(
                 task!(reject_promise: move |cx| {

@@ -257,7 +257,7 @@ impl GPUBufferMethods<crate::DomTypeHolder> for GPUBuffer {
             return promise;
         }
         // Step 4
-        *self.pending_map.borrow_mut() = Some(promise.clone());
+        *self.pending_map.borrow_mut() = Some(promise.to_traced());
         // Step 5
         let host_map = match mode {
             GPUMapModeConstants::READ => HostMap::Read,
@@ -373,9 +373,9 @@ impl GPUBufferMethods<crate::DomTypeHolder> for GPUBuffer {
 }
 
 impl GPUBuffer {
-    fn map_failure(&self, p: &Rc<Promise>, can_gc: CanGc) {
+    fn map_failure(&self, p: &PromiseRoot, can_gc: CanGc) {
         // Step 1
-        if self.pending_map.borrow().as_ref() != Some(p) {
+        if self.pending_map.borrow().as_ref() != Some(p.as_traced()) {
             assert!(p.is_rejected());
             return;
         }
@@ -392,9 +392,9 @@ impl GPUBuffer {
         }
     }
 
-    fn map_success(&self, p: &Rc<Promise>, wgpu_mapping: Mapping, can_gc: CanGc) {
+    fn map_success(&self, p: &PromiseRoot, wgpu_mapping: Mapping, can_gc: CanGc) {
         // Step 1
-        if self.pending_map.borrow().as_ref() != Some(p) {
+        if self.pending_map.borrow().as_ref() != Some(p.as_traced()) {
             assert!(p.is_rejected());
             return;
         }
@@ -434,7 +434,7 @@ impl RoutedPromiseListener<Result<Mapping, BufferAccessError>> for GPUBuffer {
         &self,
         cx: &mut js::context::JSContext,
         response: Result<Mapping, BufferAccessError>,
-        promise: &Rc<Promise>,
+        promise: &PromiseRoot,
     ) {
         match response {
             Ok(mapping) => self.map_success(promise, mapping, CanGc::from_cx(cx)),

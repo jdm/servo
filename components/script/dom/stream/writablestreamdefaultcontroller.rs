@@ -171,7 +171,7 @@ impl Callback for TransferBackPressurePromiseReaction {
         let global = self.result_promise.global();
         // Set backpressurePromise to a new promise.
         let promise = Promise::new2(cx, &global);
-        *self.backpressure_promise.borrow_mut() = Some(promise);
+        *self.backpressure_promise.borrow_mut() = Some(promise.to_traced());
 
         // Let result be PackAndPostMessageHandlingError(port, "chunk", chunk).
         rooted!(&in(cx) let mut chunk = UndefinedValue());
@@ -575,7 +575,7 @@ impl WritableStreamDefaultController {
             },
             UnderlyingSinkType::Transform(_, start_promise) => {
                 // Let startAlgorithm be an algorithm that returns startPromise.
-                Ok(start_promise.clone())
+                Ok(start_promise.duplicate())
             },
         }
     }
@@ -702,7 +702,7 @@ impl WritableStreamDefaultController {
                 // set backpressurePromise to a promise resolved with undefined.
                 if backpressure_promise.borrow().is_none() {
                     let promise = Promise::new_resolved(global, cx.into(), (), CanGc::from_cx(cx));
-                    *backpressure_promise.borrow_mut() = Some(promise);
+                    *backpressure_promise.borrow_mut() = Some(promise.into_traced());
                 }
 
                 // Return the result of reacting to backpressurePromise with the following fulfillment steps:
@@ -711,7 +711,7 @@ impl WritableStreamDefaultController {
                     port: port.clone(),
                     backpressure_promise: backpressure_promise.clone(),
                     chunk: Heap::boxed(chunk.get()),
-                    result_promise: result_promise.clone(),
+                    result_promise: result_promise.to_traced(),
                 }));
                 let handler = PromiseNativeHandler::new(
                     global,

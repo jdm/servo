@@ -333,7 +333,7 @@ impl WorkletThreadPool {
         policy_container: PolicyContainer,
         credentials: RequestCredentials,
         pending_tasks_struct: PendingTasksStruct,
-        promise: &Rc<Promise>,
+        promise: &PromiseRoot,
         inherited_secure_context: Option<bool>,
     ) {
         // Send each thread a control message asking it to load the script.

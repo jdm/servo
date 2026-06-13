@@ -38,10 +38,10 @@ pub(crate) struct FontFaceSet {
 }
 
 impl FontFaceSet {
-    fn new_inherited(cx: &mut JSContext, global: &GlobalScope) -> Self {
+    fn new_inherited(cx: &mut JSContext, global: &GlobalScope, promise: &PromiseRoot) -> Self {
         FontFaceSet {
             target: EventTarget::new_inherited(),
-            promise: Promise::new2(cx, global).into_traced(),
+            promise: promise.to_traced(),
             set_entries: Default::default(),
         }
     }
@@ -51,12 +51,34 @@ impl FontFaceSet {
         global: &GlobalScope,
         proto: Option<HandleObject>,
     ) -> DomRoot<Self> {
-        reflect_dom_object_with_proto_and_cx(
-            Box::new(FontFaceSet::new_inherited(cx, global)),
+        let promise = Promise::new2(cx, global);
+        let f = reflect_dom_object_with_proto_and_cx(
+            Box::new(FontFaceSet::new_inherited(cx, global, &promise)),
             global,
             proto,
             cx,
-        )
+        );
+        println!("pre-before");
+        f.promise.is_fulfilled();
+
+        println!("before");
+        #[expect(unsafe_code)]
+        unsafe {
+            js::rust::wrappers2::JS_GC(cx, js::jsapi::GCReason::API);
+        }
+        f.promise.is_fulfilled();
+        f.promise.inspect();
+
+        println!("after");
+        drop(promise);
+        #[expect(unsafe_code)]
+        unsafe {
+            js::rust::wrappers2::JS_GC(cx, js::jsapi::GCReason::API);
+        }
+        f.promise.inspect();
+        f.promise.is_fulfilled();
+
+        f
     }
 
     pub(super) fn handle_font_face_status_changed(&self, font_face: &FontFace) {

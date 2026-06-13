@@ -166,8 +166,8 @@ impl TransformStreamDefaultController {
         self.stream.set(Some(stream));
     }
 
-    pub(crate) fn get_finish_promise(&self) -> Option<Rc<Promise>> {
-        self.finish_promise.borrow().clone()
+    pub(crate) fn get_finish_promise(&self) -> Option<PromiseRoot> {
+        self.finish_promise.borrow().as_deref().map(Promise::duplicate)
     }
 
     pub(crate) fn set_finish_promise(&self, promise: Rc<Promise>) {

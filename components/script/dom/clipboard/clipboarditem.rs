@@ -203,7 +203,7 @@ impl ClipboardItemMethods<crate::DomTypeHolder> for ClipboardItem {
             let representation = Representation {
                 mime_type,
                 is_custom,
-                data: value.clone(),
+                data: value.to_traced(),
             };
 
             // Step 6.10 Append representation to this's clipboard item's list of representations.
@@ -291,7 +291,7 @@ impl ClipboardItemMethods<crate::DomTypeHolder> for ClipboardItem {
 
                 // Step 8.1.2 React to representationDataPromise:
                 let fulfillment_handler = Box::new(RepresentationDataPromiseFulfillmentHandler {
-                    promise: p.clone(),
+                    promise: p.to_traced(),
                     type_: representation.mime_type.to_string(),
                 });
                 let rejection_handler =

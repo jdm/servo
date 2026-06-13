@@ -515,7 +515,7 @@ impl TransformStream {
         &self,
         cx: &mut JSContext,
         global: &GlobalScope,
-        start_promise: Rc<Promise>,
+        start_promise: PromiseRoot,
         writable_high_water_mark: f64,
         writable_size_algorithm: Rc<QueuingStrategySize>,
         readable_high_water_mark: f64,
@@ -537,7 +537,7 @@ impl TransformStream {
             global,
             writable_high_water_mark,
             writable_size_algorithm,
-            UnderlyingSinkType::Transform(Dom::from_ref(self), start_promise.clone()),
+            UnderlyingSinkType::Transform(Dom::from_ref(self), start_promise.to_traced()),
         )?;
         self.writable.set(Some(&writable));
 
@@ -555,7 +555,7 @@ impl TransformStream {
         let readable = create_readable_stream(
             cx,
             global,
-            UnderlyingSourceType::Transform(self, start_promise),
+            UnderlyingSourceType::Transform(self, start_promise.to_traced()),
             Some(readable_size_algorithm),
             Some(readable_high_water_mark),
         );
@@ -585,7 +585,7 @@ impl TransformStream {
         }
 
         // Set stream.[[backpressureChangePromise]] to a new promise.;
-        *self.backpressure_change_promise.borrow_mut() = Some(Promise::new(global, can_gc));
+        *self.backpressure_change_promise.borrow_mut() = Some(Promise::new(global, can_gc).into_traced());
 
         // Set stream.[[backpressure]] to backpressure.
         self.backpressure.set(backpressure);
@@ -682,14 +682,14 @@ impl TransformStream {
                 controller: Dom::from_ref(&controller),
                 writable: Dom::from_ref(&self.writable.get().expect("writable stream")),
                 chunk: Heap::boxed(chunk.get()),
-                result_promise: result_promise.clone(),
+                result_promise: result_promise.to_traced(),
             }));
 
             let handler = PromiseNativeHandler::new(
                 global,
                 fulfillment_handler.take().map(|h| Box::new(h) as Box<_>),
                 Some(Box::new(BackpressureChangeRejection {
-                    result_promise: result_promise.clone(),
+                    result_promise: result_promise.to_traced(),
                 })),
                 CanGc::from_cx(cx),
             );
@@ -719,14 +719,14 @@ impl TransformStream {
 
         // If controller.[[finishPromise]] is not undefined, return controller.[[finishPromise]].
         if let Some(finish_promise) = controller.get_finish_promise() {
-            return Ok(finish_promise);
+            return Ok(finish_promise.duplicate());
         }
 
         // Let readable be stream.[[readable]].
         let readable = self.readable.get().expect("readable stream is not set");
 
         // Let controller.[[finishPromise]] be a new promise.
-        controller.set_finish_promise(Promise::new2(cx, global));
+        controller.set_finish_promise(Promise::new2(cx, global).into_traced());
 
         // Let cancelPromise be the result of performing controller.[[cancelAlgorithm]], passing reason.
         let cancel_promise = controller.perform_cancel(cx, global, reason)?;
@@ -783,7 +783,7 @@ impl TransformStream {
             .ok_or(Error::Type(c"readable stream is not set".to_owned()))?;
 
         // Let controller.[[finishPromise]] be a new promise.
-        controller.set_finish_promise(Promise::new2(cx, global));
+        controller.set_finish_promise(Promise::new2(cx, global).to_traced());
 
         // Let flushPromise be the result of performing controller.[[flushAlgorithm]].
         let flush_promise = controller.perform_flush(cx, global)?;
@@ -840,7 +840,7 @@ impl TransformStream {
             .ok_or(Error::Type(c"writable stream is not set".to_owned()))?;
 
         // Let controller.[[finishPromise]] be a new promise.
-        controller.set_finish_promise(Promise::new2(cx, global));
+        controller.set_finish_promise(Promise::new2(cx, global).into_traced());
 
         // Let cancelPromise be the result of performing controller.[[cancelAlgorithm]], passing reason.
         let cancel_promise = controller.perform_cancel(cx, global, reason)?;
@@ -892,10 +892,11 @@ impl TransformStream {
 
         // Return stream.[[backpressureChangePromise]].
         Ok(self
-            .backpressure_change_promise
-            .borrow()
-            .clone()
-            .expect("Promise must be some by now."))
+           .backpressure_change_promise
+           .borrow()
+           .as_ref()
+           .expect("Promise must be some by now.")
+           .duplicate())
     }
 
     /// <https://streams.spec.whatwg.org/#transform-stream-error-writable-and-unblock-write>

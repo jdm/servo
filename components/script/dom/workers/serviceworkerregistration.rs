@@ -234,7 +234,7 @@ impl ServiceWorkerRegistrationMethods<crate::DomTypeHolder> for ServiceWorkerReg
             storage_key,
             self.scope.clone(),
             worker.get_script_url(),
-            promise.clone(),
+            &promise,
         );
 
         // Set all workers to none.

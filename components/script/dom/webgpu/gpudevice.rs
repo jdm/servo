@@ -131,7 +131,7 @@ impl GPUDevice {
         device: WebGPUDevice,
         queue: &GPUQueue,
         label: String,
-        lost_promise: Rc<Promise>,
+        lost_promise: &PromiseRoot,
     ) -> Self {
         Self {
             eventtarget: EventTarget::new_inherited(),
@@ -142,7 +142,7 @@ impl GPUDevice {
             adapter_info: Dom::from_ref(adapter_info),
             label: DomRefCell::new(USVString::from(label)),
             default_queue: Dom::from_ref(queue),
-            lost_promise: DomRefCell::new(lost_promise),
+            lost_promise: DomRefCell::new(lost_promise.to_traced()),
             valid: Cell::new(true),
             droppable: DroppableGPUDevice { channel, device },
         }
@@ -176,7 +176,7 @@ impl GPUDevice {
                 device,
                 &queue,
                 label,
-                lost_promise,
+                &lost_promise,
             )),
             global,
             can_gc,
@@ -438,7 +438,7 @@ impl GPUDeviceMethods<crate::DomTypeHolder> for GPUDevice {
 
     /// <https://gpuweb.github.io/gpuweb/#dom-gpudevice-lost>
     fn Lost(&self) -> PromiseRoot {
-        self.lost_promise.borrow().clone()
+        self.lost_promise.borrow().duplicate()
     }
 
     /// <https://gpuweb.github.io/gpuweb/#dom-gpudevice-createbuffer>
@@ -633,7 +633,7 @@ impl RoutedPromiseListener<WebGPUPoppedErrorScopeResponse> for GPUDevice {
         &self,
         cx: &mut js::context::JSContext,
         response: WebGPUPoppedErrorScopeResponse,
-        promise: &Rc<Promise>,
+        promise: &PromiseRoot,
     ) {
         match response {
             Ok(None) | Err(PopError::Lost) => {
@@ -655,7 +655,7 @@ impl RoutedPromiseListener<WebGPUComputePipelineResponse> for GPUDevice {
         &self,
         cx: &mut js::context::JSContext,
         response: WebGPUComputePipelineResponse,
-        promise: &Rc<Promise>,
+        promise: &PromiseRoot,
     ) {
         match response {
             Ok(pipeline) => promise.resolve_native(
@@ -697,7 +697,7 @@ impl RoutedPromiseListener<WebGPURenderPipelineResponse> for GPUDevice {
         &self,
         cx: &mut js::context::JSContext,
         response: WebGPURenderPipelineResponse,
-        promise: &Rc<Promise>,
+        promise: &PromiseRoot,
     ) {
         match response {
             Ok(pipeline) => promise.resolve_native(

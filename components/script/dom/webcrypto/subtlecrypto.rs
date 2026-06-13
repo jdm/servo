@@ -202,8 +202,8 @@ impl SubtleCrypto {
     /// Queue a global task on the crypto task source, given realm's global object, to resolve
     /// promise with the result of creating an ArrayBuffer in realm, containing data. If it fails
     /// to create buffer source, reject promise with a JSFailedError.
-    fn resolve_promise_with_data(&self, promise: Rc<Promise>, data: Zeroizing<Vec<u8>>) {
-        let trusted_promise = TrustedPromise::new(promise);
+    fn resolve_promise_with_data(&self, promise: PromiseRoot, data: Zeroizing<Vec<u8>>) {
+        let trusted_promise = TrustedPromise::new(&promise);
         self.global()
             .task_manager()
             .crypto_task_source()
@@ -229,7 +229,7 @@ impl SubtleCrypto {
     fn resolve_promise_with_jwk(
         &self,
         cx: &mut js::context::JSContext,
-        promise: Rc<Promise>,
+        promise: PromiseRoot,
         jwk: Box<JsonWebKey>,
     ) {
         // NOTE: Serialize the JsonWebKey dictionary by stringifying it, in order to pass it to
@@ -243,7 +243,7 @@ impl SubtleCrypto {
         };
 
         let trusted_subtle = Trusted::new(self);
-        let trusted_promise = TrustedPromise::new(promise);
+        let trusted_promise = TrustedPromise::new(&promise);
         self.global()
             .task_manager()
             .crypto_task_source()
@@ -268,9 +268,9 @@ impl SubtleCrypto {
 
     /// Queue a global task on the crypto task source, given realm's global object, to resolve
     /// promise with a CryptoKey.
-    fn resolve_promise_with_key(&self, promise: Rc<Promise>, key: DomRoot<CryptoKey>) {
+    fn resolve_promise_with_key(&self, promise: PromiseRoot, key: DomRoot<CryptoKey>) {
         let trusted_key = Trusted::new(&*key);
-        let trusted_promise = TrustedPromise::new(promise);
+        let trusted_promise = TrustedPromise::new(&promise);
         self.global()
             .task_manager()
             .crypto_task_source()
@@ -283,10 +283,10 @@ impl SubtleCrypto {
 
     /// Queue a global task on the crypto task source, given realm's global object, to resolve
     /// promise with a CryptoKeyPair.
-    fn resolve_promise_with_key_pair(&self, promise: Rc<Promise>, key_pair: CryptoKeyPair) {
+    fn resolve_promise_with_key_pair(&self, promise: PromiseRoot, key_pair: CryptoKeyPair) {
         let trusted_private_key = key_pair.privateKey.map(|key| Trusted::new(&*key));
         let trusted_public_key = key_pair.publicKey.map(|key| Trusted::new(&*key));
-        let trusted_promise = TrustedPromise::new(promise);
+        let trusted_promise = TrustedPromise::new(&promise);
         self.global()
             .task_manager()
             .crypto_task_source()
@@ -302,8 +302,8 @@ impl SubtleCrypto {
 
     /// Queue a global task on the crypto task source, given realm's global object, to resolve
     /// promise with a bool value.
-    fn resolve_promise_with_bool(&self, promise: Rc<Promise>, result: bool) {
-        let trusted_promise = TrustedPromise::new(promise);
+    fn resolve_promise_with_bool(&self, promise: PromiseRoot, result: bool) {
+        let trusted_promise = TrustedPromise::new(&promise);
         self.global()
             .task_manager()
             .crypto_task_source()
@@ -331,10 +331,10 @@ impl SubtleCrypto {
     /// defined by [WebIDL].
     fn resolve_promise_with_encapsulated_key(
         &self,
-        promise: Rc<Promise>,
+        promise: PromiseRoot,
         encapsulated_key: SubtleEncapsulatedKey,
     ) {
-        let trusted_promise = TrustedPromise::new(promise);
+        let trusted_promise = TrustedPromise::new(&promise);
         self.global().task_manager().crypto_task_source().queue(
             task!(resolve_encapsulated_key: move |cx| {
                 let promise = trusted_promise.root();
@@ -348,10 +348,10 @@ impl SubtleCrypto {
     /// defined by [WebIDL].
     fn resolve_promise_with_encapsulated_bits(
         &self,
-        promise: Rc<Promise>,
+        promise: PromiseRoot,
         encapsulated_bits: SubtleEncapsulatedBits,
     ) {
-        let trusted_promise = TrustedPromise::new(promise);
+        let trusted_promise = TrustedPromise::new(&promise);
         self.global().task_manager().crypto_task_source().queue(
             task!(resolve_encapsulated_bits: move |cx| {
                 let promise = trusted_promise.root();

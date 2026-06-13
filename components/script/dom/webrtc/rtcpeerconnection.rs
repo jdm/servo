@@ -600,7 +600,7 @@ impl RTCPeerConnectionMethods<crate::DomTypeHolder> for RTCPeerConnection {
             p.reject_error(Error::InvalidState(None), can_gc);
             return p;
         }
-        self.offer_promises.borrow_mut().push(p.clone());
+        self.offer_promises.borrow_mut().push(p.to_traced());
         self.create_offer();
         p
     }
@@ -617,7 +617,7 @@ impl RTCPeerConnectionMethods<crate::DomTypeHolder> for RTCPeerConnection {
             p.reject_error(Error::InvalidState(None), can_gc);
             return p;
         }
-        self.answer_promises.borrow_mut().push(p.clone());
+        self.answer_promises.borrow_mut().push(p.to_traced());
         self.create_answer();
         p
     }

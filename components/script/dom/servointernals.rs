@@ -200,7 +200,7 @@ impl RoutedPromiseListener<MemoryReportResult> for ServoInternals {
         &self,
         cx: &mut js::context::JSContext,
         response: MemoryReportResult,
-        promise: &Rc<Promise>,
+        promise: &PromiseRoot,
     ) {
         let stringified = serde_json::to_string(&response.results)
             .unwrap_or_else(|_| "{ error: \"failed to create memory report\"}".to_owned());

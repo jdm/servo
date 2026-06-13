@@ -184,7 +184,7 @@ impl RoutedPromiseListener<Result<String, String>> for Clipboard {
         &self,
         cx: &mut js::context::JSContext,
         response: Result<String, String>,
-        promise: &Rc<Promise>,
+        promise: &PromiseRoot,
     ) {
         let global = self.global();
         let text = response.unwrap_or_default();
@@ -221,10 +221,10 @@ impl RoutedPromiseListener<Result<String, String>> for Clipboard {
         // Step 3.4.1.1.4.2 Let representationDataPromise be the representation’s data.
         // Step 3.4.1.1.4.3 React to representationDataPromise:
         let fulfillment_handler = Box::new(RepresentationDataPromiseFulfillmentHandler {
-            promise: promise.clone(),
+            promise: promise.to_traced(),
         });
         let rejection_handler = Box::new(RepresentationDataPromiseRejectionHandler {
-            promise: promise.clone(),
+            promise: promise.to_traced(),
         });
         let handler = PromiseNativeHandler::new(
             &global,

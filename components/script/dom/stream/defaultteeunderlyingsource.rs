@@ -67,7 +67,7 @@ impl DefaultTeeUnderlyingSource {
         clone_for_branch_2: Rc<Cell<bool>>,
         reason_1: Rc<Heap<Value>>,
         reason_2: Rc<Heap<Value>>,
-        cancel_promise: Rc<Promise>,
+        cancel_promise: &PromiseRoot,
         tee_cancel_algorithm: DefaultTeeCancelAlgorithm,
         can_gc: CanGc,
     ) -> DomRoot<DefaultTeeUnderlyingSource> {
@@ -85,7 +85,7 @@ impl DefaultTeeUnderlyingSource {
                 clone_for_branch_2,
                 reason_1,
                 reason_2,
-                cancel_promise,
+                cancel_promise: cancel_promise.to_traced(),
                 tee_cancel_algorithm,
             }),
             &*stream.global(),
@@ -151,7 +151,7 @@ impl DefaultTeeUnderlyingSource {
         cx: &mut js::context::JSContext,
         global: &GlobalScope,
         reason: SafeHandleValue,
-    ) -> Option<Result<Rc<Promise>, Error>> {
+    ) -> Option<Result<PromiseRoot, Error>> {
         match self.tee_cancel_algorithm {
             DefaultTeeCancelAlgorithm::Cancel1Algorithm => {
                 // Set canceled_1 to true.
@@ -165,7 +165,7 @@ impl DefaultTeeUnderlyingSource {
                     self.resolve_cancel_promise(cx, global);
                 }
                 // Return cancelPromise.
-                Some(Ok(self.cancel_promise.clone()))
+                Some(Ok(self.cancel_promise.duplicate()))
             },
             DefaultTeeCancelAlgorithm::Cancel2Algorithm => {
                 // Set canceled_2 to true.
@@ -179,7 +179,7 @@ impl DefaultTeeUnderlyingSource {
                     self.resolve_cancel_promise(cx, global);
                 }
                 // Return cancelPromise.
-                Some(Ok(self.cancel_promise.clone()))
+                Some(Ok(self.cancel_promise.duplicate()))
             },
         }
     }

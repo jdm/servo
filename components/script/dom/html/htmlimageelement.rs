@@ -1380,7 +1380,7 @@ impl HTMLImageElement {
             .image_decode_promises
             .borrow()
             .iter()
-            .map(|promise| TrustedPromise::new(&promise))
+            .map(|promise| TrustedPromise::new(&promise.duplicate()))
             .collect();
 
         self.image_decode_promises.borrow_mut().clear();
@@ -1407,7 +1407,7 @@ impl HTMLImageElement {
             .image_decode_promises
             .borrow()
             .iter()
-            .map(|promise| TrustedPromise::new(&promise))
+            .map(|promise| TrustedPromise::new(&promise.duplicate()))
             .collect();
 
         self.image_decode_promises.borrow_mut().clear();
@@ -1931,7 +1931,7 @@ impl HTMLImageElementMethods<crate::DomTypeHolder> for HTMLImageElement {
         // Step 2. Queue a microtask to perform the following steps:
         let task = ImageElementMicrotask::Decode {
             elem: DomRoot::from_ref(self),
-            promise: promise.clone(),
+            promise: promise.to_traced(),
         };
 
         ScriptThread::await_stable_state(Microtask::ImageElement(task));

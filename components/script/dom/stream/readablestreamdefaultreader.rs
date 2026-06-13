@@ -359,7 +359,7 @@ impl ReadableStreamDefaultReader {
             reflector_: Reflector::new(),
             stream: MutNullableDom::new(None),
             read_requests: DomRefCell::new(Default::default()),
-            closed_promise: DomRefCell::new(Promise::new(global, can_gc)),
+            closed_promise: DomRefCell::new(Promise::new(global, can_gc).into_traced()),
         }
     }
 
@@ -556,7 +556,7 @@ impl ReadableStreamDefaultReader {
         branch_2: &ReadableStream,
         canceled_1: Rc<Cell<bool>>,
         canceled_2: Rc<Cell<bool>>,
-        cancel_promise: Rc<Promise>,
+        cancel_promise: &PromiseRoot,
     ) {
         let branch_1_controller = branch_1.get_default_controller();
 
@@ -571,7 +571,7 @@ impl ReadableStreamDefaultReader {
                 branch_2_controller: Dom::from_ref(&branch_2_controller),
                 canceled_1,
                 canceled_2,
-                cancel_promise,
+                cancel_promise: cancel_promise.to_traced(),
             })),
             CanGc::from_cx(cx),
         );
@@ -674,7 +674,7 @@ impl ReadableStreamDefaultReaderMethods<crate::DomTypeHolder> for ReadableStream
         // Rooting(unrooted_must_root): the read request contains only a promise,
         // which does not need to be rooted,
         // as it is safely managed natively via an Rc.
-        let read_request = ReadRequest::Read(promise.clone());
+        let read_request = ReadRequest::Read(promise.to_traced()); //XXXjdm concerning
 
         // Perform ! ReadableStreamDefaultReaderRead(this, readRequest).
         self.read(cx, &read_request);
@@ -707,7 +707,7 @@ impl ReadableStreamDefaultReaderMethods<crate::DomTypeHolder> for ReadableStream
 
 impl ReadableStreamGenericReader for ReadableStreamDefaultReader {
     fn get_closed_promise(&self) -> PromiseRoot {
-        self.closed_promise.borrow().clone()
+        self.closed_promise.borrow().duplicate()
     }
 
     fn set_closed_promise(&self, promise: Rc<Promise>) {

@@ -232,7 +232,7 @@ impl RoutedPromiseListener<()> for GPUQueue {
         &self,
         cx: &mut js::context::JSContext,
         _response: (),
-        promise: &Rc<Promise>,
+        promise: &PromiseRoot,
     ) {
         promise.resolve_native(&(), CanGc::from_cx(cx));
     }

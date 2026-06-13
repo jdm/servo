@@ -424,7 +424,7 @@ struct BroadcastListener {
 }
 
 type FileListenerCallback =
-    Box<dyn Fn(&mut js::context::JSContext, Rc<Promise>, Fallible<Vec<u8>>) + Send>;
+    Box<dyn Fn(&mut js::context::JSContext, PromiseRoot, Fallible<Vec<u8>>) + Send>;
 
 /// A wrapper for the handling of file data received by the ipc router
 struct FileListener {
@@ -2249,7 +2249,7 @@ impl GlobalScope {
     ) {
         let recv = self.send_msg(id);
 
-        let trusted_promise = TrustedPromise::new(promise);
+        let trusted_promise = TrustedPromise::new(&promise);
         let mut file_listener = FileListener {
             state: Some(FileListenerState::Empty(FileListenerTarget::Promise(
                 trusted_promise,

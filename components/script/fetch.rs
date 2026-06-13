@@ -177,7 +177,7 @@ fn request_init_from_request(request: NetTraitsRequest, global: &GlobalScope) ->
 
 /// <https://fetch.spec.whatwg.org/#abort-fetch>
 fn abort_fetch_call(
-    promise: Rc<Promise>,
+    promise: &PromiseRoot,
     request: &Request,
     response_object: Option<&Response>,
     abort_reason: HandleValue,
@@ -244,7 +244,7 @@ pub(crate) fn Fetch(
         rooted!(&in(cx) let mut abort_reason = UndefinedValue());
         signal.Reason(cx.into(), abort_reason.handle_mut());
         abort_fetch_call(
-            promise.clone(),
+            &promise,
             &request_object,
             None,
             abort_reason.handle(),
@@ -527,7 +527,7 @@ impl FetchContext {
             .expect("fetch promise is missing")
             .root();
         abort_fetch_call(
-            promise,
+            &promise,
             &self.request.root(),
             Some(&self.response_object.root()),
             abort_reason,
@@ -569,7 +569,7 @@ impl FetchResponseListener for FetchContext {
                     Error::Type(cformat!("Network error: {:?}", error)),
                     CanGc::from_cx(cx),
                 );
-                self.fetch_promise = Some(TrustedPromise::new(promise));
+                self.fetch_promise = Some(TrustedPromise::new(&promise));
                 let response = self.response_object.root();
                 response.set_type(DOMResponseType::Error, CanGc::from_cx(cx));
                 response.error_stream(cx, Error::Type(c"Network error occurred".to_owned()));

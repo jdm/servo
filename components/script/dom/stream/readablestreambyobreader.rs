@@ -209,7 +209,7 @@ impl ReadableStreamBYOBReader {
             reflector_: Reflector::new(),
             stream: MutNullableDom::new(None),
             read_into_requests: DomRefCell::new(Default::default()),
-            closed_promise: DomRefCell::new(Promise::new(global, can_gc)),
+            closed_promise: DomRefCell::new(Promise::new(global, can_gc).into_traced()),
         }
     }
 
@@ -501,7 +501,7 @@ impl ReadableStreamBYOBReaderMethods<crate::DomTypeHolder> for ReadableStreamBYO
         //
         // error steps, given e
         // Reject promise with e
-        let read_into_request = ReadIntoRequest::Read(promise.clone());
+        let read_into_request = ReadIntoRequest::Read(promise.to_traced()); //XXXjdm concerning
 
         // Perform ! ReadableStreamBYOBReaderRead(this, view, options["min"], readIntoRequest).
         self.read(cx, &view, min, &read_into_request);
@@ -534,7 +534,7 @@ impl ReadableStreamBYOBReaderMethods<crate::DomTypeHolder> for ReadableStreamBYO
 
 impl ReadableStreamGenericReader for ReadableStreamBYOBReader {
     fn get_closed_promise(&self) -> PromiseRoot {
-        self.closed_promise.borrow().clone()
+        self.closed_promise.borrow().duplicate()
     }
 
     fn set_closed_promise(&self, promise: Rc<Promise>) {

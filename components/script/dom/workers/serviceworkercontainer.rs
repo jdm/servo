@@ -73,7 +73,7 @@ impl ServiceWorkerContainer {
 
     /// <https://w3c.github.io/ServiceWorker/#reject-job-promise>
     /// <https://w3c.github.io/ServiceWorker/#resolve-job-promise>
-    fn handle_job_result(&self, cx: &mut JSContext, result: JobResult, promise: Rc<Promise>) {
+    fn handle_job_result(&self, cx: &mut JSContext, result: JobResult, promise: &PromiseRoot) {
         let global = self.global();
         match result {
             // <https://w3c.github.io/ServiceWorker/#reject-job-promise>
@@ -138,7 +138,7 @@ impl ServiceWorkerContainer {
         &self,
         cx: &mut JSContext,
         registration_info: Option<ServiceWorkerRegistrationInfo>,
-        promise: Rc<Promise>,
+        promise: &PromiseRoot,
     ) {
         // Step 8.1 Let registration be the result of running Match Service Worker Registration given storage key and clientURL.
         // Note: the `registration_info` argument is the result from the parallel algorithm run.
@@ -170,14 +170,14 @@ impl ServiceWorkerContainer {
                     debug_assert!(false, "No pending algorithm result.");
                     return;
                 };
-                self.handle_job_result(cx, job_result, promise);
+                self.handle_job_result(cx, job_result, &promise.duplicate());
             },
             ServiceWorkerAlgorithmResult::MatchServiceWorkerRegistration(registration_info) => {
                 let Some(promise) = self.pending_algorithm_results.borrow_mut().pop_front() else {
                     debug_assert!(false, "No pending algorithm result.");
                     return;
                 };
-                self.handle_match_registration_result(cx, registration_info, promise);
+                self.handle_match_registration_result(cx, registration_info, &promise.duplicate());
             },
             ServiceWorkerAlgorithmResult::MessageFromWorker {
                 message,
@@ -228,11 +228,11 @@ impl ServiceWorkerContainer {
     /// Setup the callback to the backend service, if this hasn't been done already.
     fn get_or_setup_callback(
         &self,
-        promise: Rc<Promise>,
+        promise: &PromiseRoot,
     ) -> GenericCallback<ServiceWorkerAlgorithmResult> {
         self.pending_algorithm_results
             .borrow_mut()
-            .push_back(promise);
+            .push_back(promise.to_traced());
         if let Some(cb) = self.callback.borrow_mut().as_ref() {
             return cb.clone();
         }
@@ -275,7 +275,7 @@ impl ServiceWorkerContainer {
         storage_key: ImmutableOrigin,
         scope: ServoUrl,
         script_url: ServoUrl,
-        promise: Rc<Promise>,
+        promise: &PromiseRoot,
     ) {
         let global = self.global();
         let result_handler = self.get_or_setup_callback(promise);
@@ -410,7 +410,7 @@ impl ServiceWorkerContainerMethods<crate::DomTypeHolder> for ServiceWorkerContai
             return promise;
         }
 
-        let result_handler = self.get_or_setup_callback(promise.clone());
+        let result_handler = self.get_or_setup_callback(&promise);
 
         let scope_things =
             ServiceWorkerRegistration::create_scope_things(&global, script_url.clone());
@@ -502,7 +502,7 @@ impl ServiceWorkerContainerMethods<crate::DomTypeHolder> for ServiceWorkerContai
             return promise;
         }
 
-        let result_handler = self.get_or_setup_callback(promise.clone());
+        let result_handler = self.get_or_setup_callback(&promise);
 
         // Step 8: Run the following substeps in parallel:
         // Note: continues in parallel in the service worker manager,

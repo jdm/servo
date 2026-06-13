@@ -275,7 +275,7 @@ impl RoutedPromiseListener<WebGPUDeviceResponse> for GPUAdapter {
         &self,
         cx: &mut js::context::JSContext,
         response: WebGPUDeviceResponse,
-        promise: &Rc<Promise>,
+        promise: &PromiseRoot,
     ) {
         match response {
             // 3.1 Let device be a new device with the capabilities described by descriptor.

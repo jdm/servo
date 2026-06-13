@@ -83,7 +83,7 @@ impl ByteTeeUnderlyingSource {
         canceled_2: Rc<Cell<bool>>,
         reason_1: Rc<Heap<Value>>,
         reason_2: Rc<Heap<Value>>,
-        cancel_promise: Rc<Promise>,
+        cancel_promise: &PromiseRoot,
         reader_version: Rc<Cell<u64>>,
         tee_cancel_algorithm: ByteTeeCancelAlgorithm,
         byte_tee_pull_algorithm: ByteTeePullAlgorithm,
@@ -103,7 +103,7 @@ impl ByteTeeUnderlyingSource {
                 canceled_2,
                 reason_1,
                 reason_2,
-                cancel_promise,
+                cancel_promise: cancel_promise.to_traced(),
                 reader_version,
                 tee_cancel_algorithm,
                 byte_tee_pull_algorithm,
@@ -431,7 +431,7 @@ impl ByteTeeUnderlyingSource {
         &self,
         cx: &mut JSContext,
         reason: SafeHandleValue,
-    ) -> Option<Result<Rc<Promise>, Error>> {
+    ) -> Option<Result<PromiseRoot, Error>> {
         match self.tee_cancel_algorithm {
             ByteTeeCancelAlgorithm::Cancel1Algorithm => {
                 // Set canceled1 to true.
@@ -446,7 +446,7 @@ impl ByteTeeUnderlyingSource {
                 }
 
                 // Return cancelPromise.
-                Some(Ok(self.cancel_promise.clone()))
+                Some(Ok(self.cancel_promise.duplicate()))
             },
             ByteTeeCancelAlgorithm::Cancel2Algorithm => {
                 // Set canceled_2 to true.
@@ -460,7 +460,7 @@ impl ByteTeeUnderlyingSource {
                     self.resolve_cancel_promise(cx);
                 }
                 // Return cancelPromise.
-                Some(Ok(self.cancel_promise.clone()))
+                Some(Ok(self.cancel_promise.duplicate()))
             },
         }
     }

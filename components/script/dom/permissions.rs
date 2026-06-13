@@ -93,7 +93,7 @@ impl Permissions {
         cx: &mut js::context::JSContext,
         op: Operation,
         permissionDesc: *mut JSObject,
-        promise: Option<Rc<Promise>>,
+        promise: Option<PromiseRoot>,
     ) -> PromiseRoot {
         // (Query, Request) Step 3.
         let p = match promise {

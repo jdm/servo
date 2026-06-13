@@ -916,7 +916,7 @@ impl XRSessionMethods<crate::DomTypeHolder> for XRSession {
             p.resolve_native(&(), CanGc::from_cx(cx));
             return p;
         }
-        self.end_promises.borrow_mut().push(p.clone());
+        self.end_promises.borrow_mut().push(p.to_traced());
         // This is duplicated in event_callback since this should
         // happen ASAP for end() but can happen later if the device
         // shuts itself down
@@ -981,7 +981,7 @@ impl XRSessionMethods<crate::DomTypeHolder> for XRSession {
         };
         self.pending_hit_test_promises
             .borrow_mut()
-            .insert(id, p.clone());
+            .insert(id, p.to_traced());
 
         self.session.borrow().request_hit_test(source);
 
@@ -1067,7 +1067,7 @@ impl XRSessionMethods<crate::DomTypeHolder> for XRSession {
             }
         }
 
-        *self.update_framerate_promise.borrow_mut() = Some(promise.clone());
+        *self.update_framerate_promise.borrow_mut() = Some(promise.to_traced());
 
         let this = Trusted::new(self);
         let global = self.global();

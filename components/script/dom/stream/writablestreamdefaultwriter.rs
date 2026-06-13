@@ -43,8 +43,8 @@ impl WritableStreamDefaultWriter {
         WritableStreamDefaultWriter {
             reflector_: Reflector::new(),
             stream: Default::default(),
-            closed_promise: RefCell::new(Promise::new(global, can_gc)),
-            ready_promise: RefCell::new(Promise::new(global, can_gc)),
+            closed_promise: RefCell::new(Promise::new(global, can_gc).into_traced()),
+            ready_promise: RefCell::new(Promise::new(global, can_gc).into_traced()),
         }
     }
 
@@ -203,7 +203,7 @@ impl WritableStreamDefaultWriter {
 
             // Set writer.[[readyPromise]].[[PromiseIsHandled]] to true.
             promise.set_promise_is_handled();
-            *self.ready_promise.borrow_mut() = promise;
+            *self.ready_promise.borrow_mut() = promise.into_traced();
         }
     }
 
@@ -230,7 +230,7 @@ impl WritableStreamDefaultWriter {
 
             // Set writer.[[closedPromise]].[[PromiseIsHandled]] to true.
             promise.set_promise_is_handled();
-            *self.closed_promise.borrow_mut() = promise;
+            *self.closed_promise.borrow_mut() = promise.into_traced();
         }
     }
 
@@ -428,7 +428,7 @@ impl WritableStreamDefaultWriterMethods<crate::DomTypeHolder> for WritableStream
     /// <https://streams.spec.whatwg.org/#default-writer-closed>
     fn Closed(&self) -> PromiseRoot {
         // Return this.[[closedPromise]].
-        return self.closed_promise.borrow().clone();
+        return self.closed_promise.borrow().duplicate();
     }
 
     /// <https://streams.spec.whatwg.org/#default-writer-desired-size>
@@ -445,7 +445,7 @@ impl WritableStreamDefaultWriterMethods<crate::DomTypeHolder> for WritableStream
     /// <https://streams.spec.whatwg.org/#default-writer-ready>
     fn Ready(&self) -> PromiseRoot {
         // Return this.[[readyPromise]].
-        return self.ready_promise.borrow().clone();
+        return self.ready_promise.borrow().duplicate();
     }
 
     /// <https://streams.spec.whatwg.org/#default-writer-abort>

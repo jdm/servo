@@ -1049,7 +1049,7 @@ impl TestBindingMethods<crate::DomTypeHolder> for TestBinding {
     fn ResolvePromiseDelayed(&self, p: &Promise, value: DOMString, delay: u64) {
         let promise = p.duplicate();
         let cb = TestBindingCallback {
-            promise: TrustedPromise::new(promise),
+            promise: TrustedPromise::new(&promise),
             value,
         };
         let _ = self.global().schedule_callback(

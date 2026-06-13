@@ -198,7 +198,7 @@ impl GamepadHapticActuatorMethods<crate::DomTypeHolder> for GamepadHapticActuato
         self.sequence_id.set(self.sequence_id.get().wrapping_add(1));
 
         if let Some(promise) = self.playing_effect_promise.borrow_mut().take() {
-            let trusted_promise = TrustedPromise::new(promise);
+            let trusted_promise = TrustedPromise::new(&promise.duplicate());
             self.global().task_manager().gamepad_task_source().queue(
                 task!(preempt_promise: move |cx| {
                     let promise = trusted_promise.root();
@@ -213,7 +213,7 @@ impl GamepadHapticActuatorMethods<crate::DomTypeHolder> for GamepadHapticActuato
             return playing_effect_promise;
         }
 
-        *self.playing_effect_promise.borrow_mut() = Some(playing_effect_promise.clone());
+        *self.playing_effect_promise.borrow_mut() = Some(playing_effect_promise.to_traced());
         self.effect_sequence_id.set(self.sequence_id.get());
 
         let context = Trusted::new(self);
@@ -262,7 +262,7 @@ impl GamepadHapticActuatorMethods<crate::DomTypeHolder> for GamepadHapticActuato
         self.sequence_id.set(self.sequence_id.get().wrapping_add(1));
 
         if let Some(promise) = self.playing_effect_promise.borrow_mut().take() {
-            let trusted_promise = TrustedPromise::new(promise);
+            let trusted_promise = TrustedPromise::new(&promise.duplicate());
             self.global().task_manager().gamepad_task_source().queue(
                 task!(preempt_promise: move |cx| {
                     let promise = trusted_promise.root();
@@ -272,7 +272,7 @@ impl GamepadHapticActuatorMethods<crate::DomTypeHolder> for GamepadHapticActuato
             );
         }
 
-        *self.playing_effect_promise.borrow_mut() = Some(promise);
+        *self.playing_effect_promise.borrow_mut() = Some(promise.to_traced());
 
         self.reset_sequence_id.set(self.sequence_id.get());
 
@@ -295,7 +295,7 @@ impl GamepadHapticActuatorMethods<crate::DomTypeHolder> for GamepadHapticActuato
         );
         self.global().as_window().send_to_embedder(event);
 
-        self.playing_effect_promise.borrow().clone().unwrap()
+        self.playing_effect_promise.borrow().as_ref().unwrap().duplicate()
     }
 }
 
@@ -327,7 +327,7 @@ impl GamepadHapticActuator {
         let playing_effect_promise = self.playing_effect_promise.borrow_mut().take();
 
         if let Some(promise) = playing_effect_promise {
-            let trusted_promise = TrustedPromise::new(promise);
+            let trusted_promise = TrustedPromise::new(&promise.duplicate());
             let sequence_id = self.sequence_id.get();
             let reset_sequence_id = self.reset_sequence_id.get();
             self.global().task_manager().gamepad_task_source().queue(

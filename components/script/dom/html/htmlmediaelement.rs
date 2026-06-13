@@ -3132,7 +3132,7 @@ impl HTMLMediaElementMethods<crate::DomTypeHolder> for HTMLMediaElement {
 
         // Step 3. Let promise be a new promise and append promise to the list of pending play
         // promises.
-        self.push_pending_play_promise(&promise);
+        self.push_pending_play_promise(promise.as_traced());
 
         // Step 4. Run the internal play steps for the media element.
         self.internal_play_steps(cx);

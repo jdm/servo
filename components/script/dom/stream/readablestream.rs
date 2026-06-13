@@ -430,7 +430,7 @@ impl PipeTo {
             if has_value {
                 // Write the chunk.
                 let write_promise = self.writer.write(cx, global, bytes.handle());
-                self.pending_writes.borrow_mut().push_back(write_promise);
+                self.pending_writes.borrow_mut().push_back(write_promise.into_traced());
                 return true;
             }
         }
@@ -716,7 +716,7 @@ impl PipeTo {
             CanGc::from_cx(cx),
         );
         promise.append_native_handler(cx, &handler);
-        *self.shutdown_action_promise.borrow_mut() = Some(promise);
+        *self.shutdown_action_promise.borrow_mut() = Some(promise.into_traced());
     }
 
     /// <https://streams.spec.whatwg.org/#rs-pipeTo-finalize>
@@ -1670,10 +1670,10 @@ impl ReadableStream {
         let global = self.global();
         let result_promise = Promise::new2(cx, &global);
         let fulfillment_handler = Box::new(SourceCancelPromiseFulfillmentHandler {
-            result: result_promise.clone(),
+            result: result_promise.to_traced(),
         });
         let rejection_handler = Box::new(SourceCancelPromiseRejectionHandler {
-            result: result_promise.clone(),
+            result: result_promise.to_traced(),
         });
         let handler = PromiseNativeHandler::new(
             &global,
@@ -1742,7 +1742,7 @@ impl ReadableStream {
             canceled_2.clone(),
             reason_1.clone(),
             reason_2.clone(),
-            cancel_promise.clone(),
+            &cancel_promise,
             reader_version.clone(),
             ByteTeeCancelAlgorithm::Cancel1Algorithm,
             ByteTeePullAlgorithm::Pull1Algorithm,
@@ -1759,7 +1759,7 @@ impl ReadableStream {
             canceled_2,
             reason_1,
             reason_2,
-            cancel_promise,
+            &cancel_promise,
             reader_version,
             ByteTeeCancelAlgorithm::Cancel2Algorithm,
             ByteTeePullAlgorithm::Pull2Algorithm,
@@ -1833,7 +1833,7 @@ impl ReadableStream {
             clone_for_branch_2.clone(),
             reason_1.clone(),
             reason_2.clone(),
-            cancel_promise.clone(),
+            &cancel_promise,
             DefaultTeeCancelAlgorithm::Cancel1Algorithm,
             CanGc::from_cx(cx),
         );
@@ -1850,7 +1850,7 @@ impl ReadableStream {
             clone_for_branch_2,
             reason_1,
             reason_2,
-            cancel_promise.clone(),
+            &cancel_promise,
             DefaultTeeCancelAlgorithm::Cancel2Algorithm,
             CanGc::from_cx(cx),
         );
@@ -1886,7 +1886,7 @@ impl ReadableStream {
             &branch_2,
             canceled_1,
             canceled_2,
-            cancel_promise,
+            &cancel_promise,
         );
 
         // Return « branch_1, branch_2 ».
@@ -1958,7 +1958,7 @@ impl ReadableStream {
             abort_reason: Default::default(),
             shutdown_error: Default::default(),
             shutdown_action_promise:  Default::default(),
-            result_promise: promise.clone(),
+            result_promise: promise.to_traced(),
         });
 
         // If signal is not undefined,

@@ -644,7 +644,7 @@ impl WritableStream {
         let promise = Promise::new(global, can_gc);
 
         // Append promise to stream.[[writeRequests]].
-        self.write_requests.borrow_mut().push_back(promise.clone());
+        self.write_requests.borrow_mut().push_back(promise.to_traced());
 
         // Return promise.
         promise
@@ -693,7 +693,7 @@ impl WritableStream {
                 .as_ref()
                 .expect("Pending abort request must be Some.")
                 .promise
-                .clone();
+                .duplicate();
         }
 
         // Assert: state is "writable" or "erroring".
@@ -723,7 +723,7 @@ impl WritableStream {
         // reason is reason,
         // and was already erroring is wasAlreadyErroring.
         *self.pending_abort_request.borrow_mut() = Some(PendingAbortRequest {
-            promise: promise.clone(),
+            promise: promise.to_traced(),
             reason: Heap::boxed(reason.get()),
             was_already_erroring,
         });
@@ -762,7 +762,7 @@ impl WritableStream {
         let promise = Promise::new2(cx, global);
 
         // Set stream.[[closeRequest]] to promise.
-        *self.close_request.borrow_mut() = Some(promise.clone());
+        *self.close_request.borrow_mut() = Some(promise.to_traced());
 
         // Let writer be stream.[[writer]].
         // If writer is not undefined,
@@ -848,7 +848,7 @@ impl WritableStream {
                 if backpressure {
                     // If backpressure is true, set writer.[[readyPromise]] to a new promise.
                     let promise = Promise::new(global, can_gc);
-                    writer.set_ready_promise(promise);
+                    writer.set_ready_promise(promise.to_traced());
                 } else {
                     // Otherwise,
                     // Assert: backpressure is false.
@@ -886,7 +886,7 @@ impl WritableStream {
         let backpressure_promise = Rc::new(RefCell::new(Some(Promise::new(
             &global,
             CanGc::from_cx(cx),
-        ))));
+        ).into_traced())));
 
         // Let controller be a new WritableStreamDefaultController.
         let controller = WritableStreamDefaultController::new(

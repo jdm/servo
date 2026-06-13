@@ -262,7 +262,7 @@ impl FontFace {
             family_name: DomRefCell::new(family_name),
             urls: DomRefCell::new(sources),
             template: RefCell::default(),
-            font_status_promise,
+            font_status_promise: font_status_promise.into_traced(),
         }
     }
 
@@ -571,7 +571,7 @@ impl FontFaceMethods<crate::DomTypeHolder> for FontFace {
             // Step 2. If font face’s [[Urls]] slot is null, or its status attribute is anything
             // other than "unloaded", return font face’s [[FontStatusPromise]] and abort these
             // steps.
-            return self.font_status_promise.clone();
+            return self.font_status_promise.duplicate();
         };
 
         // FontFace must not be loaded at this point as `self.urls` is not None, implying `Load`

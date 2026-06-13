@@ -107,7 +107,7 @@ impl RoutedPromiseListener<WebGPUAdapterResponse> for GPU {
         &self,
         cx: &mut js::context::JSContext,
         response: WebGPUAdapterResponse,
-        promise: &Rc<Promise>,
+        promise: &PromiseRoot,
     ) {
         match response {
             Some(Ok(adapter)) => {

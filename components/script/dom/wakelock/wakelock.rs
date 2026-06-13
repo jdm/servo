@@ -89,7 +89,7 @@ impl WakeLockMethods<crate::DomTypeHolder> for WakeLock {
 
 impl RoutedPromiseListener<AllowOrDeny> for WakeLock {
     /// <https://w3c.github.io/screen-wake-lock/#the-request-method>
-    fn handle_response(&self, cx: &mut JSContext, response: AllowOrDeny, promise: &Rc<Promise>) {
+    fn handle_response(&self, cx: &mut JSContext, response: AllowOrDeny, promise: &PromiseRoot) {
         let can_gc = CanGc::from_cx(cx);
         match response {
             // Step 7a. If permission is denied, reject with NotAllowedError.

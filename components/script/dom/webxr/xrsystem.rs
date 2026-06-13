@@ -257,7 +257,7 @@ impl XRSystemMethods<crate::DomTypeHolder> for XRSystem {
                     return;
                 };
                 task_source.queue(task!(request_session: move || {
-                    this.root().session_obtained(message, trusted.root(), mode, frame_receiver, CanGc::deprecated_note());
+                    this.root().session_obtained(message, &trusted.root(), mode, frame_receiver, CanGc::deprecated_note());
                 }));
             }),
         );
@@ -278,7 +278,7 @@ impl XRSystem {
     fn session_obtained(
         &self,
         response: Result<Session, XRError>,
-        promise: Rc<Promise>,
+        promise: &PromiseRoot,
         mode: XRSessionMode,
         frame_receiver: IpcReceiver<Frame>,
         can_gc: CanGc,

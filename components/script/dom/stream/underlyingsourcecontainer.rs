@@ -155,7 +155,7 @@ impl UnderlyingSourceContainer {
         cx: &mut JSContext,
         global: &GlobalScope,
         reason: SafeHandleValue,
-    ) -> Option<Result<Rc<Promise>, Error>> {
+    ) -> Option<Result<PromiseRoot, Error>> {
         match &self.underlying_source_type {
             UnderlyingSource::Js(source, this_obj) => {
                 if let Some(algo) = &source.cancel {
@@ -215,7 +215,7 @@ impl UnderlyingSourceContainer {
         &self,
         cx: &mut JSContext,
         controller: Controller,
-    ) -> Option<Result<Rc<Promise>, Error>> {
+    ) -> Option<Result<PromiseRoot, Error>> {
         match &self.underlying_source_type {
             UnderlyingSource::Js(source, this_obj) => {
                 if let Some(algo) = &source.pull {
@@ -276,7 +276,7 @@ impl UnderlyingSourceContainer {
         &self,
         cx: &mut JSContext,
         controller: Controller,
-    ) -> Option<Result<Rc<Promise>, Error>> {
+    ) -> Option<Result<PromiseRoot, Error>> {
         match &self.underlying_source_type {
             UnderlyingSource::Js(source, this_obj) => {
                 if let Some(start) = &source.start {
@@ -326,7 +326,7 @@ impl UnderlyingSourceContainer {
             },
             UnderlyingSource::Transform(_, start_promise) => {
                 // Let startAlgorithm be an algorithm that returns startPromise.
-                Some(Ok(start_promise.clone()))
+                Some(Ok(start_promise.duplicate()))
             },
             _ => None,
         }

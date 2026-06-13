@@ -18,7 +18,8 @@ use std::rc::Rc;
 
 use dom_struct::dom_struct;
 use js::context::JSContext;
-use js::conversions::{ConversionResult, FromJSValConvertibleRc};
+use js::conversions::{ConversionResult, FromJSValConvertibleRc, ToJSValConvertible, FromJSValConvertible};
+use js::gc::MutableHandleValue;
 use js::jsapi::{
     AddRawValueRoot, CallArgs, GetFunctionNativeReserved, Heap, JS_ClearPendingException,
     JS_GetFunctionObject, JS_NewFunction, JSAutoRealm, JSContext as RawJSContext, JSObject,
@@ -89,6 +90,34 @@ pub(crate) struct PromiseRoot {
     permanent_js_root: Box<Heap<JSVal>>,
 }
 
+impl ToJSValConvertible for PromiseRoot {
+    #[expect(unsafe_code)]
+    unsafe fn to_jsval(&self, cx: *mut RawJSContext, rval: MutableHandleValue<'_>) {
+        unsafe {
+            self.promise.to_jsval(cx, rval)
+        }
+    }
+}
+
+impl FromJSValConvertible for PromiseRoot {
+    type Config = ();
+
+    #[expect(unsafe_code)]
+    unsafe fn from_jsval(
+        cx: *mut RawJSContext,
+        val: HandleValue<'_>,
+        _option: (),
+    ) -> Result<ConversionResult<Self>, ()> {
+        unsafe {
+            Promise::from_jsval(cx, val).map(|r| match r {
+                ConversionResult::Success(p) => ConversionResult::Success(p.duplicate()),
+                ConversionResult::Failure(e) => ConversionResult::Failure(e),
+            })
+        }
+    }
+
+}
+
 impl Clone for PromiseRoot {
     fn clone(&self) -> Self {
         Self {
@@ -108,8 +137,7 @@ impl PromiseRoot {
     }
 
     pub(crate) fn into_traced(self) -> Rc<Promise> {
-        let Self { promise, .. } = self;
-        promise
+        self.promise.clone()
     }
 }
 
@@ -170,6 +198,10 @@ impl Deref for PromiseRoot {
 }
 
 impl Promise {
+    pub(crate) fn inspect(&self) {
+        println!("{:p}", self.reflector().get_jsobject().get());
+    }
+
     pub(crate) fn new(global: &GlobalScope, can_gc: CanGc) -> PromiseRoot {
         let realm = enter_realm(global);
         let comp = InRealm::Entered(&realm);
@@ -213,7 +245,7 @@ impl Promise {
                 promise: Rc::new(Promise {
                     reflector: Reflector::new(),
                 }),
-                permanent_js_root: Heap::default(),
+                permanent_js_root: Box::new(Heap::default()),
             };
             promise.init_reflector_without_associated_memory(obj.get());
             promise.initialize(cx);
@@ -503,7 +535,7 @@ impl FromJSValConvertibleRc for Promise {
         let global_scope = GlobalScope::from_current_realm(&realm);
 
         let promise = Promise::new_resolved(&global_scope, cx.into(), value, CanGc::from_cx(cx));
-        Ok(ConversionResult::Success(promise))
+        Ok(ConversionResult::Success(promise.into_traced()))
     }
 }
 
@@ -617,7 +649,7 @@ impl MicrotaskRunnable for WaitForAllSuccessStepsMicrotask {
 fn wait_for_all(
     cx: &mut CurrentRealm,
     global: &GlobalScope,
-    promises: Vec<Rc<Promise>>,
+    promises: Vec<PromiseRoot>,
     success_steps: WaitForAllSuccessSteps,
     failure_steps: WaitForAllFailureSteps,
 ) {
@@ -703,7 +735,7 @@ fn wait_for_all(
 pub(crate) fn wait_for_all_promise(
     cx: &mut CurrentRealm,
     global: &GlobalScope,
-    promises: Vec<Rc<Promise>>,
+    promises: Vec<PromiseRoot>,
 ) -> PromiseRoot {
     // Let promise be a new promise of type Promise<sequence<T>> in realm.
     let promise = Promise::new2(cx, global);
