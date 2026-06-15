@@ -85,6 +85,7 @@ impl script_bindings::interfaces::PromiseHelpers<crate::DomTypeHolder> for Promi
     type StackRoot = PromiseRoot;
 }
 
+#[cfg_attr(crown, crown::unrooted_must_root_lint::allow_unrooted_interior)]
 pub(crate) struct PromiseRoot {
     promise: Rc<Promise>,
     permanent_js_root: Box<Heap<JSVal>>,
@@ -237,7 +238,6 @@ impl Promise {
     }
 
     #[expect(unsafe_code)]
-    #[cfg_attr(crown, expect(crown::unrooted_must_root))]
     pub(crate) fn new_with_js_promise(obj: HandleObject, cx: SafeJSContext) -> PromiseRoot {
         unsafe {
             assert!(IsPromiseObject(obj));
