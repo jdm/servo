@@ -15,7 +15,7 @@ use malloc_size_of::{MallocSizeOf, MallocSizeOfOps};
 use crate::assert::assert_in_script;
 use crate::conversions::DerivedFrom;
 use crate::inheritance::Castable;
-use crate::reflector::{DomObject, MutDomObject, Reflector};
+use crate::reflector::{DomObject, MutDomObject};
 use crate::trace::trace_reflector;
 
 /// A rooted value.

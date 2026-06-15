@@ -8,6 +8,8 @@
 // Register the linter `crown`, which is the Servo-specific linter for the script crate.
 #![cfg_attr(crown, register_tool(crown))]
 
+#![allow(unused_imports)]
+
 // These are used a lot so let's keep them for now
 #[macro_use]
 extern crate js;

@@ -38,7 +38,7 @@ pub(crate) struct FontFaceSet {
 }
 
 impl FontFaceSet {
-    fn new_inherited(cx: &mut JSContext, global: &GlobalScope, promise: &PromiseRoot) -> Self {
+    fn new_inherited(promise: &PromiseRoot) -> Self {
         FontFaceSet {
             target: EventTarget::new_inherited(),
             promise: promise.to_traced(),
@@ -53,7 +53,7 @@ impl FontFaceSet {
     ) -> DomRoot<Self> {
         let promise = Promise::new2(cx, global);
         let f = reflect_dom_object_with_proto_and_cx(
-            Box::new(FontFaceSet::new_inherited(cx, global, &promise)),
+            Box::new(FontFaceSet::new_inherited(&promise)),
             global,
             proto,
             cx,
