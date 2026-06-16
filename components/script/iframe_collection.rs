@@ -81,11 +81,11 @@ impl IFrameCollection {
     }
 
     pub(crate) fn remove(&self, iframe_element: &HTMLIFrameElement) -> Option<ViewportDetails> {
-        self.iframes
-            .borrow_mut()
+        let mut iframes = self.iframes.borrow_mut();
+        iframes
             .iter()
             .position(|iframe| &*iframe.element == iframe_element)
-            .and_then(|index| self.iframes.borrow_mut().remove(index).size)
+            .and_then(|index| iframes.remove(index).size)
     }
 
     pub(crate) fn iframe_element(&self, browsing_context_id: DOMString) -> Option<DomRoot<HTMLIFrameElement>> {
