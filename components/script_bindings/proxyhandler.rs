@@ -220,20 +220,20 @@ pub fn set_property_descriptor(
     *is_none = false;
 }
 
-pub(crate) fn id_to_source(cx: SafeJSContext, id: RawHandleId) -> Option<DOMString> {
+fn id_to_source(cx: &mut js::context::JSContext, id: RawHandleId) -> Option<DOMString> {
     unsafe {
         if js::glue::RUST_JSID_IS_VOID(id) {
             return None;
         }
-        rooted!(in(*cx) let mut value = UndefinedValue());
-        rooted!(in(*cx) let mut jsstr = ptr::null_mut::<jsapi::JSString>());
-        jsapi::JS_IdToValue(*cx, id.get(), value.handle_mut().into())
+        rooted!(&in(cx) let mut value = UndefinedValue());
+        rooted!(&in(cx) let mut jsstr = ptr::null_mut::<jsapi::JSString>());
+        jsapi::JS_IdToValue(cx.raw_cx(), id.get(), value.handle_mut().into())
             .then(|| {
-                jsstr.set(jsapi::JS_ValueToSource(*cx, value.handle().into()));
+                jsstr.set(jsapi::JS_ValueToSource(cx.raw_cx(), value.handle().into()));
                 jsstr.get()
             })
             .and_then(ptr::NonNull::new)
-            .map(|jsstr| jsstr_to_string(*cx, jsstr).into())
+            .map(|jsstr| jsstr_to_string(cx, jsstr).into())
     }
 }
 
@@ -545,7 +545,7 @@ pub(crate) fn report_cross_origin_denial<D: DomTypes>(
     id: RawHandleId,
     access: &str,
 ) -> bool {
-    if let Some(id) = id_to_source(cx.into(), id) {
+    if let Some(id) = id_to_source(cx, id) {
         debug!(
             "permission denied to {} property {} on cross-origin object",
             access,

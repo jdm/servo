@@ -2888,7 +2888,6 @@ impl ScriptThread {
             document
                 .iframes()
                 .get(browsing_context_id)
-                .map(|iframe| iframe.element.as_rooted())
         });
         let focusable_area = iframe_element
             .map(|iframe_element| {

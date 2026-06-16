@@ -373,7 +373,7 @@ pub(crate) struct Document {
     anchors: MutNullableDom<HTMLCollection>,
     applets: MutNullableDom<HTMLCollection>,
     /// Information about the `<iframes>` in this [`Document`].
-    iframes: RefCell<IFrameCollection>,
+    iframes: IFrameCollection,
     /// Shared locks used for style attributes, author-origin stylesheets, and user and
     /// user agent stylesheets in this document. Can be acquired once for accessing many
     /// objects. This is shared with the owning [`ScriptThread`].
@@ -2072,7 +2072,7 @@ impl Document {
         if !recursive_flag {
             // `check_if_unloading_is_cancelled` might cause futher modifications to the DOM so collecting here prevents
             // a double borrow if the `IFrameCollection` needs to be validated again.
-            let iframes: Vec<_> = self.iframes().iter().collect();
+            let iframes = self.iframes().iframes();
             for iframe in &iframes {
                 // TODO: handle the case of cross origin iframes.
                 let document = iframe.owner_document();
@@ -2140,7 +2140,7 @@ impl Document {
         if !recursive_flag {
             // `unload` might cause futher modifications to the DOM so collecting here prevents
             // a double borrow if the `IFrameCollection` needs to be validated again.
-            let iframes: Vec<_> = self.iframes().iter().collect();
+            let iframes = self.iframes().iframes();
             for iframe in &iframes {
                 // TODO: handle the case of cross origin iframes.
                 let document = iframe.owner_document();
@@ -2549,7 +2549,7 @@ impl Document {
         // Step 4.1. Let incrementDestroyed be an algorithm step which increments numberDestroyed.
         // Step 4.2. Destroy a document and its descendants given childNavigable's active document and incrementDestroyed.
         // Step 5. Wait until numberDestroyed equals childNavigable's size.
-        for exited_iframe in self.iframes().iter() {
+        for exited_iframe in self.iframes().iframes() {
             debug!("Destroying nested iframe document");
             exited_iframe.destroy_document_and_its_descendants(cx);
         }
@@ -2685,7 +2685,7 @@ impl Document {
         // Step 3. For each descendantNavigable of descendantNavigables,
         // queue a global task on the navigation and traversal task source given
         // descendantNavigable's active window to perform the following steps:
-        for iframe in self.iframes().iter() {
+        for iframe in self.iframes().iframes() {
             if let Some(descendant_document) = iframe.GetContentDocument() {
                 let trusted_descendant_document = Trusted::new(&*descendant_document);
                 let document = Trusted::new(self);
@@ -2730,14 +2730,8 @@ impl Document {
 
     /// A reference to the [`IFrameCollection`] of this [`Document`], holding information about
     /// `<iframe>`s found within it.
-    pub(crate) fn iframes(&self) -> Ref<'_, IFrameCollection> {
-        self.iframes.borrow()
-    }
-
-    /// A mutable reference to the [`IFrameCollection`] of this [`Document`], holding information about
-    /// `<iframe>`s found within it.
-    pub(crate) fn iframes_mut(&self) -> RefMut<'_, IFrameCollection> {
-        self.iframes.borrow_mut()
+    pub(crate) fn iframes(&self) -> &IFrameCollection {
+        &self.iframes
     }
 
     pub(crate) fn get_dom_interactive(&self) -> Option<CrossProcessInstant> {
@@ -3539,7 +3533,7 @@ impl Document {
         has_trustworthy_ancestor_origin: bool,
         custom_element_reaction_stack: Rc<CustomElementReactionStack>,
         creation_sandboxing_flag_set: SandboxingFlagSet,
-        can_gc: CanGc,
+        timeline: &DocumentTimeline,
     ) -> Document {
         let url = url.unwrap_or_else(|| ServoUrl::parse("about:blank").unwrap());
 
@@ -3610,7 +3604,7 @@ impl Document {
             scripts: Default::default(),
             anchors: Default::default(),
             applets: Default::default(),
-            iframes: RefCell::new(IFrameCollection::new()),
+            iframes: IFrameCollection::new(),
             shared_style_locks,
             stylesheets: DomRefCell::new(DocumentStylesheetSet::new()),
             stylesheet_list: MutNullableDom::new(None),
@@ -3672,7 +3666,7 @@ impl Document {
             dirty_canvases: DomRefCell::new(Default::default()),
             has_pending_animated_image_update: Cell::new(false),
             selection: MutNullableDom::new(None),
-            timeline: DocumentTimeline::new(window, can_gc).as_traced(),
+            timeline: Dom::from_ref(timeline),
             animations: Animations::new(),
             image_animation_manager: DomRefCell::new(ImageAnimationManager::default()),
             dirty_root: Default::default(),
@@ -3876,6 +3870,7 @@ impl Document {
         creation_sandboxing_flag_set: SandboxingFlagSet,
         can_gc: CanGc,
     ) -> DomRoot<Document> {
+        let timeline = DocumentTimeline::new(window, can_gc);
         let document = reflect_dom_object_with_proto(
             Box::new(Document::new_inherited(
                 window,
@@ -3898,7 +3893,7 @@ impl Document {
                 has_trustworthy_ancestor_origin,
                 custom_element_reaction_stack,
                 creation_sandboxing_flag_set,
-                can_gc,
+                &timeline,
             )),
             window,
             proto,
@@ -6664,7 +6659,7 @@ pub(crate) struct SameOriginDescendantNavigablesIterator {
 
 impl SameOriginDescendantNavigablesIterator {
     pub(crate) fn new(document: DomRoot<Document>) -> Self {
-        let iframes: Vec<DomRoot<HTMLIFrameElement>> = document.iframes().iter().collect();
+        let iframes = document.iframes().iframes();
         Self {
             stack: vec![Box::new(iframes.into_iter())],
         }
@@ -6690,8 +6685,7 @@ impl Iterator for SameOriginDescendantNavigablesIterator {
             };
 
             if let Some(document) = ScriptThread::find_document(pipeline_id) {
-                let child_iframes: Vec<DomRoot<HTMLIFrameElement>> =
-                    document.iframes().iter().collect();
+                let child_iframes = document.iframes().iframes();
                 self.stack.push(Box::new(child_iframes.into_iter()));
                 return Some(document);
             } else {

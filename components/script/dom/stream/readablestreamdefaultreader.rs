@@ -82,6 +82,7 @@ fn read_loop(
 
 /// <https://streams.spec.whatwg.org/#read-request>
 #[derive(Clone, JSTraceable, MallocSizeOf)]
+#[cfg_attr(crown, crown::unrooted_must_root_lint::must_root)]
 pub(crate) enum ReadRequest {
     /// <https://streams.spec.whatwg.org/#default-reader-read>
     Read(#[conditional_malloc_size_of] Rc<Promise>),
@@ -106,6 +107,8 @@ pub(crate) enum ReadRequest {
         byte_tee_read_request: Dom<ByteTeeReadRequest>,
     },
 }
+
+impl js::gc::Rootable for ReadRequest {}
 
 impl ReadRequest {
     /// <https://streams.spec.whatwg.org/#read-request-chunk-steps>
@@ -346,26 +349,28 @@ impl ReadableStreamDefaultReader {
         proto: Option<SafeHandleObject>,
         can_gc: CanGc,
     ) -> DomRoot<ReadableStreamDefaultReader> {
+        let promise = Promise::new(global, can_gc);
         reflect_dom_object_with_proto(
-            Box::new(ReadableStreamDefaultReader::new_inherited(global, can_gc)),
+            Box::new(ReadableStreamDefaultReader::new_inherited(&promise)),
             global,
             proto,
             can_gc,
         )
     }
 
-    fn new_inherited(global: &GlobalScope, can_gc: CanGc) -> ReadableStreamDefaultReader {
+    fn new_inherited(promise: &PromiseRoot) -> ReadableStreamDefaultReader {
         ReadableStreamDefaultReader {
             reflector_: Reflector::new(),
             stream: MutNullableDom::new(None),
             read_requests: DomRefCell::new(Default::default()),
-            closed_promise: DomRefCell::new(Promise::new(global, can_gc).into_traced()),
+            closed_promise: DomRefCell::new(promise.to_traced()),
         }
     }
 
     pub(crate) fn new(global: &GlobalScope, can_gc: CanGc) -> DomRoot<ReadableStreamDefaultReader> {
+        let promise = Promise::new(global, can_gc);
         reflect_dom_object(
-            Box::new(Self::new_inherited(global, can_gc)),
+            Box::new(Self::new_inherited(&promise)),
             global,
             can_gc,
         )
@@ -400,10 +405,10 @@ impl ReadableStreamDefaultReader {
             .resolve_native(&(), CanGc::from_cx(cx));
         // If reader implements ReadableStreamDefaultReader,
         // Let readRequests be reader.[[readRequests]].
-        let mut read_requests = self.take_read_requests();
+        rooted!(&in(cx) let mut read_requests = self.take_read_requests());
         // Set reader.[[readRequests]] to an empty list.
         // For each readRequest of readRequests,
-        for request in read_requests.drain(0..) {
+        for request in read_requests.iter() {
             // Perform readRequest’s close steps.
             request.close_steps(cx);
         }
@@ -469,10 +474,10 @@ impl ReadableStreamDefaultReader {
     /// <https://streams.spec.whatwg.org/#abstract-opdef-readablestreamdefaultreadererrorreadrequests>
     fn error_read_requests(&self, cx: &mut js::context::JSContext, rval: SafeHandleValue) {
         // step 1
-        let mut read_requests = self.take_read_requests();
+        rooted!(&in(cx) let mut read_requests = self.take_read_requests());
 
         // step 2 & 3
-        for request in read_requests.drain(0..) {
+        for request in read_requests.iter() {
             request.error_steps(cx, rval);
         }
     }
@@ -613,7 +618,7 @@ impl ReadableStreamDefaultReader {
 
             // Let readRequest be reader.[[readRequests]][0].
             // Remove entry from controller.[[queue]].
-            let read_request = self.remove_read_request();
+            rooted!(&in(cx) let read_request = self.remove_read_request());
 
             // Perform ! ReadableByteStreamControllerFillReadRequestFromQueue(controller, readRequest).
             controller

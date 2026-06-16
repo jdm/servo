@@ -26,6 +26,7 @@ use style::Atom;
 use style::str::HTML_SPACE_CHARACTERS;
 use zeroize::Zeroize;
 
+use crate::script_runtime::temp_cx;
 use crate::trace::RootedTraceableBox;
 
 const ASCII_END: u8 = 0x7E;
@@ -132,8 +133,9 @@ impl DOMStringType {
         let new_string = match self {
             DOMStringType::Rust(string) => return string,
             DOMStringType::JSString(rooted_traceable_box) => unsafe {
+                let cx = temp_cx();
                 jsstr_to_string(
-                    Runtime::get().expect("JS runtime has shut down").as_ptr(),
+                    &cx,
                     NonNull::new(rooted_traceable_box.get()).unwrap(),
                 )
             },
@@ -318,7 +320,7 @@ impl DOMString {
         cx: &mut js::context::JSContext,
         value: HandleValue,
     ) -> Result<DOMString, DOMStringErrorType> {
-        let string_ptr = unsafe { js::rust::ToString(cx.raw_cx(), value) };
+        let string_ptr = unsafe { js::rust::ToString(cx, value) };
         if string_ptr.is_null() {
             debug!("ToString failed");
             Err(DOMStringErrorType::JSConversionError)
@@ -330,7 +332,7 @@ impl DOMString {
             } else {
                 // We need to convert the string anyway as it is not just latin1
                 DOMStringType::Rust(unsafe {
-                    jsstr_to_string(cx.raw_cx(), ptr::NonNull::new(string_ptr).unwrap())
+                    jsstr_to_string(cx, ptr::NonNull::new(string_ptr).unwrap())
                 })
             };
             Ok(DOMString(RefCell::new(inner)))
@@ -351,8 +353,9 @@ impl DOMString {
             DOMStringType::Rust(ref s) => info!("Rust String ({})", s),
             DOMStringType::JSString(ref rooted_traceable_box) => {
                 let s = unsafe {
+                    let cx = unsafe { temp_cx() };
                     jsstr_to_string(
-                        Runtime::get().expect("JS runtime has shut down").as_ptr(),
+                        &cx,
                         ptr::NonNull::new(rooted_traceable_box.get()).unwrap(),
                     )
                 };

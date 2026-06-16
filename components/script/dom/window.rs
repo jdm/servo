@@ -1681,7 +1681,7 @@ impl WindowMethods<crate::DomTypeHolder> for Window {
 
     /// <https://html.spec.whatwg.org/multipage/#accessing-other-browsing-contexts>
     fn Length(&self) -> u32 {
-        self.Document().iframes().iter().count() as u32
+        self.Document().iframes().len() as u32 //iter().count() as u32
     }
 
     /// <https://html.spec.whatwg.org/multipage/#dom-parent>
@@ -1849,7 +1849,9 @@ impl WindowMethods<crate::DomTypeHolder> for Window {
     fn WebdriverFrame(&self, browsing_context_id: DOMString) -> Option<DomRoot<WindowProxy>> {
         self.Document()
             .iframes()
-            .iter()
+            .iframe_element(browsing_context_id)
+            .and_then(|iframe| iframe.GetContentWindow())
+            /*.iter()
             .find(|iframe| {
                 iframe
                     .browsing_context_id()
@@ -1857,7 +1859,7 @@ impl WindowMethods<crate::DomTypeHolder> for Window {
                     .map(BrowsingContextId::to_string) ==
                     Some(browsing_context_id.to_string())
             })
-            .and_then(|iframe| iframe.GetContentWindow())
+            .and_then(|iframe| iframe.GetContentWindow())*/
     }
 
     fn WebdriverWindow(&self, webview_id: DOMString) -> DomRoot<WindowProxy> {
@@ -2244,7 +2246,9 @@ impl WindowMethods<crate::DomTypeHolder> for Window {
         // https://html.spec.whatwg.org/multipage/#document-tree-child-browsing-context-name-property-set
         let iframes: Vec<_> = document
             .iframes()
-            .iter()
+            .iframes()
+            .into_iter()
+            //.iter()
             .filter(|iframe| {
                 if let Some(window) = iframe.GetContentWindow() {
                     return window.get_name() == name;
@@ -2713,7 +2717,7 @@ impl Window {
 
         if let Some(iframe_sizes) = reflow_result.iframe_sizes {
             document
-                .iframes_mut()
+                .iframes()
                 .handle_new_iframe_sizes_after_layout(self, iframe_sizes);
         }
 
@@ -3041,8 +3045,9 @@ impl Window {
         self.layout_reflow(QueryMsg::InnerWindowDimensionsQuery);
         self.Document()
             .iframes()
-            .get(browsing_context_id)
-            .and_then(|iframe| iframe.size)
+            .iframe_size(browsing_context_id)
+            // .get(browsing_context_id)
+            //.and_then(|iframe| iframe.size)
     }
 
     #[expect(unsafe_code)]

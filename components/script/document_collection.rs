@@ -60,7 +60,7 @@ impl DocumentCollection {
             document
                 .iframes()
                 .get(browsing_context_id)
-                .map(|iframe| iframe.element.as_rooted())
+                //.map(|iframe| iframe.element.as_rooted())
         })
     }
 
@@ -141,7 +141,8 @@ impl DocumentTree {
         for (id, document) in documents.iter() {
             let children: Vec<PipelineId> = document
                 .iframes()
-                .iter()
+                .iframes()
+                .into_iter()
                 .filter_map(|iframe| iframe.pipeline_id())
                 .filter(|iframe_pipeline_id| documents.find_document(*iframe_pipeline_id).is_some())
                 .collect();

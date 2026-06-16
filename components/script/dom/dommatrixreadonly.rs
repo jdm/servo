@@ -872,15 +872,16 @@ impl DOMMatrixReadOnlyMethods<crate::DomTypeHolder> for DOMMatrixReadOnly {
             return Err(error::Error::InvalidState(None));
         }
 
-        let cx = GlobalScope::get_cx();
-        let to_string = |f: f64| {
+        //let cx = GlobalScope::get_cx();
+        let mut cx = unsafe { script_bindings::script_runtime::temp_cx() };
+        let mut to_string = |f: f64| {
             let value = jsval::DoubleValue(f);
 
             unsafe {
-                rooted!(in(*cx) let mut rooted_value = value);
-                let serialization = std::ptr::NonNull::new(ToString(*cx, rooted_value.handle()))
+                rooted!(&in(cx) let mut rooted_value = value);
+                let serialization = std::ptr::NonNull::new(ToString(&mut cx, rooted_value.handle()))
                     .expect("Pointer cannot be null");
-                jsstr_to_string(*cx, serialization)
+                jsstr_to_string(&cx, serialization)
             }
         };
 

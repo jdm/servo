@@ -754,7 +754,7 @@ impl DocumentFocusHandler {
                 .Document()
                 .iframes()
                 .get(browsing_context_id)
-                .map(|iframe| DomRoot::from_ref(iframe.element.upcast::<Node>()))
+                .map(|iframe| DomRoot::upcast::<Node>(iframe))
         });
         self.sequential_focus_navigation_loop(
             cx,

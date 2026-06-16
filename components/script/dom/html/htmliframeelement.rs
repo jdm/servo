@@ -1224,7 +1224,7 @@ impl VirtualMethods for HTMLIFrameElement {
             super_type.bind_to_tree(cx, context);
         }
 
-        self.owner_document().iframes_mut().add(self);
+        self.owner_document().iframes().add(self);
     }
 
     /// <https://html.spec.whatwg.org/multipage/#the-iframe-element:html-element-removing-steps>
@@ -1237,7 +1237,7 @@ impl VirtualMethods for HTMLIFrameElement {
         // navigable given removedNode
         self.destroy_child_navigable(cx);
 
-        self.owner_document().iframes_mut().remove(self);
+        self.owner_document().iframes().remove(self);
     }
 }
 

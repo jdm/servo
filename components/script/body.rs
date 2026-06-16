@@ -757,13 +757,13 @@ pub(crate) fn consume_body<T: BodyMixin + DomObject>(
     };
 
     // Let errorSteps given error be to reject promise with error.
-    let error_promise = promise.clone();
+    let error_promise = promise.duplicate();
 
     // Let successSteps given a byte sequence data be to resolve promise
     // with the result of running convertBytesToJSValue with data.
     // If that threw an exception, then run errorSteps with that exception.
     let mime_type = object.get_mime_type(cx);
-    let success_promise = promise.clone();
+    let success_promise = promise.duplicate();
 
     // Read all bytes from reader, given successSteps and errorSteps.
     // Note: spec uses an intermediary concept of `fully_read`,

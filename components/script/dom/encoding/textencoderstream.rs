@@ -231,7 +231,7 @@ pub(crate) fn encode_and_enqueue_a_chunk(
     )?;
 
     assert!(!rval.is_object());
-    rooted!(&in(cx) let jsstr = unsafe { ToString(cx.raw_cx(), rval.handle()) });
+    rooted!(&in(cx) let jsstr = unsafe { ToString(cx, rval.handle()) });
     if jsstr.is_null() {
         unsafe {
             if !JS_IsExceptionPending(cx.raw_cx()) {
@@ -250,7 +250,7 @@ pub(crate) fn encode_and_enqueue_a_chunk(
     let input = unsafe {
         if JS_DeprecatedStringHasLatin1Chars(*jsstr) {
             let s = NonNull::new(*jsstr).expect("jsstr cannot be null");
-            ConvertedInput::String(latin1_to_string(cx.raw_cx(), s))
+            ConvertedInput::String(latin1_to_string(cx, s))
         } else {
             let mut len = 0;
             let data =

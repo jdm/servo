@@ -58,7 +58,7 @@ impl From<UnderlyingSourceType<'_>> for UnderlyingSource {
             UnderlyingSourceType::Tee(source) => UnderlyingSource::Tee(Dom::from_ref(source)),
             UnderlyingSourceType::Transfer(port) => UnderlyingSource::Transfer(Dom::from_ref(port)),
             UnderlyingSourceType::Transform(stream, promise) => {
-                UnderlyingSource::Transform(Dom::from_ref(stream), promise)
+                UnderlyingSource::Transform(Dom::from_ref(stream), promise.to_traced())
             },
             UnderlyingSourceType::TeeByte(source) => {
                 UnderlyingSource::TeeByte(Dom::from_ref(source))
@@ -89,7 +89,7 @@ pub(crate) enum UnderlyingSourceType<'a> {
     /// A struct representing a JS object as underlying source,
     /// and the actual JS object for use as `thisArg` in callbacks.
     /// This is used for the `TransformStream` API.
-    Transform(&'a TransformStream, Rc<Promise>),
+    Transform(&'a TransformStream, &'a PromiseRoot),
     /// Tee Byte
     TeeByte(&'a ByteTeeUnderlyingSource),
 }
