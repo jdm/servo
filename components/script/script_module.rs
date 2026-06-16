@@ -907,7 +907,6 @@ pub(crate) unsafe extern "C" fn host_import_module_dynamically(
     let specifier = unsafe { jsstr_to_string(cx, NonNull::new(jsstr).unwrap()) };
 
     let mut realm = CurrentRealm::assert(cx);
-    let payload = Payload::PromiseRecord(promise.to_traced());
     host_load_imported_module(
         &mut realm,
         None,
@@ -915,7 +914,7 @@ pub(crate) unsafe extern "C" fn host_import_module_dynamically(
         specifier,
         module_type,
         None,
-        payload,
+        Payload::PromiseRecord(promise),
     );
 
     true

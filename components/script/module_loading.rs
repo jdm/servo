@@ -41,6 +41,7 @@ use crate::script_module::{
 use crate::script_runtime::{CanGc, IntroductionType};
 
 #[derive(JSTraceable, MallocSizeOf)]
+#[cfg_attr(crown, crown::unrooted_must_root_lint::must_root)]
 struct OnRejectedHandler {
     #[conditional_malloc_size_of]
     promise: Rc<Promise>,
@@ -55,7 +56,7 @@ impl Callback for OnRejectedHandler {
 
 pub(crate) enum Payload {
     GraphRecord(Rc<GraphLoadingState>),
-    PromiseRecord(Rc<Promise>),
+    PromiseRecord(PromiseRoot),
 }
 
 #[derive(JSTraceable)]
@@ -68,14 +69,16 @@ pub(crate) struct LoadState {
 }
 
 /// <https://tc39.es/ecma262/#graphloadingstate-record>
+#[derive(JSTraceable)]
 pub(crate) struct GraphLoadingState {
     /// [[PromiseCapability]]
-    promise: Rc<Promise>,
+    promise: PromiseRoot,
     /// [[IsLoading]]
     is_loading: Cell<bool>,
     /// [[PendingModulesCount]]
     pending_modules_count: Cell<u32>,
     /// [[Visited]]
+    #[no_trace]
     visited: RefCell<HashSet<ServoUrl>>,
     /// [[HostDefined]]
     load_state: Option<Rc<LoadState>>,
@@ -98,7 +101,7 @@ pub(crate) fn load_requested_modules(
     // Step 3. Let state be the GraphLoadingState Record
     // { [[IsLoading]]: true, [[PendingModulesCount]]: 1, [[Visited]]: « », [[PromiseCapability]]: pc, [[HostDefined]]: hostDefined }.
     let state = GraphLoadingState {
-        promise: promise.to_traced(),
+        promise: promise.duplicate(),
         is_loading: Cell::new(true),
         pending_modules_count: Cell::new(1),
         visited: RefCell::new(HashSet::new()),
@@ -284,16 +287,16 @@ fn finish_loading_imported_module(
 
         // Step 3. Else,
         // a. Perform ContinueDynamicImport(payload, result).
-        Payload::PromiseRecord(promise) => continue_dynamic_import(cx, promise, result),
+        Payload::PromiseRecord(promise) => continue_dynamic_import(cx, &promise.duplicate(), result),
     }
 
     // 4. Return unused.
 }
 
 /// <https://tc39.es/ecma262/#sec-ContinueDynamicImport>
-fn continue_dynamic_import(
-    cx: &mut CurrentRealm,
-    promise: Rc<Promise>,
+fn continue_dynamic_import<'a, 'b>(
+    cx: &'a mut CurrentRealm,
+    promise: &'b PromiseRoot,
     module_completion: Result<Rc<ModuleTree>, RethrowError>,
 ) {
     // Step 1. If moduleCompletion is an abrupt completion, then
@@ -321,14 +324,14 @@ fn continue_dynamic_import(
     // Note: implemented by OnRejectedHandler.
 
     let global_scope = global.clone();
-    let inner_promise = promise.clone();
-    let fulfilled_promise = promise.clone();
+    let inner_promise = promise.duplicate();
+    let fulfilled_promise = promise.duplicate();
 
     // Step 6. Let linkAndEvaluateClosure be a new Abstract Closure with no parameters that captures
     // module, promiseCapability, and onRejected and performs the following steps when called:
     // Step 7. Let linkAndEvaluate be CreateBuiltinFunction(linkAndEvaluateClosure, 0, "", « »).
     let link_and_evaluate = ModuleHandler::new_boxed(Box::new(
-        task!(link_and_evaluate: |cx, global_scope: DomRoot<GlobalScope>, inner_promise: Rc<Promise>, record: ModuleObject| {
+        task!(link_and_evaluate: |cx, global_scope: DomRoot<GlobalScope>, inner_promise: PromiseRoot, record: ModuleObject| {
             let mut realm = AutoRealm::new(
                 cx,
                 std::ptr::NonNull::new(global_scope.reflector().get_jsobject().get()).unwrap(),
@@ -364,7 +367,7 @@ fn continue_dynamic_import(
             // module and promiseCapability and performs the following steps when called:
             // e. Let onFulfilled be CreateBuiltinFunction(fulfilledClosure, 0, "", « »).
             let on_fulfilled = ModuleHandler::new_boxed(Box::new(
-                task!(on_fulfilled: |cx, fulfilled_promise: Rc<Promise>, record: ModuleObject| {
+                task!(on_fulfilled: |cx, fulfilled_promise: PromiseRoot, record: ModuleObject| {
 
                     // i. Let namespace be GetModuleNamespace(module).
                     rooted!(&in(cx) let rval = unsafe { GetModuleNamespace(cx, record.handle()) });
@@ -380,7 +383,7 @@ fn continue_dynamic_import(
             let handler = PromiseNativeHandler::new(
                 &global_scope,
                 Some(on_fulfilled),
-                Some(Box::new(OnRejectedHandler { promise: inner_promise })),
+                Some(Box::new(OnRejectedHandler { promise: inner_promise.to_traced() })),
                 CanGc::from_cx(cx),
             );
             evaluate_promise.append_native_handler(cx, &handler);
@@ -396,7 +399,7 @@ fn continue_dynamic_import(
         let handler = PromiseNativeHandler::new(
             &global,
             Some(link_and_evaluate),
-            Some(Box::new(OnRejectedHandler { promise })),
+            Some(Box::new(OnRejectedHandler { promise: promise.to_traced() })),
             CanGc::from_cx(cx),
         );
         load_promise.append_native_handler(cx, &handler);
@@ -505,6 +508,7 @@ pub(crate) fn host_load_imported_module(
         ),
     };
 
+    
     let on_single_fetch_complete =
         move |cx: &mut JSContext, module_tree: Option<Rc<ModuleTree>>| {
             let mut realm = CurrentRealm::assert(cx);
