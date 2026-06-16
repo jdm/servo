@@ -70,12 +70,12 @@ fn read_loop(
     // bytes, successSteps, and failureSteps:
 
     // Step 1 .Let readRequest be a new read request with the following items:
-    let req = ReadRequest::ReadLoop {
+    rooted!(&in(cx) let req = ReadRequest::ReadLoop {
         success_steps,
         failure_steps,
         reader: Dom::from_ref(reader),
         bytes: Rc::new(DomRefCell::new(Vec::new())),
-    };
+    });
     // Step 2 .Perform ! ReadableStreamDefaultReaderRead(reader, readRequest).
     reader.read(cx, &req);
 }
@@ -398,6 +398,7 @@ impl ReadableStreamDefaultReader {
     }
 
     /// <https://streams.spec.whatwg.org/#readable-stream-close>
+    #[cfg_attr(crown, expect(crown::unrooted_must_root))] //XXXjdm
     pub(crate) fn close(&self, cx: &mut js::context::JSContext) {
         // Resolve reader.[[closedPromise]] with undefined.
         self.closed_promise
@@ -472,6 +473,7 @@ impl ReadableStreamDefaultReader {
     }
 
     /// <https://streams.spec.whatwg.org/#abstract-opdef-readablestreamdefaultreadererrorreadrequests>
+    #[cfg_attr(crown, expect(crown::unrooted_must_root))] //XXXjdm
     fn error_read_requests(&self, cx: &mut js::context::JSContext, rval: SafeHandleValue) {
         // step 1
         rooted!(&in(cx) let mut read_requests = self.take_read_requests());
@@ -679,7 +681,7 @@ impl ReadableStreamDefaultReaderMethods<crate::DomTypeHolder> for ReadableStream
         // Rooting(unrooted_must_root): the read request contains only a promise,
         // which does not need to be rooted,
         // as it is safely managed natively via an Rc.
-        let read_request = ReadRequest::Read(promise.to_traced()); //XXXjdm concerning
+        rooted!(&in(cx) let read_request = ReadRequest::Read(promise.to_traced()));
 
         // Perform ! ReadableStreamDefaultReaderRead(this, readRequest).
         self.read(cx, &read_request);
