@@ -593,6 +593,7 @@ impl Gui {
                     let id = egui::Id::new(webview_id);
                     ctx.accesskit_node_builder(id, |node| {
                         node.set_tree_id(tree_id);
+                        //node.set_role(accesskit::Role::RootWebArea);
                     });
                 }
             }

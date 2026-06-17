@@ -17,7 +17,7 @@ use servo_base::print_tree::PrintTree;
 use servo_config::opts::{self, DiagnosticsLogging, DiagnosticsLoggingOption};
 use servo_config::pref;
 use style::dom::OpaqueNode;
-use web_atoms::{LocalName, local_name};
+use web_atoms::{LocalName, local_name, ns};
 
 use crate::ArcRefCell;
 
@@ -33,6 +33,8 @@ bitflags! {
         const ROLE_CHANGED = 0b0010;
         /// This node's computed label or text value (for a text node) changed.
         const TEXT_CHANGED = 0b0100;
+        /// The node's authored id changed.
+        const ID_CHANGED = 0b100;
     }
 }
 
@@ -197,6 +199,9 @@ impl AccessibilityTree {
         if let Some(dom_element) = dom_node.as_element() {
             let local_name = dom_element.local_name().to_ascii_lowercase();
             new_node.set_html_tag(&local_name);
+            if let Some(id) = dom_element.attribute_as_str(&ns!(), &local_name!("id")) {
+                new_node.set_author_id(id.to_string());
+            }
         }
 
         (id, node.clone())
@@ -559,6 +564,19 @@ impl AccessibilityNode {
         self.accesskit_node.set_role(role);
         self.updated = true;
         LocalAccessibilityDamage::ROLE_CHANGED
+    }
+
+    fn author_id(&self) -> Option<&str> {
+        self.accesskit_node.author_id()
+    }
+
+    fn set_author_id(&mut self, id: String) -> LocalAccessibilityDamage {
+        if self.accesskit_node.author_id() == Some(&id) {
+            return LocalAccessibilityDamage::empty();
+        }
+        self.accesskit_node.set_author_id(id);
+        self.updated = true;
+        LocalAccessibilityDamage::ID_CHANGED
     }
 
     fn label(&self) -> Option<&str> {

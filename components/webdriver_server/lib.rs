@@ -614,6 +614,8 @@ impl Handler {
             },
         };
 
+        capabilities.insert("servo:processID".into(), process::id().into());
+
         // Step 6. Create a session
         let session_id = self.create_session(&mut capabilities, &servo_capabilities)?;
 

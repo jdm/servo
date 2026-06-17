@@ -5,7 +5,9 @@ from typing import Any, Optional
 from ApplicationServices import (
     AXUIElementCopyAttributeNames,
     AXUIElementCopyAttributeValue,
+    AXUIElementCopyAttributeValues,
     AXUIElementCreateApplication,
+    AXUIElementGetAttributeValueCount,
 )
 
 from Cocoa import (
@@ -72,7 +74,9 @@ class AxapiWrapper(ApiWrapper[AXUIElement]):
         pid = app.processIdentifier()
         if pid == -1:
             return None
-        return AXUIElementCreateApplication(pid)
+        app = AXUIElementCreateApplication(pid)
+        AXUIElementSetAttributeValue(app, "AXManualAccessibility", true);
+        return app
 
     def _find_tab(self) -> Optional[AXUIElement]:
         """Find the active tab of the browser.
@@ -87,6 +91,7 @@ class AxapiWrapper(ApiWrapper[AXUIElement]):
             if err:
                 continue
             if role == "AXWebArea":
+                print("found web area!!")
                 # TODO: AtspiWrapper will check that the found tab is the correct
                 # tab by checking the URL. Perform this check here.
                 return node
@@ -96,6 +101,7 @@ class AxapiWrapper(ApiWrapper[AXUIElement]):
                 continue
             stack.extend(children)
 
+        print("did not find!!")
         return None
 
     def _find_node_by_id(self, root: Any, dom_id: str) -> Optional[AXUIElement]:
@@ -105,23 +111,32 @@ class AxapiWrapper(ApiWrapper[AXUIElement]):
         :param dom_id: The dom ID.
         :return: AXUIElement or None if not found.
         """
+        print("Start")
         stack = [root]
         while stack:
             node = stack.pop()
 
             err, attributes = AXUIElementCopyAttributeNames(node, None)
+            print("names", err, attributes)
             if err:
                 continue
-            if "AXDOMIdentifier" in attributes:
+            if "AXIdentifier" in attributes:
                 err, value = AXUIElementCopyAttributeValue(
-                    node, "AXDOMIdentifier", None
+                    node, "AXIdentifier", None
                 )
+                print("identifier", err, value)
                 if not err and value == dom_id:
                     return node
 
-            err, children = AXUIElementCopyAttributeValue(node, "AXChildren", None)
-            if err:
-                continue
-            stack.extend(children)
+            err, num_children = AXUIElementGetAttributeValueCount(node, "AXChildren", None)
+            print("num children", err, num_children)
+
+            if not err and num_children:
+                err, children = AXUIElementCopyAttributeValues(node, "AXChildren", 0, num_children, None)
+                print("children", err, children)
+                if err:
+                    continue
+                stack.extend(children)
+            print("next")
 
         return None

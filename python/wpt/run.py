@@ -97,8 +97,8 @@ def run_tests(default_binary_path: str, multiprocess: bool, **kwargs: Any) -> in
 
     if not kwargs.get("no_default_test_types"):
         test_types = {
-            "servo": ["testharness", "reftest", "wdspec", "crashtest"],
-            "servo_legacy": ["testharness", "reftest", "wdspec", "crashtest"],
+            "servo": ["testharness", "reftest", "wdspec", "crashtest", "aamtest"],
+            "servo_legacy": ["testharness", "reftest", "wdspec", "crashtest", "aamtest"],
         }
         kwargs["test_types"] = test_types[product]
 
