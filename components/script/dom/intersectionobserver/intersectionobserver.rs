@@ -710,6 +710,15 @@ impl IntersectionObserver {
 
         // Step 5
         // > If the implementation cannot guarantee that the target is completely unoccluded by other page content, return false.
+
+        // idea: layout query for "elements in rectangle"
+        // walk up frame tree; at each level translate target rectangle by frame offset
+        // perform layout query for elements in translated rectangle
+        // iframes and target are ok; anything else that is in front of those means the target is occlued
+
+        // handling cross origin: send message to constellation to check for occluded rectangle, passing parent pipeline id and iframe browsing context id and child rectangle
+        // synchronously wait for response; constellation forwards response sender to relevant script thread, response includes any cross-origin grandparent pipeline
+
         let mut target_rect = target.upcast::<Node>().border_box().unwrap_or_default();
         let local_target_rect = target_rect;
         let mut current_target = DomRoot::from_ref(target);
