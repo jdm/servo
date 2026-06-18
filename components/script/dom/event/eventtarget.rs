@@ -1074,7 +1074,7 @@ impl EventTarget {
     /// <https://dom.spec.whatwg.org/#retarget>
     pub(crate) fn retarget(&self, b: &Self) -> DomRoot<EventTarget> {
         // To retarget an object A against an object B, repeat these steps until they return an object:
-        let mut a = DomRoot::from_ref(self);
+        let mut a = DomRoot::from_ref(self); // Text
         loop {
             // Step 1. If one of the following is true
             // * A is not a node
@@ -1084,7 +1084,7 @@ impl EventTarget {
             let Some(a_node) = a.downcast::<Node>() else {
                 return a;
             };
-            let a_root = a_node.GetRootNode(&GetRootNodeOptions::empty());
+            let a_root = a_node.GetRootNode(&GetRootNodeOptions::empty()); // Document
             if !a_root.is::<ShadowRoot>() {
                 return a;
             }

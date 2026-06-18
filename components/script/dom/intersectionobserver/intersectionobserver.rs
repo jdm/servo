@@ -8,11 +8,13 @@ use std::time::Duration;
 use app_units::Au;
 use cssparser::Parser;
 use dom_struct::dom_struct;
-use euclid::{Rect, SideOffsets2D, Size2D, Transform, Transform3D, Vector2D, Vector3D};
+use euclid::{Point2D, Rect, SideOffsets2D, Size2D, Transform, Transform3D, Vector2D, Vector3D};
 use js::context::{JSContext, NoGC};
 use js::rust::{HandleObject, MutableHandleValue};
 use script_bindings::callback::{RootedCallback, TracedCallback};
 use script_bindings::cell::DomRefCell;
+use script_bindings::codegen::GenericBindings::DocumentBinding::DocumentMethods;
+use script_bindings::codegen::GenericBindings::HTMLIFrameElementBinding::HTMLIFrameElementMethods;
 use script_bindings::reflector::{Reflector, reflect_dom_object_with_proto};
 use servo_base::cross_process_instant::CrossProcessInstant;
 use servo_geometry::f32_rect_to_au_rect;
@@ -39,6 +41,7 @@ use crate::dom::bindings::utils::to_frozen_array;
 use crate::dom::document::{Document, RenderingUpdateReason};
 use crate::dom::domrectreadonly::DOMRectReadOnly;
 use crate::dom::element::Element;
+use crate::dom::html::htmliframeelement::HTMLIFrameElement;
 use crate::dom::intersectionobserverentry::IntersectionObserverEntry;
 use crate::dom::node::{Node, NodeTraits};
 use crate::dom::window::Window;
@@ -633,7 +636,7 @@ impl IntersectionObserver {
 
         // Step 14
         // > Let isVisible be the result of running the visibility algorithm on target.
-        let is_visible = self.calculate_visibility(&target.owner_document(), target);
+        let is_visible = self.calculate_visibility(target);
 
         // We never report isIntersecting as true unless we have exceeded a threshold,
         // which matches other browser eengines.
@@ -653,7 +656,7 @@ impl IntersectionObserver {
 
     /// <https://w3c.github.io/IntersectionObserver/#calculate-visibility-algo>
     #[allow(unsafe_code)]
-    fn calculate_visibility(&self, document: &Document, target: &Element) -> bool {
+    fn calculate_visibility(&self, target: &Element) -> bool {
         // Step 1
         // > If the observer’s trackVisibility attribute is false, return false.
         if !self.track_visibility.get() {
@@ -663,7 +666,7 @@ impl IntersectionObserver {
         // Step 2
         // > If the target has an effective transformation matrix other than a 2D translation or proportional 2D upscaling, return false.
         let effective_transformation_matrix =
-            self.calculate_effective_transformation_matrix(document, target);
+            self.calculate_effective_transformation_matrix(target);
 
         if !effective_transformation_matrix.is_2d() {
             println!("not a 2d transformation matrix");
@@ -671,8 +674,13 @@ impl IntersectionObserver {
             return false;
         }
 
+        let root_document = self.root_document(target);
         let mut current = Some(DomRoot::from_ref(target));
-        while let Some(element) = current {
+        loop {
+            let Some(element) = current else {
+                break;
+            };
+        //while let Some(element) = current {
             // Step 3
             // > If the target, or any element in its containing block chain, has an effective opacity other than 100%, return false.
             // Step 4
@@ -685,15 +693,77 @@ impl IntersectionObserver {
                 .upcast::<Node>()
                 .containing_block_node_without_reflow()
                 .and_then(DomRoot::downcast::<Element>);
+
+            if current.is_some() {
+                continue;
+            }
+
+            if element.owner_document() == root_document {
+                break;
+            }
+
+            current = element.owner_window()
+                .window_proxy()
+                .frame_element()
+                .map(DomRoot::from_ref);
         }
 
         // Step 5
         // > If the implementation cannot guarantee that the target is completely unoccluded by other page content, return false.
-        let target_rect = target.upcast::<Node>().client_rect();
-        let results = target
+        let mut target_rect = target.upcast::<Node>().border_box().unwrap_or_default();
+        let local_target_rect = target_rect;
+        let mut current_target = DomRoot::from_ref(target);
+        //FIXME units need conversions
+        /*loop {
+            let Some(container) = current_target
+                .owner_window()
+                .undiscarded_window_proxy()
+                .and_then(|window_proxy| window_proxy.frame_element().map(DomRoot::from_ref))
+            else {
+                break;
+            };
+
+            let container_rect = container.upcast::<Node>().client_rect();
+            target_rect = target_rect.translate(container_rect.min().to_vector());
+
+            current_target = DomRoot::upcast(container);
+        }*/
+        
+        /*let results = current_target
             .owner_window()
-            .elements_from_point_query(target_rect.center().cast_unit().try_cast().unwrap_or_default());
-        let mut skip = true;
+        .elements_from_point_query(target_rect.center().cast_unit().try_cast().unwrap_or_default());*/
+        let mut current_window = current_target.owner_window();
+        let mut current_point = Point2D::new(target_rect.origin.x.to_f32_px(), target_rect.origin.y.to_f32_px());
+        current_point.add_size(&Size2D::new(target_rect.size.width.to_f32_px() / 2., target_rect.size.height.to_f32_px() / 2.));
+        loop {
+            let results = current_window.hit_test_from_point_in_viewport(current_point).unwrap();
+            println!("hit: {:?} vs. {:?}", results.node.type_id(), target.upcast::<Node>().type_id());
+            if let Some(iframe) = results.node.downcast::<HTMLIFrameElement>() {
+                let Some(windowproxy) = iframe.GetContentWindow() else {
+                    // Cross-origin :(
+                    return true;
+                };
+                let Some(window) = windowproxy.document().map(|document| DomRoot::from_ref(document.window())) else {
+                    return true;
+                };
+                current_window = window;
+                current_point = results.point_in_node;
+                continue;
+            } else {
+                println!("rect {:?} vs. {:?}", local_target_rect, results.point_in_frame);
+                let results = current_window
+                    .Document()
+                    .ElementsFromPoint(Finite::new(results.point_in_frame.x as f64).unwrap(), Finite::new(results.point_in_frame.y as f64).unwrap());
+                    //.ElementsFromPoint(Finite::new(current_point.x as f64).unwrap(), Finite::new(current_point.y as f64).unwrap());
+                return results.iter().rev().any(|element| {
+                    println!("checking {:?} vs {:?}", element.upcast::<Node>().type_id(), target.upcast::<Node>().type_id());
+                    println!("{:?} vs {:?}", element.upcast::<Node>().client_rect(), target.upcast::<Node>().client_rect());
+
+                    &**element == target
+                });
+            }
+        }
+        /*let mut skip = true;
         for result in results.iter().rev() {
             let untrusted_node = embedder_traits::UntrustedNodeAddress(result.node.0 as *const std::os::raw::c_void);
             let node = unsafe { crate::dom::node::from_untrusted_node_address(untrusted_node) };
@@ -716,17 +786,16 @@ impl IntersectionObserver {
             if element_rect.contains_rect(&target_rect) {
                 return false;
             }
-        }
+        }*/
 
         // Step 6
         // > Return true.
-        true
+        //true
     }
 
     /// <https://w3c.github.io/IntersectionObserver/#calculate-effective-transformation-matrix>
     pub(crate) fn calculate_effective_transformation_matrix(
         &self,
-        document: &Document,
         target: &Element,
     ) -> Transform3D<f32, style_traits::CSSPixel, style_traits::CSSPixel> {
         // Step 1
@@ -749,11 +818,11 @@ impl IntersectionObserver {
         // Step 3
         // > While container is not the intersection root:
         let intersection_root = match self.root.as_ref() {
-            None => document.upcast::<Node>(),
-            Some(ElementOrDocument::Element(root)) => root.upcast::<Node>(),
-            Some(ElementOrDocument::Document(root)) => root.upcast::<Node>(),
+            None => DomRoot::upcast::<Node>(target.owner_document()),
+            Some(ElementOrDocument::Element(root)) => DomRoot::upcast::<Node>(root.clone()),
+            Some(ElementOrDocument::Document(root)) => DomRoot::upcast::<Node>(root.clone()),
         };
-        while container.upcast::<Node>() != intersection_root {
+        while *container.upcast::<Node>() != *intersection_root {
             let containing_block = container
                 .upcast::<Node>()
                 .containing_block_node_without_reflow()
@@ -880,6 +949,12 @@ impl IntersectionObserver {
             if time - registration.last_update_time.get() <
                 Duration::from_millis(self.delay.get().max(0) as u64)
             {
+                // Ensure that another turn of the event loop occurs to process
+                // the delayed observations.
+                document.add_rendering_update_reason(
+                    RenderingUpdateReason::IntersectionObserverDelayed,
+                );
+
                 return;
             }
 
@@ -952,6 +1027,14 @@ impl IntersectionObserver {
             inner.2.to_used_value(containing_block.height()),
             inner.3.to_used_value(containing_block.width()),
         )
+    }
+
+    fn root_document(&self, target: &Element) -> DomRoot<Document> {
+        match &self.root {
+            None => target.owner_document(),
+            Some(ElementOrDocument::Document(document)) => document.clone(),
+            Some(ElementOrDocument::Element(element)) => element.owner_document(),
+        }
     }
 }
 

@@ -143,14 +143,14 @@ impl DocumentOrShadowRoot {
     /// resolution in <https://github.com/w3c/csswg-drafts/issues/556>.
     pub(crate) fn retarget_hit_test_result(
         &self,
-        this: &Node,
-        node: &Node,
+        this: &Node, // Document
+        node: &Node, // Text
     ) -> Option<DomRoot<Element>> {
         let retargeted_node =
             DomRoot::downcast::<Node>(node.upcast::<EventTarget>().retarget(this.upcast()))?;
         DomRoot::downcast::<Element>(retargeted_node.clone()).or_else(|| {
-            let parent_node = retargeted_node.GetParentNode()?;
-
+            let parent_node = retargeted_node.GetParentNode()?; // Span
+            println!("retarged: {:?}, parent: {:?}", retargeted_node.type_id(), parent_node.type_id());
             // This node has already been retargeted, but if it is the direct descendant of
             // a shadow root and it isn't an element, the only reasonable thing to return is
             // the shadow host (even though that is outside of `this`.) This is a surprising
@@ -244,7 +244,10 @@ impl DocumentOrShadowRoot {
                 // layout has run and any OpaqueNodes that no longer refer to real nodes are gone.
                 let address = UntrustedNodeAddress(result.node.0 as *const c_void);
                 let node = unsafe { node::from_untrusted_node_address(address) };
-                self.retarget_hit_test_result(this, &node)
+                println!("got {:?} before retargeting", node.type_id());
+                let retargeted = self.retarget_hit_test_result(this, &node)?;
+                println!("got {:?} after retargeting", retargeted.upcast::<Node>().type_id());
+                Some(retargeted)
             })
             .collect();
 

@@ -411,6 +411,7 @@ bitflags! {
         /// one more rendering update possibility after this happens, so that any potential screenshot
         /// reflects the up-to-date contents.
         const FontReadyPromiseFulfilled = 1 << 2;
+        const IntersectionObserverDelayed = 1 << 3;
     }
 }
 

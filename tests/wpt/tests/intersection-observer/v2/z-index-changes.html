@@ -35,15 +35,18 @@ async_test(function(t) {
         assert_equals(record.isVisible, true, 'Initial observation should be visible');
 
         // Adjust the overlay z-index so that it occludes the frame.
-        overlay.style.zIndex = '9999';
+          console.log("setting zindex to positive"); 
+       overlay.style.zIndex = '9999';
       } else if (observation_count === 2) {
         assert_equals(record.isVisible, false, 'Second observation should be obscured');
 
         // Adjust the overlay z-index so it no longer occludes the frame.
+          console.log("setting zindex to negative"); 
         overlay.style.zIndex = '-9999';
       } else if (observation_count === 3) {
         assert_equals(record.isVisible, true, 'Third observation should be visible');
 
+          console.log("all done"); 
         observer.disconnect();
         t.done();
       }
