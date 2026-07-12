@@ -10,6 +10,7 @@ use std::sync::Arc;
 use malloc_size_of_derive::MallocSizeOf;
 use serde::Serialize;
 use serde_json::{Map, Value};
+use servo_config::pref;
 
 use crate::StreamId;
 use crate::actor::{Actor, ActorError, ActorRegistry, new_actor_name};
@@ -60,6 +61,7 @@ struct GetWalkerReply {
 #[derive(MallocSizeOf)]
 pub(crate) struct AccessibilityActor {
     name: String,
+    accessible_walker_actor: String,
 }
 
 impl Actor for AccessibilityActor {
@@ -89,7 +91,9 @@ impl Actor for AccessibilityActor {
             "bootstrap" => {
                 let msg = BootstrapReply {
                     from: self.name().into(),
-                    state: BootstrapState { enabled: false },
+                    state: BootstrapState {
+                        enabled: pref!(accessibility_enabled),
+                    },
                 };
                 request.reply_final(&msg)?
             },
@@ -107,17 +111,16 @@ impl Actor for AccessibilityActor {
                 let msg = GetTraitsReply {
                     from: self.name().into(),
                     traits: AccessibilityTraits {
-                        tabbing_order: true,
+                        tabbing_order: false,
                     },
                 };
                 request.reply_final(&msg)?
             },
             "getWalker" => {
-                let accessible_walker_actor = AccessibleWalkerActor::register(registry);
                 let msg = GetWalkerReply {
                     from: self.name().into(),
                     walker: ActorMsg {
-                        actor: accessible_walker_actor.name().into(),
+                        actor: self.accessible_walker_actor.clone(),
                     },
                 };
                 request.reply_final(&msg)?
@@ -129,9 +132,14 @@ impl Actor for AccessibilityActor {
 }
 
 impl AccessibilityActor {
-    pub fn register(registry: &ActorRegistry) -> Arc<Self> {
+    pub fn register(registry: &ActorRegistry, browsing_context_actor: String) -> Arc<Self> {
+        let accessible_walker_actor =
+            AccessibleWalkerActor::register(registry, browsing_context_actor);
         let name = new_actor_name::<Self>();
-        let actor = Self { name };
+        let actor = Self {
+            name,
+            accessible_walker_actor: accessible_walker_actor.name().into(),
+        };
         registry.register::<Self>(actor)
     }
 }

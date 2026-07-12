@@ -23,6 +23,8 @@ use crate::actor::{Actor, ActorEncode, ActorError, ActorRegistry, new_actor_name
 use crate::actors::inspector::InspectorActor;
 use crate::actors::inspector::accessibility::AccessibilityActor;
 use crate::actors::inspector::css_properties::CssPropertiesActor;
+use crate::actors::inspector::node::NodeActorMsg;
+use crate::actors::inspector::walker::WalkerActor;
 use crate::actors::reflow::ReflowActor;
 use crate::actors::stylesheets::StyleSheetsActor;
 use crate::actors::tab::TabDescriptorActor;
@@ -93,7 +95,7 @@ pub(crate) struct BrowsingContextActorMsg {
     accessibility_actor: String,
     console_actor: String,
     css_properties_actor: String,
-    inspector_actor: String,
+    pub(crate) inspector_actor: String,
     reflow_actor: String,
     style_sheets_actor: String,
     thread_actor: String,
@@ -198,7 +200,7 @@ impl BrowsingContextActor {
     ) -> Arc<Self> {
         let name = new_actor_name::<BrowsingContextActor>();
 
-        let accessibility_actor = AccessibilityActor::register(registry);
+        let accessibility_actor = AccessibilityActor::register(registry, name.clone());
 
         let properties = (|| {
             let (properties_sender, properties_receiver) = generic_channel::channel()?;
@@ -249,6 +251,12 @@ impl BrowsingContextActor {
         };
 
         registry.register::<Self>(actor)
+    }
+
+    pub(crate) fn root_node(&self, registry: &ActorRegistry) -> Result<NodeActorMsg, ActorError> {
+        let inspector_actor = registry.find::<InspectorActor>(&self.inspector_name);
+        let walker_actor = registry.find::<WalkerActor>(&inspector_actor.walker_name);
+        walker_actor.root(registry)
     }
 
     pub(crate) fn handle_new_global(

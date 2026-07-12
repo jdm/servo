@@ -20,6 +20,7 @@ use crate::actor::{
     Actor, ActorEncode, ActorError, ActorRegistry, DowncastableActorArc, new_actor_name,
 };
 use crate::actors::browsing_context::BrowsingContextActor;
+use crate::actors::inspector::accessible::AccessibleActor;
 use crate::actors::inspector::layout::LayoutInspectorActor;
 use crate::actors::inspector::node::{NodeActor, NodeActorMsg};
 use crate::actors::long_string::{LongStringActor, LongStringObj};
@@ -121,6 +122,12 @@ struct NewMutationsNotification {
 struct GetInnerOrOuterHTMLReply {
     from: String,
     value: LongStringObj,
+}
+
+#[derive(Serialize)]
+struct GetNodeFromActorReply {
+    from: String,
+    node: Option<NodeActorMsg>,
 }
 
 impl Actor for WalkerActor {
@@ -282,6 +289,25 @@ impl Actor for WalkerActor {
             },
             "innerHTML" => {
                 self.handle_get_inner_or_outer_html(request, registry, msg, GetHTMLType::InnerHTML)?
+            },
+            "getNodeFromActor" => {
+                let actor_id = msg
+                    .get("actorID")
+                    .ok_or(ActorError::MissingParameter)?
+                    .as_str()
+                    .ok_or(ActorError::BadParameterType)?;
+                if actor_id.starts_with("AccessibleActor") {
+                    let actor = registry.find::<AccessibleActor>(actor_id);
+                    let node_actor = actor.node_actor(registry);
+                    let node_actor = registry.find::<NodeActor>(&node_actor);
+                    let msg = GetNodeFromActorReply {
+                        from: self.name().into(),
+                        node: Some(node_actor.encode(registry)),
+                    };
+                    request.reply_final(&msg)?
+                } else {
+                    return Err(ActorError::UnrecognizedPacketType);
+                }
             },
             _ => return Err(ActorError::UnrecognizedPacketType),
         };

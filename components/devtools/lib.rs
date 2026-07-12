@@ -76,6 +76,7 @@ mod actors {
     pub mod memory;
     pub mod network_event;
     pub mod object;
+    pub mod parent_accessibility;
     pub mod pause;
     pub mod performance;
     pub mod preference;

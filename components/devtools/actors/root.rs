@@ -19,6 +19,7 @@ use serde_json::{Map, Value};
 use crate::actor::{Actor, ActorEncode, ActorError, ActorRegistry};
 use crate::actors::browsing_context::BrowsingContextActor;
 use crate::actors::device::DeviceActor;
+use crate::actors::parent_accessibility::ParentAccessibilityActor;
 use crate::actors::performance::PerformanceActor;
 use crate::actors::preference::PreferenceActor;
 use crate::actors::process::{ProcessActor, ProcessActorMsg};
@@ -81,10 +82,10 @@ struct GlobalActors {
     device_actor: String,
     perf_actor: String,
     preference_actor: String,
+    parent_accessibility_actor: String,
     // Not implemented in Servo
     // addons_actor
     // heap_snapshot_file_actor
-    // parent_accessibility_actor
     // screenshot_actor
 }
 
@@ -368,6 +369,7 @@ impl RootActor {
         let device_actor = DeviceActor::register(registry);
         let performance_actor = PerformanceActor::register(registry);
         let preference_actor = PreferenceActor::register(registry);
+        let parent_accessibility_actor = ParentAccessibilityActor::register(registry);
 
         // Process descriptor
         let process_actor = ProcessActor::register(registry);
@@ -380,6 +382,7 @@ impl RootActor {
                 device_actor: device_actor.name().into(),
                 perf_actor: performance_actor.name().into(),
                 preference_actor: preference_actor.name().into(),
+                parent_accessibility_actor: parent_accessibility_actor.name().into(),
             },
             process_name: process_actor.name().into(),
             active_tab: AtomicRefCell::new(None),
