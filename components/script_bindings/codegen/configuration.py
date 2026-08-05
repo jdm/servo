@@ -296,6 +296,7 @@ class Descriptor(DescriptorProvider):
         self.cx_no_gcMethods: list[str] = []
         self.cxMethods: list[str] = []
         self.realmMethods: list[str] = []
+        self.useFancyErrors: bool = desc.get("fancyErrors", False)
 
         configurationMethods = ["no_gc", "cx_no_gc", "cx", "realm"]
         for configurationName in configurationMethods:

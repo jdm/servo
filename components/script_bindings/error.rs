@@ -11,6 +11,99 @@ use js::rust::wrappers2::JS_IsExceptionPending;
 use crate::codegen::PrototypeList::proto_id_to_name;
 use crate::num::Finite;
 
+pub trait InterfaceScopedError {
+    type IdlError: Into<String>;
+}
+
+/// DOM exceptions that can be thrown by a native DOM method.
+/// <https://webidl.spec.whatwg.org/#dfn-error-names-table>
+#[derive(Clone, Debug, MallocSizeOf)]
+pub enum InterfaceError<T> {
+    /// IndexSizeError DOMException
+    IndexSize(T),
+    /// NotFoundError DOMException
+    NotFound(T),
+    /// HierarchyRequestError DOMException
+    HierarchyRequest(T),
+    /// WrongDocumentError DOMException
+    WrongDocument(T),
+    /// InvalidCharacterError DOMException
+    InvalidCharacter(T),
+    /// NotSupportedError DOMException
+    NotSupported(T),
+    /// InUseAttributeError DOMException
+    InUseAttribute(T),
+    /// InvalidStateError DOMException
+    InvalidState(T),
+    /// SyntaxError DOMException
+    Syntax(T),
+    /// NamespaceError DOMException
+    Namespace(T),
+    /// InvalidAccessError DOMException
+    InvalidAccess(T),
+    /// SecurityError DOMException
+    Security(T),
+    /// NetworkError DOMException
+    Network(T),
+    /// AbortError DOMException
+    Abort(T),
+    /// TimeoutError DOMException
+    Timeout(T),
+    /// InvalidNodeTypeError DOMException
+    InvalidNodeType(T),
+    /// DataCloneError DOMException
+    DataClone(T),
+    /// TransactionInactiveError DOMException
+    TransactionInactive(T),
+    /// ReadOnlyError DOMException
+    ReadOnly(T),
+    /// VersionError DOMException
+    Version(T),
+    /// NoModificationAllowedError DOMException
+    NoModificationAllowed(T),
+    /// QuotaExceededError DOMException
+    QuotaExceeded(T),
+    /// TypeMismatchError DOMException
+    TypeMismatch(T),
+    /// InvalidModificationError DOMException
+    InvalidModification(T),
+    /// NotReadableError DOMException
+    NotReadable(T),
+    /// DataError DOMException
+    Data(T),
+    /// OperationError DOMException
+    Operation(T),
+    /// NotAllowedError DOMException
+    NotAllowed(T),
+    /// EncodingError DOMException
+    Encoding(T),
+    /// ConstraintError DOMException
+    Constraint(T),
+
+    /// TypeError JavaScript Error
+    Type(T),
+    /// RangeError JavaScript Error
+    Range(T),
+
+    /// A JavaScript exception is already pending.
+    JSFailed,
+}
+
+impl<T: Into<String>> From<InterfaceError<T>> for Error {
+    fn from(error: InterfaceError<T>) -> Error {
+        match error {
+            InterfaceError::IndexSize(message) => Error::IndexSize(Some(message.into())),
+            InterfaceError::NotFound(message) => Error::NotFound(Some(message.into())),
+            InterfaceError::HierarchyRequest(message) => Error::HierarchyRequest(Some(message.into())),
+            InterfaceError::WrongDocument(message) => Error::WrongDocument(Some(message.into())),
+            InterfaceError::InvalidCharacter(message) => Error::InvalidCharacter(Some(message.into())),
+            InterfaceError::NotSupported(message) => Error::NotSupported(Some(message.into())),
+            _ => todo!(),
+        }
+    }
+}
+
+
 /// DOM exceptions that can be thrown by a native DOM method.
 /// <https://webidl.spec.whatwg.org/#dfn-error-names-table>
 #[derive(Clone, Debug, MallocSizeOf)]

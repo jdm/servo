@@ -3024,6 +3024,9 @@ def DomTypes(descriptors: list[Descriptor],
         if descriptor.weakReferenceable:
             traits += ["crate::weakref::WeakReferenceable"]
 
+        if descriptor.useFancyErrors:
+            traits += ["crate::error::InterfaceScopedError"]
+
         if not descriptor.interface.isNamespace():
             traits += [
                 "js::conversions::ToJSValConvertible",
@@ -4258,7 +4261,8 @@ class CGCallGenerator(CGThing):
             outparamRootType = None
 
         if isFallible:
-            result = CGWrapper(result, pre="Result<", post=", Error>")
+            errorType = f"crate::error::InterfaceError<<D::{MakeNativeName(descriptor.interface.identifier.name)} as crate::error::InterfaceScopedError>::IdlError>" if descriptor.useFancyErrors else "Error"
+            result = CGWrapper(result, pre="Result<", post=f", {errorType}>")
 
         args = CGList([CGGeneric(arg) for arg in argsPre], ", ")
         for (a, name) in arguments:
@@ -4341,7 +4345,7 @@ class CGCallGenerator(CGThing):
                 "    Ok(result) => result,\n"
                 "    Err(e) => {\n"
                 f"        let global = {glob};\n"
-                f"        <D as DomHelpers<D>>::throw_dom_exception(cx, global, e);\n"
+                f"        <D as DomHelpers<D>>::throw_dom_exception(cx, global, e.into());\n"
                 f"        return{errorResult};\n"
                 "    },\n"
                 "};"))
@@ -7090,7 +7094,7 @@ class CGInterfaceTrait(CGThing):
                                                      cx_no_gc=name in descriptor.cx_no_gcMethods,
                                                      cx=name in descriptor.cxMethods or descriptor.interface.isIteratorInterface(),
                                                      realm=name in descriptor.realmMethods)
-                        rettype = return_type(descriptor, rettype, infallible)
+                        rettype = return_type(descriptor, rettype, infallible, descriptor.useFancyErrors)
                         yield f"{name}{'_' * idx}", arguments, rettype, m.isStatic()
                 elif m.isAttr():
                     name = CGSpecializedGetter.makeNativeName(descriptor, m)
@@ -7111,7 +7115,7 @@ class CGInterfaceTrait(CGThing):
                                realm=name in descriptor.realmMethods,
                                retval=True
                            ),
-                           return_type(descriptor, m.type, infallible),
+                           return_type(descriptor, m.type, infallible, descriptor.useFancyErrors),
                            m.isStatic())
 
                     if not m.readonly:
@@ -7165,7 +7169,7 @@ class CGInterfaceTrait(CGThing):
                                                      cx_no_gc=name in descriptor.cx_no_gcMethods,
                                                      cx=name in descriptor.cxMethods,
                                                      realm=name in descriptor.realmMethods)
-                    rettype = return_type(descriptor, rettype, infallible)
+                    rettype = return_type(descriptor, rettype, infallible, descriptor.useFancyErrors)
                     yield name, arguments, rettype, False
 
         def fmt(arguments: list[tuple[str, str]], leadingComma: bool = True) -> str:
@@ -7214,7 +7218,7 @@ class CGInterfaceTrait(CGThing):
                 args = [args[0]] + extra + args[1:]
                 yield CGGeneric(
                     f"fn {name}({fmt(args, leadingComma=False)}) -> "
-                    f"{return_type(descriptorProvider, rettype, infallible)};\n"
+                    f"{return_type(descriptorProvider, rettype, infallible, descriptor.useFancyErrors)};\n"
                 )
 
         ctor = descriptor.interface.ctor()
@@ -7228,8 +7232,9 @@ class CGInterfaceTrait(CGThing):
             methods.append(CGGeneric("fn Length(&self, cx:&JSContext) -> u32;\n"))
 
         name = descriptor.interface.identifier.name
+        extra = ": crate::error::InterfaceScopedError" if descriptor.useFancyErrors else ""
         self.cgRoot = CGWrapper(CGIndenter(CGList(methods, "")),
-                                pre=f"pub trait {name}Methods<D: DomTypes> {{\n",
+                                pre=f"pub trait {name}Methods<D: DomTypes>{extra} {{\n",
                                 post="}")
         self.empty = not methods
 
@@ -8450,12 +8455,15 @@ def method_arguments(descriptorProvider: DescriptorProvider,
         yield "rval", outparamTypeFromReturnType(returnType),
 
 
-def return_type(descriptorProvider: DescriptorProvider, rettype: IDLType, infallible: bool) -> str:
+def return_type(descriptorProvider: DescriptorProvider, rettype: IDLType, infallible: bool, fancyErrors: bool) -> str:
     result = getRetvalDeclarationForType(rettype, descriptorProvider)
     if rettype and returnTypeNeedsOutparam(rettype):
         result = CGGeneric("()")
     if not infallible:
-        result = CGWrapper(result, pre="Fallible<", post=">")
+        if fancyErrors:
+            result = CGWrapper(result, pre="Result<", post=", crate::error::InterfaceError<Self::IdlError>>")
+        else:
+            result = CGWrapper(result, pre="Fallible<", post=">")
     return result.define()
 
 
@@ -8493,7 +8501,7 @@ class CGNativeMember(ClassMethod):
 
     def getReturnType(self, type: IDLType) -> str:
         infallible = 'infallible' in self.extendedAttrs
-        typeDecl = return_type(self.descriptorProvider, type, infallible)
+        typeDecl = return_type(self.descriptorProvider, type, infallible, False)
         return typeDecl
 
     def getArgs(self, returnType: IDLType, argList: list[IDLArgument | FakeArgument]) -> list[Argument]:
