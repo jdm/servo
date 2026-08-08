@@ -88,6 +88,8 @@ pub struct Opts {
 
     /// Unminify Css.
     pub unminify_css: bool,
+
+    pub mem_profiler_period: Option<u16>,
 }
 
 /// The set of diagnostic options that can be enabled in Servo.
@@ -262,6 +264,7 @@ impl Default for Opts {
             unminify_js: false,
             local_script_source: None,
             unminify_css: false,
+            mem_profiler_period: None,
         }
     }
 }

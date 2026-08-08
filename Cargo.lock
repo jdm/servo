@@ -8873,6 +8873,7 @@ dependencies = [
  "libc",
  "log",
  "mach2",
+ "parking_lot",
  "regex",
  "serde",
  "serde_json",

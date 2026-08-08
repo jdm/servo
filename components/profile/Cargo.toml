@@ -15,6 +15,7 @@ path = "lib.rs"
 
 [dependencies]
 log = { workspace = true }
+parking_lot = { workspace = true }
 profile_traits = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

@@ -581,6 +581,9 @@ struct CmdArgs {
     /// The url we should load.
     #[bpaf(positional("URL"), fallback(String::from("https://www.servo.org")))]
     url: String,
+
+    #[bpaf(long)]
+    memory_profiler: Option<u16>,
 }
 
 fn update_preferences_from_command_line_arguments(
@@ -743,6 +746,7 @@ fn parse_arguments_helper(args_without_binary: Args) -> ArgumentParsingResult {
         time_profiler_trace_path: cmd_args
             .profiler_trace_path
             .map(|p| p.to_string_lossy().into_owned()),
+        mem_profiler_period: cmd_args.memory_profiler,
         hard_fail: cmd_args.hard_fail,
         multiprocess: cmd_args.multiprocess,
         background_hang_monitor: cmd_args.background_hang_monitor,
