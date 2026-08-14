@@ -112,6 +112,8 @@ pub(crate) struct HTMLIFrameElement {
     /// an empty iframe is attached. In that case, we shouldn't fire a
     /// subsequent asynchronous load event.
     already_fired_synchronous_load_event: Cell<bool>,
+
+    frozen_name: DomRefCell<DOMString>,
 }
 
 impl HTMLIFrameElement {
@@ -272,6 +274,7 @@ impl HTMLIFrameElement {
             inherited_secure_context: load_data.inherited_secure_context,
             history_handling,
             target_snapshot_params,
+            name: self.frozen_name.borrow().to_string(),
         };
 
         let viewport_details = window
@@ -309,6 +312,7 @@ impl HTMLIFrameElement {
                     user_content_manager_id: None,
                     embedder_theme: window.embedder_theme(),
                     target_snapshot_params,
+                    frame_name: Some(self.frozen_name.borrow().to_string()),
                 };
 
                 self.pipeline_id.set(Some(new_pipeline_id));
@@ -463,7 +467,7 @@ impl HTMLIFrameElement {
         // Note: the spec says to set the name 'when the nested browsing context is created'.
         // The current implementation sets the name on the window,
         // when the iframe attributes are first processed.
-        if mode == ProcessingMode::FirstTime &&
+        /*if mode == ProcessingMode::FirstTime &&
             let Some(window) = self.GetContentWindow()
         {
             window.set_name(
@@ -471,7 +475,7 @@ impl HTMLIFrameElement {
                     .get_name()
                     .map_or(DOMString::from(""), |n| DOMString::from(&*n)),
             );
-        }
+        }*/
 
         // Step 2.1. Let url be the result of running the shared attribute processing steps
         // for iframe and frame elements given element and initialInsertion.
@@ -583,6 +587,10 @@ impl HTMLIFrameElement {
     /// and we still fire load and pageshow events as part of `maybe_queue_document_completion`.
     /// Also, some controversy spec-wise remains: <https://github.com/whatwg/html/issues/4965>
     fn create_nested_browsing_context(&self, cx: &mut JSContext) {
+        *self.frozen_name.borrow_mut() = self.upcast::<Element>()
+            .get_name()
+            .map_or(DOMString::from(""), |n| DOMString::from(&*n));
+        
         let url = ServoUrl::parse("about:blank").unwrap();
         let document = self.owner_document();
         let window = self.owner_window();
@@ -617,6 +625,10 @@ impl HTMLIFrameElement {
             ProcessingMode::FirstTime,
             snapshot_self(self),
         );
+
+        if let Some(window) = self.GetContentWindow() {
+            window.set_name(self.frozen_name.borrow().clone());
+        }
     }
 
     fn destroy_nested_browsing_context(&self) {
@@ -685,6 +697,7 @@ impl HTMLIFrameElement {
             lazy_load_resumption_steps: Default::default(),
             pending_navigation: Default::default(),
             already_fired_synchronous_load_event: Default::default(),
+            frozen_name: DomRefCell::new(DOMString::new()),
         }
     }
 

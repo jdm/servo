@@ -498,6 +498,8 @@ pub struct IFrameLoadInfo {
     /// A snapshot of the navigation-related parameters of the target
     /// of this navigation.
     pub target_snapshot_params: TargetSnapshotParams,
+    ///
+    pub name: String,
 }
 
 /// Specifies the information required to load a URL in an iframe.
