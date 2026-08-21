@@ -197,7 +197,7 @@ impl InputActivationType {
 
 impl InputType {
     pub(crate) fn new_from_atom(value: &Atom) -> Self {
-        let value = value.as_ref();
+        let value = value.as_str();
         if value.eq_ignore_ascii_case("button") {
             InputType::Button(Default::default())
         } else if value.eq_ignore_ascii_case("checkbox") {

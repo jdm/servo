@@ -57,6 +57,17 @@ pub fn collect_reports(request: ReporterRequest) {
         for heap_report in servo_allocator::heap_reports() {
             report(path![heap_report.path], heap_report.size);
         }
+
+        let mut ops = string_cache_malloc_size_of::MallocSizeOfOps::new(
+            servo_allocator::usable_size,
+            None,
+            None,
+        );
+        reports.push(Report {
+            path: path!["atoms"],
+            kind: ReportKind::ExplicitJemallocHeapSize,
+            size: string_cache::malloc_size_of_dynamic_set(&mut ops),
+        });
     }
 
     request.reports_channel.send(ProcessReports::new(reports));

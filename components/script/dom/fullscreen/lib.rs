@@ -62,12 +62,12 @@ impl Document {
             // > - This’s namespace is the HTML namespace or this is an SVG svg or MathML math element. [SVG] [MATHML]
             match *pending.namespace() {
                 ns!(mathml) => {
-                    if pending.local_name().as_ref() != "math" {
+                    if pending.local_name().as_str() != "math" {
                         error = true;
                     }
                 },
                 ns!(svg) => {
-                    if pending.local_name().as_ref() != "svg" {
+                    if pending.local_name().as_str() != "svg" {
                         error = true;
                     }
                 },

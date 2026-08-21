@@ -235,7 +235,9 @@ skrifa = "0.44.0"
 smallvec = { version = "1.15", features = ["serde", "union"] }
 speexdsp-resampler = "0.1.0"
 sponge-cursor = "0.1"
-string_cache = "0.9"
+#string_cache = { git = "https://github.com/servo/string-cache", branch = "measure-dynamic", features = ["malloc_size_of"] }
+string_cache_malloc_size_of = { package = "malloc_size_of", version = "0.1" }
+string_cache = { version = "0.9", features = ["malloc_size_of"] }
 strum = { version = "0.28", features = ["derive"] }
 stylo = { git = "https://github.com/servo/stylo", rev = "800d90bf8018da8d596e3cb50d0df5491bf1df78" }
 stylo_atoms = { git = "https://github.com/servo/stylo", rev = "800d90bf8018da8d596e3cb50d0df5491bf1df78" }
@@ -478,3 +480,5 @@ codegen-units = 1
 #
 # [patch."https://github.com/servo/<repository>"]
 # <crate> = { path = "/path/to/local/checkout" }
+string_cache = { path = "../string-cache" }
+#string_cache = { git = "https://github.com/servo/string-cache", branch = "measure-dynamic" } 

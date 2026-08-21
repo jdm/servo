@@ -896,12 +896,6 @@ impl<T: MallocSizeOf, U> MallocSizeOf for euclid::Vector2D<T, U> {
     }
 }
 
-impl<Static: string_cache::StaticAtomSet> MallocSizeOf for string_cache::Atom<Static> {
-    fn size_of(&self, _ops: &mut MallocSizeOfOps) -> usize {
-        0
-    }
-}
-
 impl MallocSizeOf for usvg::Tree {
     fn size_of(&self, ops: &mut MallocSizeOfOps) -> usize {
         let root = self.root();
@@ -1305,6 +1299,13 @@ malloc_size_of_is_webrender_malloc_size_of!(webrender_api::RepeatMode);
 malloc_size_of_is_webrender_malloc_size_of!(webrender_api::SpatialId);
 malloc_size_of_is_webrender_malloc_size_of!(webrender_api::StickyOffsetBounds);
 malloc_size_of_is_webrender_malloc_size_of!(webrender_api::TransformStyle);
+
+impl<T: string_cache::StaticAtomSet> MallocSizeOf for string_cache::Atom<T> {
+    fn size_of(&self, _ops: &mut MallocSizeOfOps) -> usize {
+        let mut ops = string_cache_malloc_size_of::MallocSizeOfOps::new(servo_allocator::usable_size, None, None);
+        <Self as string_cache_malloc_size_of::MallocSizeOf>::size_of(self, &mut ops)
+    }
+}
 
 macro_rules! malloc_size_of_is_stylo_malloc_size_of(
     ($($ty:ty),+) => (
