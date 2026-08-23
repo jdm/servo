@@ -1117,6 +1117,7 @@ unsafe extern "C" fn has(
 }
 
 #[expect(unsafe_code)]
+/// <https://html.spec.whatwg.org/multipage/#windowproxy-get>
 unsafe extern "C" fn get(
     cx: *mut RawJSContext,
     proxy: RawHandleObject,
@@ -1128,25 +1129,45 @@ unsafe extern "C" fn get(
         // SAFETY: We are in SM hook
         JSContext::from_ptr(NonNull::new(cx).expect("JSContext should not be null in SM hook"))
     };
-    let cx = &mut cx;
-    let window = unsafe { GetSubframeWindowProxy(cx, proxy, id) };
-    let vp = unsafe { MutableHandle::from_raw(vp) };
-    if let Some((window, _attrs)) = window {
-        window.safe_to_jsval(cx, vp);
-        return true;
+    let mut cx = CurrentRealm::assert(&mut cx);
+    let current_realm = &mut cx;
+
+    if script_bindings::proxyhandler::is_platform_object_same_origin(current_realm, unsafe { Handle::from_raw(proxy) }) {
+        let window = unsafe { GetSubframeWindowProxy(&mut cx, proxy, id) };
+        let vp = unsafe { MutableHandle::from_raw(vp) };
+        if let Some((window, _attrs)) = window {
+            window.safe_to_jsval(&mut cx, vp);
+            return true;
+        }
+
+        let mut slot = UndefinedValue();
+        unsafe { GetProxyPrivate(*proxy.ptr, &mut slot) };
+        rooted!(&in(cx) let target = slot.to_object());
+        unsafe {
+            return JS_ForwardGetPropertyTo(
+                &mut cx,
+                target.handle(),
+                Handle::from_raw(id),
+                Handle::from_raw(receiver),
+                vp,
+            );
+        }
     }
 
-    let mut slot = UndefinedValue();
-    unsafe { GetProxyPrivate(*proxy.ptr, &mut slot) };
-    rooted!(&in(cx) let target = slot.to_object());
     unsafe {
-        JS_ForwardGetPropertyTo(
-            cx,
-            target.handle(),
-            Handle::from_raw(id),
-            Handle::from_raw(receiver),
-            vp,
-        )
+        rooted!(&in(cx) let mut desc: PropertyDescriptor);
+        let mut is_none = false;
+        JS_GetOwnPropertyDescriptorById(&mut cx, Handle::from_raw(proxy), Handle::from_raw(id), desc.handle_mut(), &mut is_none);
+        assert!(!is_none);
+        if desc.hasValue_() || desc.hasWritable_() {
+            vp.set(desc.value_);
+            return true;
+        }
+        if !desc.hasGetter_() {
+            return throw_security_error(&mut cx);
+        }
+        todo!()
+        //get_xorigin(cx.raw_cx(), proxy, receiver, id, vp)
     }
 }
 

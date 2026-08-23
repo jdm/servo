@@ -1007,7 +1007,7 @@ where
 }
 
 /// <https://html.spec.whatwg.org/multipage/#isplatformobjectsameorigin-(-o-)>
-pub(crate) fn is_platform_object_same_origin(realm: &CurrentRealm, obj: HandleObject) -> bool {
+pub fn is_platform_object_same_origin(realm: &CurrentRealm, obj: HandleObject) -> bool {
     let subject_realm = realm.realm().as_ptr();
     let obj_realm = unsafe { GetObjectRealmOrNull(*obj) };
     assert!(!obj_realm.is_null());
