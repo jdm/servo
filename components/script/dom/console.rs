@@ -24,6 +24,7 @@ use js::rust::wrappers2::{
     JS_GetOwnPropertyDescriptorById, JS_GetPropertyById, JS_IdToValue, JS_Stringify,
     JS_ValueToFunction, JS_ValueToSource, MapEntries, MapSize,
 };
+use js::jsapi::HandleValue as RawHandleValue;
 use js::rust::{
     CapturedJSStack, HandleObject, HandleValue, IdVector, ToNumber, ToString,
     describe_scripted_caller, for_of,
@@ -86,6 +87,7 @@ impl Console {
         Self::send_to_devtools(global, console_message);
     }
 
+    #[allow(unsafe_code)]
     fn method(
         cx: &mut JSContext,
         global: &GlobalScope,
@@ -93,6 +95,7 @@ impl Console {
         messages: Vec<HandleValue>,
         include_stacktrace: IncludeStackTrace,
     ) {
+        unsafe { js::rust::wrappers2::DumpJSStack(cx, false, false, false) };
         // If the first argument is a string, apply sprintf-style substitutions per the
         // WHATWG Console spec formatter. The result is a single formatted string followed
         // by any arguments that were not consumed by a substitution specifier.
@@ -107,6 +110,7 @@ impl Console {
                     cx,
                     *msg,
                     &mut Vec::new(),
+                    0,
                 ));
             }
 
@@ -120,7 +124,7 @@ impl Console {
         } else {
             let arguments = messages
                 .iter()
-                .map(|msg| console_argument_from_handle_value(cx, *msg, &mut Vec::new()))
+                .map(|msg| console_argument_from_handle_value(cx, *msg, &mut Vec::new(), 0))
                 .collect();
             (arguments, stringify_handle_values(cx, &messages))
         };
@@ -172,13 +176,15 @@ fn handle_value_to_string(cx: &mut JSContext, value: HandleValue) -> DOMString {
 fn console_argument_from_handle_value(
     cx: &mut JSContext,
     handle_value: HandleValue,
-    seen: &mut Vec<u64>,
+    seen: &mut Vec<RawHandleValue>,
+    depth: u32,
 ) -> DebuggerValue {
     #[expect(unsafe_code)]
     fn inner(
         cx: &mut JSContext,
         handle_value: HandleValue,
-        seen: &mut Vec<u64>,
+        seen: &mut Vec<RawHandleValue>,
+        depth: u32,
     ) -> Result<DebuggerValue, ()> {
         if handle_value.is_string() {
             let js_string = ptr::NonNull::new(handle_value.to_string()).unwrap();
@@ -198,15 +204,25 @@ fn console_argument_from_handle_value(
 
         if handle_value.is_object() {
             // JS objects can create circular reference, and we want to avoid recursing infinitely
-            if seen.contains(&handle_value.asBits_) {
+            if seen.iter().any(|value| value.get() == handle_value.get()) {
                 // FIXME: Handle this properly
                 return Ok(DebuggerValue::StringValue("[circular]".into()));
             }
 
-            seen.push(handle_value.asBits_);
-            let console_object = console_object_from_handle_value(cx, handle_value, seen);
-            let js_value = seen.pop();
-            debug_assert_eq!(js_value, Some(handle_value.asBits_));
+            let max_depth = std::env::var("MAX_DEPTH").unwrap_or("10".to_owned()).parse::<u32>().unwrap();
+            if max_depth > 0 && depth >= max_depth {
+                return Ok(DebuggerValue::StringValue("[exceeded max depth]".into()));
+            }
+
+            seen.push(handle_value.into());
+            //unsafe { js::jsapi::JS_GC(cx.raw_cx(), js::jsapi::GCReason::API) };
+            let console_object = console_object_from_handle_value(cx, handle_value, seen, depth);
+            let skip_pop_seen = std::env::var("SKIP_POP_SEEN").unwrap_or("".to_owned());
+            if skip_pop_seen.is_empty() {
+                let js_value = seen.pop();
+                use crate::js::rust::IntoHandle;
+                debug_assert_eq!(js_value.map(|v| v.get()), Some(handle_value.into_handle().get()));
+            }
 
             if let Some((class, preview)) = console_object {
                 return Ok(DebuggerValue::ObjectValue {
@@ -226,7 +242,7 @@ fn console_argument_from_handle_value(
         Ok(DebuggerValue::StringValue(stringified_value.into()))
     }
 
-    match inner(cx, handle_value, seen) {
+    match inner(cx, handle_value, seen, depth) {
         Ok(arg) => arg,
         Err(()) => {
             report_pending_exception(&mut CurrentRealm::assert(cx));
@@ -254,7 +270,8 @@ fn accessor_value_from_property_descriptor(descriptor: &PropertyDescriptor) -> D
 fn console_map_object_from_handle_value(
     cx: &mut JSContext,
     handle_object: HandleObject,
-    seen: &mut Vec<u64>,
+    seen: &mut Vec<RawHandleValue>,
+    depth: u32,
 ) -> Option<(String, ObjectPreview)> {
     rooted!(&in(cx) let mut iterator = UndefinedValue());
     if !unsafe { MapEntries(cx, handle_object, iterator.handle_mut()) } {
@@ -279,8 +296,8 @@ fn console_map_object_from_handle_value(
         }
 
         entries.push((
-            console_argument_from_handle_value(cx, key.handle(), seen),
-            console_argument_from_handle_value(cx, value.handle(), seen),
+            console_argument_from_handle_value(cx, key.handle(), seen, depth + 1),
+            console_argument_from_handle_value(cx, value.handle(), seen, depth + 1),
         ));
 
         Ok(std::ops::ControlFlow::Continue(()))
@@ -306,7 +323,8 @@ fn console_map_object_from_handle_value(
 fn console_object_from_handle_value(
     cx: &mut JSContext,
     handle_value: HandleValue,
-    seen: &mut Vec<u64>,
+    seen: &mut Vec<RawHandleValue>,
+    depth: u32,
 ) -> Option<(String, ObjectPreview)> {
     rooted!(&in(cx) let object = handle_value.to_object());
     let mut object_class = ESClass::Other;
@@ -322,7 +340,7 @@ fn console_object_from_handle_value(
     }
 
     if object_class == ESClass::Map {
-        return console_map_object_from_handle_value(cx, object.handle(), seen);
+        return console_map_object_from_handle_value(cx, object.handle(), seen, depth);
     }
 
     let mut own_properties = Vec::new();
@@ -369,7 +387,7 @@ fn console_object_from_handle_value(
             accessor_value_from_property_descriptor(&descriptor)
         } else {
             rooted!(&in(cx) let property = descriptor.value_);
-            console_argument_from_handle_value(cx, property.handle(), seen)
+            console_argument_from_handle_value(cx, property.handle(), seen, depth + 1)
         };
 
         if object_class == ESClass::Array && id.is_int() {
@@ -485,7 +503,7 @@ pub(crate) fn stringify_handle_value(cx: &mut JSContext, message: HandleValue) -
     fn stringify_object_from_handle_value(
         cx: &mut JSContext,
         value: HandleValue,
-        parents: Vec<u64>,
+        parents: Vec<RawHandleValue>,
     ) -> DOMString {
         rooted!(&in(cx) let mut obj = value.to_object());
         let mut object_class = ESClass::Other;
@@ -573,12 +591,12 @@ pub(crate) fn stringify_handle_value(cx: &mut JSContext, message: HandleValue) -
             DOMString::from(format!("{{{}}}", itertools::join(props, ", ")))
         }
     }
-    fn stringify_inner(cx: &mut JSContext, value: HandleValue, mut parents: Vec<u64>) -> DOMString {
-        if parents.len() >= MAX_LOG_DEPTH {
+    fn stringify_inner(cx: &mut JSContext, value: HandleValue, mut parents: Vec<RawHandleValue>) -> DOMString {
+        let max_log_depth = std::env::var("MAX_DEPTH").unwrap_or("10".to_owned()).parse::<u32>().unwrap();
+        if max_log_depth > 0 && parents.len() >= max_log_depth as usize {
             return DOMString::from_static("...");
         }
-        let value_bits = value.asBits_;
-        if parents.contains(&value_bits) {
+        if parents.iter().any(|parent| parent.get() == value.get()) {
             return DOMString::from_static("[circular]");
         }
         if value.is_undefined() {
@@ -587,7 +605,7 @@ pub(crate) fn stringify_handle_value(cx: &mut JSContext, message: HandleValue) -
         } else if !value.is_object() {
             return handle_value_to_string(cx, value);
         }
-        parents.push(value_bits);
+        parents.push(value.into());
 
         if value.is_object() &&
             let Some(repr) = maybe_stringify_dom_object(cx, value)
@@ -927,7 +945,7 @@ impl consoleMethods<crate::DomTypeHolder> for Console {
         _options: Option<*mut jsapi::JSObject>,
     ) {
         // Step 1. Let object be item with generic JavaScript object formatting applied.
-        let argument = console_argument_from_handle_value(cx, item, &mut Vec::new());
+        let argument = console_argument_from_handle_value(cx, item, &mut Vec::new(), 0);
         let prefix = global.current_group_label().unwrap_or_default();
         // Step 2. Perform Printer("dir", « object », options).
         Console::send_to_devtools(
