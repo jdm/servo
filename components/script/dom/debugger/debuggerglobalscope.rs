@@ -570,7 +570,7 @@ impl DebuggerGlobalScopeMethods<crate::DomTypeHolder> for DebuggerGlobalScope {
                 },
             };
 
-        let msg = ScriptToDevtoolsControlMsg::CreateObjectActor(tx, value);
+        let msg = ScriptToDevtoolsControlMsg::CreateObjectActor(tx, Some(value));
         let _ = chan.send(msg);
 
         rx.recv().ok().map(DOMString::from)

@@ -28,7 +28,7 @@ use crate::actors::environment::EnvironmentActor;
 use crate::actors::worker::WorkerTargetActor;
 use crate::protocol::{ClientRequest, DevtoolsConnection, JsonPacketStream};
 use crate::resource::{ResourceArrayType, ResourceAvailable};
-use crate::{EmptyReplyMsg, StreamId, UniqueId, debugger_value_to_json};
+use crate::{EmptyReplyMsg, StreamId, UniqueId, debugger_value_to_json, debugger_value_to_json_limited};
 
 #[derive(Clone, Serialize, MallocSizeOf)]
 #[serde(rename_all = "camelCase")]
@@ -51,7 +51,7 @@ impl DevtoolsConsoleMessage {
             arguments: message
                 .arguments
                 .into_iter()
-                .map(|argument| debugger_value_to_json(registry, argument))
+                .map(|argument| debugger_value_to_json_limited(registry, argument, 0, Some(1)))
                 .collect(),
             stacktrace: message.stacktrace,
         }

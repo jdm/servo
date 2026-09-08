@@ -141,7 +141,7 @@ pub enum ScriptToDevtoolsControlMsg {
     CreateFrameActor(GenericSender<String>, PipelineId, FrameInfo),
 
     /// Get object information from script
-    CreateObjectActor(GenericSender<String>, DebuggerValue),
+    CreateObjectActor(GenericSender<String>, Option<DebuggerValue>),
 
     /// Get environment information from script
     CreateEnvironmentActor(
@@ -233,6 +233,7 @@ pub enum DebuggerValue {
     BooleanValue(bool),
     NumberValue(#[serde(deserialize_with = "deserialize_debugger_number")] f64),
     StringValue(String),
+    ObjectValueReference(String),
     ObjectValue {
         actor: Option<String>,
         class: String,

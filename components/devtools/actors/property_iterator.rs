@@ -109,7 +109,7 @@ impl Actor for PropertyIteratorActor {
                         PropertyIteratorEntry::Property(prop) => {
                             own_properties.insert(
                                 prop.name.clone(),
-                                ObjectPropertyDescriptor::from_property_descriptor(registry, prop),
+                                ObjectPropertyDescriptor::from_property_descriptor_limited(registry, prop, 0, Some(1)),
                             );
                         },
                         PropertyIteratorEntry::MapEntry(key, value) => {

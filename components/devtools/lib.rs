@@ -49,7 +49,7 @@ use crate::actors::framerate::FramerateActor;
 use crate::actors::inspector::InspectorActor;
 use crate::actors::inspector::walker::WalkerActor;
 use crate::actors::network_event::NetworkEventActor;
-use crate::actors::object::ObjectActor;
+use crate::actors::object::{ObjectActor, ObjectActorMsg, ObjectActorReference, encode_object_actor_msg};
 use crate::actors::pause::PauseActor;
 use crate::actors::root::RootActor;
 use crate::actors::source::SourceActor;
@@ -897,8 +897,19 @@ impl DevtoolsInstance {
     fn handle_create_object_actor(
         &mut self,
         result_sender: GenericSender<String>,
-        value: DebuggerValue,
+        value: Option<DebuggerValue>,
     ) {
+        let Some(value) = value else {
+            let object_actor = ObjectActor::register(
+                &self.registry,
+                None,
+                "Object".to_string(),
+                None,
+                None,
+            );
+            let _ = result_sender.send(object_actor);            
+            return;
+        };
         let DebuggerValue::ObjectValue {
             actor,
             class,
@@ -1010,6 +1021,10 @@ fn handle_client(
 
 /// <https://searchfox.org/mozilla-central/source/devtools/server/actors/object/utils.js#148>
 pub(crate) fn debugger_value_to_json(registry: &ActorRegistry, value: DebuggerValue) -> Value {
+    debugger_value_to_json_limited(registry, value, 0, None)
+}
+
+pub(crate) fn debugger_value_to_json_limited(registry: &ActorRegistry, value: DebuggerValue, depth: u32, max_depth: Option<u32>) -> Value {
     let mut v = Map::new();
     match value {
         DebuggerValue::VoidValue => {
@@ -1043,6 +1058,13 @@ pub(crate) fn debugger_value_to_json(registry: &ActorRegistry, value: DebuggerVa
             }
         },
         DebuggerValue::StringValue(str) => Value::String(str),
+        DebuggerValue::ObjectValueReference(actor) => {
+            let actor = registry.find::<ObjectActor>(&actor);
+            let object_msg = encode_object_actor_msg(&actor, registry, depth, max_depth);
+            //let object_msg = registry.encode::<ObjectActor, ObjectActorMsg>(&actor);
+            let value = serde_json::to_value(object_msg).unwrap_or_default();
+            Value::Object(value.as_object().cloned().unwrap_or_default())
+        }
         DebuggerValue::ObjectValue {
             actor,
             class,
@@ -1056,7 +1078,9 @@ pub(crate) fn debugger_value_to_json(registry: &ActorRegistry, value: DebuggerVa
                 own_property_length,
                 preview.map(|preview| *preview),
             );
-            let object_msg = registry.encode::<ObjectActor, _>(&object_name);
+            let actor = registry.find::<ObjectActor>(&object_name);
+            let object_msg = encode_object_actor_msg(&actor, registry, depth, max_depth);
+            //let object_msg = registry.encode::<ObjectActor, ObjectActorMsg>(&object_name);
             let value = serde_json::to_value(object_msg).unwrap_or_default();
             Value::Object(value.as_object().cloned().unwrap_or_default())
         },

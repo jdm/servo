@@ -30,6 +30,7 @@ use js::rust::{
     describe_scripted_caller, for_of,
 };
 use script_bindings::conversions::get_dom_class;
+use servo_base::generic_channel;
 
 use crate::dom::bindings::codegen::Bindings::ConsoleBinding::consoleMethods;
 use crate::dom::bindings::error::report_pending_exception;
@@ -111,6 +112,8 @@ impl Console {
                     *msg,
                     &mut Vec::new(),
                     0,
+                    global,
+                    &mut Vec::new(),
                 ));
             }
 
@@ -124,7 +127,7 @@ impl Console {
         } else {
             let arguments = messages
                 .iter()
-                .map(|msg| console_argument_from_handle_value(cx, *msg, &mut Vec::new(), 0))
+                .map(|msg| console_argument_from_handle_value(cx, *msg, &mut Vec::new(), 0, global, &mut Vec::new()))
                 .collect();
             (arguments, stringify_handle_values(cx, &messages))
         };
@@ -178,6 +181,8 @@ fn console_argument_from_handle_value(
     handle_value: HandleValue,
     seen: &mut Vec<RawHandleValue>,
     depth: u32,
+    global: &GlobalScope,
+    debugger_value_map: &mut Vec<(RawHandleValue, String)>,
 ) -> DebuggerValue {
     #[expect(unsafe_code)]
     fn inner(
@@ -185,6 +190,8 @@ fn console_argument_from_handle_value(
         handle_value: HandleValue,
         seen: &mut Vec<RawHandleValue>,
         depth: u32,
+        global: &GlobalScope,
+        debugger_value_map: &mut Vec<(RawHandleValue, String)>,
     ) -> Result<DebuggerValue, ()> {
         if handle_value.is_string() {
             let js_string = ptr::NonNull::new(handle_value.to_string()).unwrap();
@@ -204,10 +211,20 @@ fn console_argument_from_handle_value(
 
         if handle_value.is_object() {
             // JS objects can create circular reference, and we want to avoid recursing infinitely
-            if seen.iter().any(|value| value.get() == handle_value.get()) {
-                // FIXME: Handle this properly
-                return Ok(DebuggerValue::StringValue("[circular]".into()));
+            if let Some((_, existing_actor)) = debugger_value_map.iter().find(|(value, _)| value.get() == handle_value.get()) {
+                return Ok(DebuggerValue::ObjectValueReference(existing_actor.clone()));
+            } else if seen.iter().any(|value| value.get() == handle_value.get()) {
+                // Backstop.
+                return Ok(DebuggerValue::StringValue("[circular]".to_owned()));
             }
+
+            let actor_name = global.devtools_chan().and_then(|channel| {
+                let (sender, receiver) = generic_channel::channel().unwrap();
+                channel.send(ScriptToDevtoolsControlMsg::CreateObjectActor(sender, None))
+                    .ok()
+                    .and_then(|_| receiver.recv().ok())
+            }).unwrap_or_else(|| "[unavailable]".to_string());
+            debugger_value_map.push((handle_value.into_handle(), actor_name.clone()));
 
             let max_depth = std::env::var("MAX_DEPTH").unwrap_or("10".to_owned()).parse::<u32>().unwrap();
             if max_depth > 0 && depth >= max_depth {
@@ -216,21 +233,22 @@ fn console_argument_from_handle_value(
 
             seen.push(handle_value.into());
             //unsafe { js::jsapi::JS_GC(cx.raw_cx(), js::jsapi::GCReason::API) };
-            let console_object = console_object_from_handle_value(cx, handle_value, seen, depth);
-            let skip_pop_seen = std::env::var("SKIP_POP_SEEN").unwrap_or("".to_owned());
-            if skip_pop_seen.is_empty() {
-                let js_value = seen.pop();
+            let console_object = console_object_from_handle_value(cx, handle_value, seen, depth, global, debugger_value_map);
+            //let skip_pop_seen = std::env::var("SKIP_POP_SEEN").unwrap_or("".to_owned());
+            //if skip_pop_seen.is_empty() {
+                let js_value = seen.pop().expect("must have an entry");
                 use crate::js::rust::IntoHandle;
-                debug_assert_eq!(js_value.map(|v| v.get()), Some(handle_value.into_handle().get()));
-            }
+                debug_assert_eq!(js_value.get(), handle_value.into_handle().get());
+            //}
 
             if let Some((class, preview)) = console_object {
-                return Ok(DebuggerValue::ObjectValue {
-                    actor: None,
+                let debugger_value = DebuggerValue::ObjectValue {
+                    actor: Some(actor_name.clone()),
                     class,
                     own_property_length: preview.own_properties_length,
                     preview: Some(Box::new(preview)),
-                });
+                };
+                return Ok(debugger_value);
             }
 
             return Err(());
@@ -242,7 +260,7 @@ fn console_argument_from_handle_value(
         Ok(DebuggerValue::StringValue(stringified_value.into()))
     }
 
-    match inner(cx, handle_value, seen, depth) {
+    match inner(cx, handle_value, seen, depth, global, debugger_value_map) {
         Ok(arg) => arg,
         Err(()) => {
             report_pending_exception(&mut CurrentRealm::assert(cx));
@@ -272,6 +290,8 @@ fn console_map_object_from_handle_value(
     handle_object: HandleObject,
     seen: &mut Vec<RawHandleValue>,
     depth: u32,
+    global: &GlobalScope,
+    debugger_value_map: &mut Vec<(RawHandleValue, String)>,
 ) -> Option<(String, ObjectPreview)> {
     rooted!(&in(cx) let mut iterator = UndefinedValue());
     if !unsafe { MapEntries(cx, handle_object, iterator.handle_mut()) } {
@@ -296,8 +316,8 @@ fn console_map_object_from_handle_value(
         }
 
         entries.push((
-            console_argument_from_handle_value(cx, key.handle(), seen, depth + 1),
-            console_argument_from_handle_value(cx, value.handle(), seen, depth + 1),
+            console_argument_from_handle_value(cx, key.handle(), seen, depth + 1, global, debugger_value_map),
+            console_argument_from_handle_value(cx, value.handle(), seen, depth + 1, global, debugger_value_map),
         ));
 
         Ok(std::ops::ControlFlow::Continue(()))
@@ -325,6 +345,8 @@ fn console_object_from_handle_value(
     handle_value: HandleValue,
     seen: &mut Vec<RawHandleValue>,
     depth: u32,
+    global: &GlobalScope,
+    debugger_value_map: &mut Vec<(RawHandleValue, String)>,
 ) -> Option<(String, ObjectPreview)> {
     rooted!(&in(cx) let object = handle_value.to_object());
     let mut object_class = ESClass::Other;
@@ -340,7 +362,7 @@ fn console_object_from_handle_value(
     }
 
     if object_class == ESClass::Map {
-        return console_map_object_from_handle_value(cx, object.handle(), seen, depth);
+        return console_map_object_from_handle_value(cx, object.handle(), seen, depth, global, debugger_value_map);
     }
 
     let mut own_properties = Vec::new();
@@ -387,7 +409,7 @@ fn console_object_from_handle_value(
             accessor_value_from_property_descriptor(&descriptor)
         } else {
             rooted!(&in(cx) let property = descriptor.value_);
-            console_argument_from_handle_value(cx, property.handle(), seen, depth + 1)
+            console_argument_from_handle_value(cx, property.handle(), seen, depth + 1, global, debugger_value_map)
         };
 
         if object_class == ESClass::Array && id.is_int() {
@@ -796,6 +818,7 @@ fn stringify_debugger_value(value: &DebuggerValue) -> String {
         DebuggerValue::BooleanValue(value) => value.to_string(),
         DebuggerValue::NumberValue(value) => value.to_string(),
         DebuggerValue::StringValue(value) => value.clone(),
+        DebuggerValue::ObjectValueReference(actor) => todo!(),
         DebuggerValue::ObjectValue { class, preview, .. } => {
             let Some(preview) = preview else {
                 return class.clone();
@@ -945,7 +968,7 @@ impl consoleMethods<crate::DomTypeHolder> for Console {
         _options: Option<*mut jsapi::JSObject>,
     ) {
         // Step 1. Let object be item with generic JavaScript object formatting applied.
-        let argument = console_argument_from_handle_value(cx, item, &mut Vec::new(), 0);
+        let argument = console_argument_from_handle_value(cx, item, &mut Vec::new(), 0, global, &mut Vec::new());
         let prefix = global.current_group_label().unwrap_or_default();
         // Step 2. Perform Printer("dir", « object », options).
         Console::send_to_devtools(

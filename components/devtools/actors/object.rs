@@ -14,7 +14,7 @@ use crate::actor::{Actor, ActorEncode, ActorError, ActorRegistry, new_actor_name
 use crate::actors::property_iterator::{PropertyIteratorActor, PropertyIteratorEntry};
 use crate::actors::symbol_iterator::SymbolIteratorActor;
 use crate::protocol::ClientRequest;
-use crate::{StreamId, debugger_value_to_json};
+use crate::{StreamId, debugger_value_to_json_limited, debugger_value_to_json};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -98,6 +98,11 @@ pub(crate) struct ObjectActorMsg {
 }
 
 #[derive(Serialize)]
+pub(crate) struct ObjectActorReference {
+    actor: String,
+}
+
+#[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ObjectPropertyDescriptor {
     pub value: Value,
@@ -115,8 +120,17 @@ impl ObjectPropertyDescriptor {
         registry: &ActorRegistry,
         prop: &PropertyDescriptor,
     ) -> Self {
+        Self::from_property_descriptor_limited(registry, prop, 0, None)
+    }
+
+    pub(crate) fn from_property_descriptor_limited(
+        registry: &ActorRegistry,
+        prop: &PropertyDescriptor,
+        depth: u32,
+        max_depth: Option<u32>,
+    ) -> Self {
         Self {
-            value: debugger_value_to_json(registry, prop.value.clone()),
+            value: debugger_value_to_json_limited(registry, prop.value.clone(), depth + 1, max_depth),
             configurable: Some(prop.configurable),
             enumerable: prop.enumerable,
             writable: Some(prop.writable),
@@ -230,7 +244,7 @@ impl Actor for ObjectActor {
             "prototype" => {
                 let msg = PrototypeReply {
                     from: self.name().into(),
-                    prototype: self.encode(registry),
+                    prototype: encode_object_actor_msg(self, registry, 0, Some(1)),//self.encode(registry),
                 };
                 request.reply_final(&msg)?
             },
@@ -295,11 +309,18 @@ impl ObjectActor {
     }
 }
 
-impl ActorEncode<ObjectActorMsg> for ObjectActor {
-    fn encode(&self, registry: &ActorRegistry) -> ObjectActorMsg {
-        let data = self.data.borrow().clone();
-        let mut msg = ObjectActorMsg {
+impl ActorEncode<ObjectActorReference> for ObjectActor {
+    fn encode(&self, _registry: &ActorRegistry) -> ObjectActorReference {
+        ObjectActorReference {
             actor: self.name().into(),
+        }
+    }
+}
+
+pub(crate) fn encode_object_actor_msg(actor: &ObjectActor, registry: &ActorRegistry, depth: u32, max_depth: Option<u32>) -> ObjectActorMsg {
+        let data = actor.data.borrow().clone();
+        let mut msg = ObjectActorMsg {
+            actor: actor.name().into(),
             type_: "object".into(),
             class: data.class.clone(),
             extensible: true,
@@ -336,35 +357,40 @@ impl ActorEncode<ObjectActorMsg> for ObjectActor {
                     .iter()
                     .map(|(key, value)| {
                         (
-                            debugger_value_to_json(registry, key.clone()),
-                            debugger_value_to_json(registry, value.clone()),
+                            debugger_value_to_json_limited(registry, key.clone(), depth + 1, max_depth),
+                            debugger_value_to_json_limited(registry, value.clone(), depth + 1, max_depth),
                         )
                     })
                     .collect()
             }),
-            own_properties: preview.own_properties.map(|own_properties| {
+            own_properties: if depth <= max_depth.unwrap_or(u32::MAX - 1) + 1 { preview.own_properties.map(|own_properties| {
                 own_properties
                     .iter()
                     .map(|prop| {
                         (
                             prop.name.clone(),
-                            ObjectPropertyDescriptor::from_property_descriptor(registry, prop),
+                            ObjectPropertyDescriptor::from_property_descriptor_limited(registry, prop, depth, max_depth),
                         )
                     })
                     .collect()
-            }),
+            }) } else { None },
             own_properties_length: preview.own_properties_length,
             function,
             length: preview.array_length,
-            items: preview.items.map(|items| {
+            items: if depth <= max_depth.unwrap_or(u32::MAX - 1) + 1 { preview.items.map(|items| {
                 items
                     .iter()
-                    .map(|item| debugger_value_to_json(registry, item.clone()))
+                    .map(|item| debugger_value_to_json_limited(registry, item.clone(), depth, max_depth))
                     .collect()
-            }),
+            }) } else { None },
         };
 
         msg.preview = Some(preview);
         msg
+}
+
+impl ActorEncode<ObjectActorMsg> for ObjectActor {
+    fn encode(&self, registry: &ActorRegistry) -> ObjectActorMsg {
+        encode_object_actor_msg(self, registry, 0, None)
     }
 }
