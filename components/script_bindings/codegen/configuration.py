@@ -51,7 +51,7 @@ class Configuration:
     callbacks: list[IDLCallback]
     sub_crates: dict[str,list[str]]
 
-    def __init__(self, filename: str, parseData: list[IDLObjectWithIdentifier]) -> None:
+    def __init__(self, filename: str, other_filename: Optional[str], parseData: list[IDLObjectWithIdentifier]) -> None:
         # Read the configuration file.
         glbl = {}
         exec(compile(open(filename).read(), filename, 'exec'), glbl)
@@ -60,6 +60,15 @@ class Configuration:
         self.dictConfig = glbl['Dictionaries']
         self.unionConfig = glbl['Unions']
         self.sub_crates = glbl['SubCrates']
+
+        if other_filename:
+            glbl2 = {}
+            exec(compile(open(other_filename).read(), other_filename, 'exec'), glbl2)
+            config.update(glbl2.get('DOMInterfaces', {}))
+            self.enumConfig.update(glbl2.get('Enums', {}))
+            self.dictConfig.update(glbl2.get('Dictionaries', {}))
+            self.unionConfig.update(glbl2.get('Unions', {}))
+            self.sub_crates.update(glbl2.get('SubCrates', {}))
 
         # Build descriptors for all the interfaces we have in the parse data.
         # This allows callers to specify a subset of interfaces by filtering

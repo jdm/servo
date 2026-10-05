@@ -35,16 +35,24 @@ def main() -> None:
     # or even have a parent (see CARGO_TARGET_DIR).
     doc_servo = os.path.join(out_dir, "..", "..", "..", "..", "doc")
     webidls_dir = os.path.join(SCRIPT_BINDINGS_ROOT, "webidls")
+    webidls_embedder_path = os.environ.get("SERVO_EXTRA_WEBIDLS", None)
+    webidls_embedder_dir = os.path.abspath(webidls_embedder_path) if webidls_embedder_path else None
+
     config_file = "Bindings.conf"
+    config_file_extra = os.path.join(webidls_embedder_dir, "Bindings.conf") if webidls_embedder_dir else None
 
     import WebIDL
     from codegen import CGBindingRoot, CGConcreteBindingRoot
     from configuration import Configuration
 
     parser = WebIDL.Parser(make_dir(os.path.join(out_dir, "cache")))
-    webidls = [name for name in os.listdir(webidls_dir) if name.endswith(".webidl")]
-    for webidl in webidls:
-        filename = os.path.join(webidls_dir, webidl)
+    webidls = [os.path.join(webidls_dir, name) for name in os.listdir(webidls_dir) if name.endswith(".webidl")]
+    if webidls_embedder_dir:
+        webidls += [os.path.join(webidls_embedder_dir, name) for name in os.listdir(webidls_embedder_dir)]
+
+    for filename in webidls:
+        if not filename.endswith('.webidl'):
+            continue
         with open(filename, "r", encoding="utf-8") as f:
             contents = f.read()
             filter_match = FILTER_PATTERN.search(contents)
@@ -58,12 +66,13 @@ def main() -> None:
 
     add_css_properties_attributes(css_properties_json, parser)
     parser_results = parser.finish()
-    config = Configuration(config_file, parser_results)
+    config = Configuration(config_file, config_file_extra, parser_results)
     make_dir(os.path.join(out_dir, "Bindings"))
     make_dir(os.path.join(out_dir, "ConcreteBindings"))
-    make_dir(os.path.join(out_dir, "WebGPUConcreteBindings"))
+    for crate in config.sub_crates.keys():
+        make_dir(os.path.join(out_dir, f"{crate}ConcreteBindings"))
 
-    for name, filename in [
+    to_generate = [
         ("PrototypeList", "PrototypeList.rs"),
         ("RegisterBindings", "RegisterBindings.rs"),
         ("Globals", "Globals.rs"),
@@ -73,49 +82,57 @@ def main() -> None:
         ("InheritTypes", "InheritTypes.rs"),
         ("Bindings", "Bindings/mod.rs"),
         ("Bindings", "ConcreteBindings/mod.rs"),
-        ("Bindings", "WebGPUConcreteBindings/mod.rs"),
+        #("Bindings", "WebGPUConcreteBindings/mod.rs"),
         ("UnionTypes", "GenericUnionTypes.rs"),
         ("ConcreteUnionTypes", "UnionTypes.rs"),
         ("DomTypes", "DomTypes.rs"),
         ("DomTypeHolder", "DomTypeHolder.rs"),
         ("ContentEventHandlerNames", "ContentEventHandlerNames.rs"),
-    ]:
+    ]
+    to_generate += [("Bindings", f"{crate}ConcreteBindings/mod.rs") for crate in config.sub_crates.keys()]
+    for name, filename in to_generate:
         generate(config, name, os.path.join(out_dir, filename))
     make_dir(doc_servo)
     generate(config, "SupportedDomApis", os.path.join(doc_servo, "apis.html"))
 
     all_interface_descriptors = set(d.interface.identifier.name.replace('\'','') for d in config.descriptors)
-    s = set(item for item in config.sub_crates["script_webgpu"])
-    for webidl in webidls:
-        filename = os.path.join(webidls_dir, webidl)
+
+    all_subcrate_items = set()
+    for items in config.sub_crates.values():
+        all_subcrate_items.update(items)
+    for filename in webidls:
+        webidl = os.path.basename(filename)
         prefix = "Bindings/%sBinding" % webidl[:-len(".webidl")]
         module = CGBindingRoot(config, prefix, filename).define()
         if module:
             with open(os.path.join(out_dir, prefix + ".rs"), "wb") as f:
                 f.write(module.encode("utf-8"))
         prefix = "ConcreteBindings/%sBinding" % webidl[:-len(".webidl")]
-        module = CGConcreteBindingRoot(config, prefix, filename, only_interfaces = all_interface_descriptors -s).define()
+        module = CGConcreteBindingRoot(config, prefix, filename, only_interfaces = all_interface_descriptors - all_subcrate_items).define()
         if module:
             with open(os.path.join(out_dir, prefix + ".rs"), "wb") as f:
                 f.write(module.encode("utf-8"))
 
-    for webidl in webidls:
-        filename = os.path.join(webidls_dir, webidl)
-        prefix = "ConcreteBindings/%sBinding" % webidl[:-len(".webidl")]
-        module = CGConcreteBindingRoot(config, prefix, filename, only_interfaces = s, generic=True).define()
-        prefix = "WebGPUConcreteBindings/%sBinding" % webidl[:-len(".webidl")]
-        if module:
-            with open(os.path.join(out_dir, prefix + ".rs"), "wb") as f:
-                f.write(module.encode("utf-8"))
+    for (crate, items) in config.sub_crates.items():
+        items = set(items)
+        for filename in webidls:
+            webidl = os.path.basename(filename)
+            prefix = "ConcreteBindings/%sBinding" % webidl[:-len(".webidl")]
+            module = CGConcreteBindingRoot(config, prefix, filename, only_interfaces = items, generic=True).define()
+            prefix = f"{crate}ConcreteBindings/%sBinding" % webidl[:-len(".webidl")]
+            if module:
+                with open(os.path.join(out_dir, prefix + ".rs"), "wb") as f:
+                    f.write(module.encode("utf-8"))
 
 
-    from codegen import GlobalGenRoots
-    root = GlobalGenRoots.ConcreteInheritTypes(config, s, generic = True)
-    code = root.define()
-    with open(os.path.join(out_dir, "WebGPUConcreteInheritTypes.rs"), "wb") as f:
-        f.write(code.encode("utf-8"))
+    for (crate, items) in config.sub_crates.items():
+        from codegen import GlobalGenRoots
+        root = GlobalGenRoots.ConcreteInheritTypes(config, items, generic = True)
+        code = root.define()
+        with open(os.path.join(out_dir, f"{crate}ConcreteInheritTypes.rs"), "wb") as f:
+            f.write(code.encode("utf-8"))
 
-    root = GlobalGenRoots.ConcreteInheritTypes(config, all_interface_descriptors - s, generic = False)
+    root = GlobalGenRoots.ConcreteInheritTypes(config, all_interface_descriptors - all_subcrate_items, generic = False)
     code = root.define()
     with open(os.path.join(out_dir, "ConcreteInheritTypes.rs"), "wb") as f:
         f.write(code.encode("utf-8"))
