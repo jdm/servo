@@ -21,6 +21,9 @@ fn main() {
 
     println!("cargo:out_dir={}", out_dir.display());
 
+    if let Some(embedder_webidls) = env::var_os("SERVO_EXTRA_WEBIDLS") {
+        println!("cargo::rerun-if-changed={}", embedder_webidls.display());
+    }
     println!("cargo::rerun-if-changed=webidls");
     println!("cargo::rerun-if-changed=codegen");
     println!("cargo::rerun-if-changed={}", css_properties_json.display());
