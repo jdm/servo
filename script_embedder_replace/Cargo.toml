@@ -1,0 +1,23 @@
+[package]
+name = "servo-script-embedder"
+build = "build.rs"
+version = "0.7.0"
+edition = "2024"
+
+[lib]
+name = "script_embedder"
+path = "lib.rs"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(crown)'] }
+#workspace = true
+
+[dependencies]
+js = { package = "mozjs", version = "=0.26.7", default-features = false, features = ["intl", "libz-sys"] }
+malloc_size_of_derive = "0.1"
+servo-deny-public-fields = { path = "../components/deny_public_fields" }
+servo-dom-struct = { path = "../components/dom_struct" }
+servo-jstraceable-derive = { path = "../components/jstraceable_derive" }
+servo-malloc-size-of = { path = "../components/malloc_size_of" }
+servo-script-bindings = { path = "../components/script_bindings" }
+trait-set = "0.5"

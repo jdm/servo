@@ -23,19 +23,26 @@ fn dom_struct_impl(
     input: proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
     let no_has_parent = args.to_string().contains("no_has_parent");
-    if !no_has_parent && !args.is_empty() {
-        panic!("#[dom_struct] only takes 'no_has_parent' as an argument");
+    let no_crown = args.to_string().contains("no_crown");
+    if !no_has_parent && !no_crown && !args.is_empty() {
+        panic!("#[dom_struct] only takes 'no_has_parent' and 'no_crown' as an argument");
     }
     let attributes = quote! {
         #[derive(deny_public_fields::DenyPublicFields, JSTraceable, MallocSizeOf)]
-        #[cfg_attr(crown, crown::unrooted_must_root_lint::must_root)]
         #[repr(C)]
+    };
+
+    let extra_attributes = if no_crown { quote!{} } else {
+        quote! {
+            #[cfg_attr(crown, crown::unrooted_must_root_lint::must_root)]
+        }
     };
 
     // Work around https://github.com/rust-lang/rust/issues/46489
     let attributes: proc_macro2::TokenStream = attributes.to_string().parse().unwrap();
+    let extra_attributes: proc_macro2::TokenStream = extra_attributes.to_string().parse().unwrap();
 
-    let output: proc_macro2::TokenStream = attributes.into_iter().chain(input).collect();
+    let output: proc_macro2::TokenStream = attributes.into_iter().chain(extra_attributes).chain(input).collect();
 
     let item: Item = syn::parse2(output).unwrap();
 

@@ -20,6 +20,7 @@ fn main() {
         "UnionTypes.rs",
         "InterfaceObjectMapPhf.rs",
         "ContentEventHandlerNames.rs",
+        "typealiases.rs",
     ]
     .iter()
     .map(Path::new)
