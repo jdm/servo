@@ -13,7 +13,7 @@ fn main() {
     let out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap());
     // copy ConcreteBindings folder
     let _ = std::fs::create_dir(out_dir.join("ConcreteBindings"));
-    let script_concrete_bindings_out_dir = script_bindings_out_dir.join("WebGPUConcreteBindings");
+    let script_concrete_bindings_out_dir = script_bindings_out_dir.join("script_webgpuConcreteBindings");
     println!(
         "cargo::rerun-if-changed={}",
         script_concrete_bindings_out_dir.display()
@@ -34,7 +34,7 @@ fn main() {
 
     let concrete_inherit_bindings =
         PathBuf::from(env::var_os("DEP_SCRIPT_BINDINGS_CRATE_OUT_DIR").unwrap())
-            .join("WebGPUConcreteInheritTypes.rs");
+            .join("script_webgpuConcreteInheritTypes.rs");
     let concrete_path_out =
         PathBuf::from(env::var_os("OUT_DIR").unwrap()).join("ConcreteInheritTypes.rs");
     std::fs::copy(concrete_inherit_bindings, concrete_path_out).expect("Could not copy types");

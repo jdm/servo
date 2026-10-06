@@ -330,6 +330,7 @@ profile = { package = "servo-profile", version = "=0.7.0", path = "components/pr
 profile_traits = { package = "servo-profile-traits", version = "=0.7.0", path = "components/shared/profile" }
 script = { package = "servo-script", version = "=0.7.0", path = "components/script" }
 script_bindings = { package = "servo-script-bindings", version = "=0.7.0", path = "components/script_bindings" }
+script_embedder = { package = "servo-script-embedder", version = "=0.7.0" }#, path = "components/script_embedder" }
 script_traits = { package = "servo-script-traits", version = "=0.7.0", path = "components/shared/script" }
 script_webgpu = { package = "servo-script-webgpu", version = "=0.7.0", path = "components/script_webgpu" }
 servo = { version = "=0.7.0", path = "components/servo", default-features = false }
@@ -489,3 +490,5 @@ codegen-units = 1
 #
 # [patch."https://github.com/servo/<repository>"]
 # <crate> = { path = "/path/to/local/checkout" }
+#[patch.crates-io]
+servo-script-embedder = { path = "./script_embedder_replace" }

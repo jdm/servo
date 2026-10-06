@@ -124,6 +124,15 @@ def main() -> None:
                 with open(os.path.join(out_dir, prefix + ".rs"), "wb") as f:
                     f.write(module.encode("utf-8"))
 
+    with open(os.path.join(out_dir, f"typealiases.rs"), "w") as f:
+        for (crate, items) in config.sub_crates.items():
+            if crate == "script_webgpu":
+                continue
+            for item in items:
+                lowered = item.lower()
+                f.write(f"pub(crate) mod {lowered} {{\n")
+                f.write(f"    pub(crate) type {item} = {crate}::{lowered}::{item}<crate::DomTypeHolder>;\n")
+                f.write("}\n")
 
     for (crate, items) in config.sub_crates.items():
         from codegen import GlobalGenRoots

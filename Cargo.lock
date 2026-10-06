@@ -9398,6 +9398,7 @@ dependencies = [
  "servo-pixels",
  "servo-profile-traits",
  "servo-script-bindings",
+ "servo-script-embedder",
  "servo-script-traits",
  "servo-script-webgpu",
  "servo-storage-traits",
@@ -9484,6 +9485,20 @@ dependencies = [
  "tracing",
  "xml5ever",
  "zeroize",
+]
+
+[[package]]
+name = "servo-script-embedder"
+version = "0.7.0"
+dependencies = [
+ "malloc_size_of_derive",
+ "mozjs",
+ "servo-deny-public-fields",
+ "servo-dom-struct",
+ "servo-jstraceable-derive",
+ "servo-malloc-size-of",
+ "servo-script-bindings",
+ "trait-set",
 ]
 
 [[package]]

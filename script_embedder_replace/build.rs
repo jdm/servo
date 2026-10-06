@@ -3,7 +3,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 use std::env;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 fn main() {
     // copy include! files from script_bindings's OUT_DIR, to script's OUT_DIR
@@ -11,33 +11,9 @@ fn main() {
     let script_bindings_out_dir =
         PathBuf::from(env::var_os("DEP_SCRIPT_BINDINGS_CRATE_OUT_DIR").unwrap());
     let out_dir = PathBuf::from(env::var_os("OUT_DIR").unwrap());
-    // copy concrete files
-    [
-        "InterfaceTypes.rs",
-        "DomTypeHolder.rs",
-        "InterfaceObjectMap.rs",
-        "ConcreteInheritTypes.rs",
-        "UnionTypes.rs",
-        "InterfaceObjectMapPhf.rs",
-        "ContentEventHandlerNames.rs",
-        "typealiases.rs",
-    ]
-    .iter()
-    .map(Path::new)
-    .for_each(|file| {
-        println!(
-            "cargo::rerun-if-changed={}",
-            script_bindings_out_dir.join(file).display()
-        );
-        std::fs::copy(
-            script_bindings_out_dir.join(file),
-            out_dir.join(file.file_name().unwrap()),
-        )
-        .unwrap();
-    });
     // copy ConcreteBindings folder
     let _ = std::fs::create_dir(out_dir.join("ConcreteBindings"));
-    let script_concrete_bindings_out_dir = script_bindings_out_dir.join("ConcreteBindings");
+    let script_concrete_bindings_out_dir = script_bindings_out_dir.join("script_embedderConcreteBindings");
     println!(
         "cargo::rerun-if-changed={}",
         script_concrete_bindings_out_dir.display()
@@ -55,4 +31,11 @@ fn main() {
             )
             .unwrap();
         });
+
+    let concrete_inherit_bindings =
+        PathBuf::from(env::var_os("DEP_SCRIPT_BINDINGS_CRATE_OUT_DIR").unwrap())
+            .join("script_embedderConcreteInheritTypes.rs");
+    let concrete_path_out =
+        PathBuf::from(env::var_os("OUT_DIR").unwrap()).join("ConcreteInheritTypes.rs");
+    std::fs::copy(concrete_inherit_bindings, concrete_path_out).expect("Could not copy types");
 }

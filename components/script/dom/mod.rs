@@ -210,6 +210,14 @@ pub(crate) mod types {
     include!(concat!(env!("OUT_DIR"), "/InterfaceTypes.rs"));
 }
 
+pub(crate) use self::type_aliases::*;
+pub(crate) mod type_aliases {
+    include!(concat!(env!("OUT_DIR"), "/typealiases.rs"));
+}
+
+//pub(crate) use script_embedder::dom::*;
+//pub(crate) use script_embedder::dom::Foopy;
+
 pub(crate) mod abort;
 pub(crate) use self::abort::*;
 pub(crate) mod activation;
