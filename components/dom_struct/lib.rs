@@ -32,7 +32,9 @@ fn dom_struct_impl(
         #[repr(C)]
     };
 
-    let extra_attributes = if no_crown { quote!{} } else {
+    let extra_attributes = if no_crown {
+        quote! {}
+    } else {
         quote! {
             #[cfg_attr(crown, crown::unrooted_must_root_lint::must_root)]
         }
@@ -42,7 +44,11 @@ fn dom_struct_impl(
     let attributes: proc_macro2::TokenStream = attributes.to_string().parse().unwrap();
     let extra_attributes: proc_macro2::TokenStream = extra_attributes.to_string().parse().unwrap();
 
-    let output: proc_macro2::TokenStream = attributes.into_iter().chain(extra_attributes).chain(input).collect();
+    let output: proc_macro2::TokenStream = attributes
+        .into_iter()
+        .chain(extra_attributes)
+        .chain(input)
+        .collect();
 
     let item: Item = syn::parse2(output).unwrap();
 
