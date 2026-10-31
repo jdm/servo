@@ -58,6 +58,7 @@ use crate::dom::audio::iirfilternode::IIRFilterNode;
 use crate::dom::audio::oscillatornode::OscillatorNode;
 use crate::dom::audio::pannernode::PannerNode;
 use crate::dom::audio::periodicwave::PeriodicWave;
+use crate::dom::audio::scriptprocessornode::ScriptProcessorNode;
 use crate::dom::audio::stereopannernode::StereoPannerNode;
 use crate::dom::bindings::buffer_source::HeapBufferSource;
 use crate::dom::bindings::callback::{ExceptionHandling, RootedCallback, TracedCallback};
@@ -765,6 +766,24 @@ impl BaseAudioContextMethods<crate::DomTypeHolder> for BaseAudioContext {
             feedforward,
         };
         IIRFilterNode::Constructor(cx, self.global().as_window(), None, self, &opts)
+    }
+
+    /// <https://webaudio.github.io/web-audio-api/#dom-baseaudiocontext-createscriptprocessor>
+    fn CreateScriptProcessor(
+        &self,
+        cx: &mut JSContext,
+        buffer_size: u32,
+        number_of_inputs: u32,
+        number_of_outputs: u32,
+    ) -> DomRoot<ScriptProcessorNode> {
+        ScriptProcessorNode::new(
+            cx,
+            self.global().as_window(),
+            self,
+            number_of_inputs,
+            number_of_outputs,
+            buffer_size,
+        )
     }
 }
 

@@ -8,6 +8,7 @@ use std::ops::*;
 
 use byte_slice_cast::*;
 use euclid::default::Vector3D;
+use malloc_size_of_derive::MallocSizeOf;
 use serde::{Deserialize, Serialize};
 use smallvec::{SmallVec, smallvec};
 
@@ -31,6 +32,7 @@ pub struct Tick(pub u64);
 /// Some nodes have multiple inputs or outputs, which is
 /// where this becomes useful. Source nodes have an input
 /// of an empty chunk.
+#[derive(MallocSizeOf)]
 pub struct Chunk {
     pub blocks: SmallVec<[Block; 1]>,
 }
@@ -69,7 +71,7 @@ impl Chunk {
 /// We render audio in blocks of size FRAMES_PER_BLOCK
 ///
 /// A single block may contain multiple channels
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug, MallocSizeOf)]
 pub struct Block {
     /// The number of channels in this block
     channels: u8,

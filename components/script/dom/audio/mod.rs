@@ -31,4 +31,5 @@ pub(crate) mod offlineaudiocontext;
 pub(crate) mod oscillatornode;
 pub(crate) mod pannernode;
 pub(crate) mod periodicwave;
+pub(crate) mod scriptprocessornode;
 pub(crate) mod stereopannernode;

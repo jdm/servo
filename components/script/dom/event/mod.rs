@@ -4,6 +4,7 @@
 
 pub(crate) use self::event::*;
 pub(crate) mod animationevent;
+pub(crate) mod audioprocessingevent;
 pub(crate) mod beforeunloadevent;
 pub(crate) mod closeevent;
 pub(crate) mod commandevent;

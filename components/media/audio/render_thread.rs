@@ -26,6 +26,7 @@ use crate::media_stream_source_node::MediaStreamSourceNode;
 use crate::offline_sink::OfflineAudioSink;
 use crate::oscillator_node::OscillatorNode;
 use crate::panner_node::PannerNode;
+use crate::script_processor_node::ScriptProcessorNode;
 use crate::sink::{AudioSink, AudioSinkError};
 use crate::stereo_panner::StereoPannerNode;
 use crate::wave_shaper_node::WaveShaperNode;
@@ -251,6 +252,9 @@ impl AudioRenderThread {
             AudioNodeInit::WaveShaperNode(options) => Box::new(WaveShaperNode::new(options, ch)),
             AudioNodeInit::MediaElementSourceNode => Box::new(MediaElementSourceNode::new(ch)),
             AudioNodeInit::IIRFilterNode(options) => Box::new(IIRFilterNode::new(options, ch)),
+            AudioNodeInit::ScriptProcessorNode(options) => {
+                Box::new(ScriptProcessorNode::new(options, ch))
+            },
             _ => unimplemented!(),
         };
         let id = self.graph.add_node(node);

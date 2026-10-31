@@ -23,6 +23,7 @@ use crate::media_element_source_node::MediaElementSourceNodeMessage;
 use crate::oscillator_node::{OscillatorNodeMessage, OscillatorNodeOptions};
 use crate::panner_node::{PannerNodeMessage, PannerNodeOptions};
 use crate::param::{Param, ParamRate, ParamType, UserAutomationEvent};
+use crate::script_processor_node::{ScriptProcessorNodeMessage, ScriptProcessorNodeOptions};
 use crate::stereo_panner::StereoPannerOptions;
 use crate::wave_shaper_node::{WaveShaperNodeMessage, WaveShaperNodeOptions};
 
@@ -47,7 +48,7 @@ pub enum AudioNodeInit {
     OscillatorNode(OscillatorNodeOptions),
     PannerNode(PannerNodeOptions),
     PeriodicWave,
-    ScriptProcessorNode,
+    ScriptProcessorNode(ScriptProcessorNodeOptions),
     StereoPannerNode(StereoPannerOptions),
     WaveShaperNode(WaveShaperNodeOptions),
 }
@@ -248,6 +249,7 @@ pub enum AudioNodeMessage {
     MediaElementSourceNode(MediaElementSourceNodeMessage),
     OscillatorNode(OscillatorNodeMessage),
     PannerNode(PannerNodeMessage),
+    ScriptProcessorNode(ScriptProcessorNodeMessage),
     SetChannelCount(u8),
     SetChannelMode(ChannelCountMode),
     SetChannelInterpretation(ChannelInterpretation),
