@@ -2525,7 +2525,7 @@ impl Document {
     }
 
     /// <https://html.spec.whatwg.org/multipage/#completely-finish-loading>
-    fn completely_finish_loading(&self) {
+    pub(crate) fn completely_finish_loading(&self) {
         // Step 1. Assert: document's browsing context is non-null.
         // TODO: Adding this assert fails a lot of tests
 

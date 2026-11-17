@@ -4729,6 +4729,137 @@ impl ScriptThread {
     pub(crate) fn online() -> bool {
         with_script_thread(|script_thread| script_thread.online.get())
     }
+
+    pub(crate) fn create_realm(
+        cx: &mut JSContext,
+        new_pipeline_info: NewPipelineInfo,
+        origin: MutableOrigin,
+        creation_url: ServoUrl,
+        top_level_creation_url: ServoUrl,
+    ) -> DomRoot<Window> {
+        with_optional_script_thread(|script_thread| {
+            let script_thread = script_thread.expect("script thread must exist");
+            let webview_state = script_thread.shared_webview_state(&new_pipeline_info.webview_state);
+
+            let font_context = Arc::new(FontContext::new(
+                script_thread.system_font_service.clone(),
+                script_thread.paint_api.clone(),
+                script_thread.resource_threads.clone(),
+            ));
+
+            let font_resolver = Arc::new(SvgFontResolver::new(font_context.clone()));
+
+            let image_cache = script_thread.image_cache_factory.create(
+                webview_state.id,
+                new_pipeline_info.new_pipeline_id,
+                &script_thread.paint_api,
+                font_resolver,
+            );
+
+            let (user_scripts, user_stylesheets) = new_pipeline_info
+                .user_content_manager_id
+                .and_then(|user_content_manager_id| {
+                    script_thread.user_contents_for_manager_id
+                        .borrow()
+                        .get(&user_content_manager_id)
+                        .map(|script_thread_user_contents| {
+                            (
+                                script_thread_user_contents.user_scripts.clone(),
+                                script_thread_user_contents.user_stylesheets.clone(),
+                            )
+                        })
+                })
+                .unwrap_or_default();
+
+            let layout_config = LayoutConfig {
+                id: new_pipeline_info.new_pipeline_id,
+                webview_id: webview_state.id,
+                url: creation_url.clone(),
+                is_iframe: new_pipeline_info.parent_info.is_some(),
+                script_chan: script_thread.senders.constellation_sender.clone(),
+                image_cache: image_cache.clone(),
+                font_context,
+                time_profiler_chan: script_thread.senders.time_profiler_sender.clone(),
+                paint_api: script_thread.paint_api.clone(),
+                viewport_details: new_pipeline_info.viewport_details,
+                user_stylesheets,
+                theme: webview_state.theme.get(),
+                embedder_chan: script_thread.senders.pipeline_to_embedder_sender.clone(),
+            };
+
+            let window = Window::new(
+                cx,
+                webview_state,
+                script_thread.js_runtime.clone(),
+                script_thread.senders.self_sender.clone(),
+                script_thread.layout_factory.create(layout_config),
+                script_thread.senders.image_cache_sender.clone(),
+                script_thread.resource_threads.clone(),
+                script_thread.storage_threads.clone(),
+                #[cfg(feature = "bluetooth")]
+                script_thread.senders.bluetooth_sender.clone(),
+                script_thread.senders.memory_profiler_sender.clone(),
+                script_thread.senders.time_profiler_sender.clone(),
+                #[cfg(feature = "devtools")]
+                script_thread.senders.devtools_server_sender.clone(),
+                script_thread.senders.pipeline_to_constellation_sender.clone(),
+                script_thread.senders.pipeline_to_embedder_sender.clone(),
+                script_thread.senders.constellation_sender.clone(),
+                new_pipeline_info.new_pipeline_id,
+                new_pipeline_info.parent_info,
+                new_pipeline_info.viewport_details,
+                origin,
+                creation_url,
+                top_level_creation_url,
+                CrossProcessInstant::now(),
+                #[cfg(feature = "webgl")]
+                script_thread.webgl_chan.as_ref().map(|chan| chan.channel()),
+                #[cfg(feature = "webxr")]
+                script_thread.webxr_registry.clone(),
+                script_thread.paint_api.clone(),
+                script_thread.unminify_js,
+                script_thread.unminify_css,
+                script_thread.local_script_source.clone(),
+                user_scripts,
+                script_thread.player_context.clone(),
+                #[cfg(feature = "webgpu")]
+                script_thread.gpu_id_hub.clone(),
+                new_pipeline_info.load_data.inherited_secure_context,
+                script_thread.this.clone(),
+            );
+
+            #[cfg(feature = "devtools")]
+            if script_thread.senders.devtools_server_sender.is_some() &&
+                let Some(debugger_global) = &script_thread.debugger_global
+            {
+                debugger_global.fire_add_debuggee(cx, window.upcast(), new_pipeline_info.new_pipeline_id, None);
+            }
+
+            let iframe = new_pipeline_info.parent_info.and_then(|parent_id| {
+                script_thread.documents
+                    .borrow()
+                    .find_iframe(parent_id, new_pipeline_info.browsing_context_id)
+            });
+
+            // Initialize the browsing context for the window.
+            let window_proxy = script_thread.window_proxies.local_window_proxy(
+                cx,
+                &script_thread.senders,
+                &window,
+                new_pipeline_info.browsing_context_id,
+                new_pipeline_info.webview_state.id,
+                new_pipeline_info.parent_info,
+                iframe,
+                new_pipeline_info.opener,
+            );
+            if let Some(name) = new_pipeline_info.frame_name {
+                window_proxy.set_name(DOMString::from(name));
+            }
+            window.init_window_proxy(&window_proxy);
+
+            window
+        })
+    }
 }
 
 impl Drop for ScriptThread {

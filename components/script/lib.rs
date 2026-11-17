@@ -26,6 +26,7 @@ mod tasks;
 #[macro_use]
 extern crate script_bindings;
 
+mod browsing_context;
 pub(crate) mod conversions;
 mod css;
 mod fetch;

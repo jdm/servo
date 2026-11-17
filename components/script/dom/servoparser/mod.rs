@@ -2416,7 +2416,7 @@ fn attach_declarative_shadow_inner(
 }
 
 /// <https://html.spec.whatwg.org/multipage/#populate-with-html/head/body>
-fn populate_about_blank(cx: &mut JSContext, document: &Document) {
+pub(crate) fn populate_about_blank(cx: &mut JSContext, document: &Document) {
     let mut create_html_element = |name| {
         create_element(
             cx,
