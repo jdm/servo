@@ -27,6 +27,7 @@ use servo_url::ServoUrl;
 use style::attr::{AttrValue, LengthOrPercentageOrAuto};
 use stylo_atoms::Atom;
 
+use crate::browsing_context::{InitialBrowsingContextDetails, create_a_new_browsing_context_and_document};
 use crate::dom::bindings::codegen::Bindings::HTMLIFrameElementBinding::HTMLIFrameElementMethods;
 use crate::dom::bindings::codegen::Bindings::WindowBinding::Window_Binding::WindowMethods;
 use crate::dom::bindings::codegen::UnionTypes::TrustedHTMLOrString;
@@ -351,9 +352,10 @@ impl HTMLIFrameElement {
                 };
 
                 self.pipeline_id.set(Some(new_pipeline_id));
-                with_script_thread(|script_thread| {
+                /*with_script_thread(|script_thread| {
                     script_thread.spawn_pipeline(cx, new_pipeline_info);
-                });
+            });*/
+                
             },
             PipelineType::Navigation => {
                 let load_info = IFrameLoadInfoWithData {
@@ -613,9 +615,24 @@ impl HTMLIFrameElement {
     /// Synchronously create a new browsing context; this is not a navigation.
     fn create_nested_browsing_context(&self, cx: &mut JSContext) {
         // Step 1. Let parentNavigable be element's node navigable.
-        let document = self.owner_document();
+        let creator_document = self.owner_document();
         let window = self.owner_window();
         let pipeline_id = Some(window.pipeline_id());
+        // Step 3. Let browsingContext and document be the result of creating a new browsing context and document given element's node document, element, and group.
+        let browsing_context_id = BrowsingContextId::new();
+        let webview_id = window.window_proxy().webview_id();
+        self.pipeline_id.set(None);
+        self.pending_pipeline_id.set(None);
+        self.webview_id.set(Some(webview_id));
+        self.browsing_context_id.set(Some(browsing_context_id));
+
+        let viewport_details = window
+            .get_iframe_viewport_details_if_known(cx, browsing_context_id)
+            .unwrap_or_else(|| ViewportDetails {
+                hidpi_scale_factor: window.device_pixel_ratio(),
+                ..Default::default()
+            });
+
         // Step 4. Let targetName be null.
         // Step 5. If element has a name content attribute,
         // then set targetName to the value of that attribute.
@@ -623,47 +640,98 @@ impl HTMLIFrameElement {
             .upcast::<Element>()
             .get_name()
             .map(|name| name.to_string());
-        // Step 6. Let documentState be a new document state, with
+
+        let new_pipeline_id = PipelineId::new();
+
         let mut load_data = LoadData::new(
             // > initiator origin
             // >     document's origin
-            LoadOrigin::Script(document.origin().snapshot()),
+            LoadOrigin::Script(creator_document.origin().snapshot()),
             ServoUrl::parse("about:blank").unwrap(),
             // > about base URL
             // >     document's about base URL
-            Some(document.base_url()),
+            creator_document.about_base_url(),
             pipeline_id,
             window.as_global_scope().get_referrer(),
-            document.get_referrer_policy(),
+            creator_document.get_referrer_policy(),
             Some(window.as_global_scope().is_secure_context()),
-            Some(document.insecure_requests_policy()),
+            Some(creator_document.insecure_requests_policy()),
             window
                 .as_global_scope()
                 .upgrade_insecure_navigations_set()
                 .clone(),
-            document.has_trustworthy_ancestor_or_current_origin(),
+            creator_document.has_trustworthy_ancestor_or_current_origin(),
             self.sandboxing_flag_set(),
         );
         load_data.is_initial_about_blank = true;
         load_data.destination = Destination::IFrame;
         load_data.policy_container = Some(window.as_global_scope().policy_container());
 
+        let load_info = IFrameLoadInfo {
+            parent_pipeline_id: pipeline_id.expect("must have a parent"),
+            browsing_context_id,
+            webview_id,
+            new_pipeline_id,
+            is_private: false, // FIXME
+            inherited_secure_context: load_data.inherited_secure_context,
+            history_handling: NavigationHistoryBehavior::Push,
+            target_snapshot_params: snapshot_self(self),
+            name: self.frozen_name.borrow().clone(),
+        };
+
+        let load_info = IFrameLoadInfoWithData {
+            info: load_info,
+            load_data: load_data.clone(),
+            old_pipeline_id: None,
+            viewport_details,
+        };
+
+        window
+            .as_global_scope()
+            .script_to_constellation_chan()
+            .send(ScriptToConstellationMessage::ScriptNewIFrame(load_info))
+            .unwrap();
+
+        let details = InitialBrowsingContextDetails {
+            webview_state: window.webview_state(),
+            parent_info: pipeline_id,
+            viewport_details,
+            opener: None,
+            inherited_secure_context: Some(window.as_global_scope().is_secure_context()),
+            frame_name: self.frozen_name.borrow().clone(),
+            new_pipeline_id,
+            browsing_context_id,
+        };
+        let document = create_a_new_browsing_context_and_document(
+            cx,
+            Some(&creator_document),
+            Some(self.upcast()),
+            details,
+        );
+        // Step 6. Let documentState be a new document state, with
+
         // Step 7. Let navigable be a new navigable.
-        let browsing_context_id = BrowsingContextId::new();
-        let webview_id = window.window_proxy().webview_id();
+        //let browsing_context_id = BrowsingContextId::new();
+        /*let webview_id = window.window_proxy().webview_id();
         self.pipeline_id.set(None);
         self.pending_pipeline_id.set(None);
         self.webview_id.set(Some(webview_id));
-        self.browsing_context_id.set(Some(browsing_context_id));
+        self.browsing_context_id.set(Some(browsing_context_id));*/
         // Step 8. Initialize the navigable navigable given documentState and parentNavigable.
-        self.start_new_pipeline(
+        self.about_blank_pipeline_id.set(Some(new_pipeline_id));
+        self.pipeline_id.set(Some(new_pipeline_id));
+
+
+        // TODO: notify devtools like ScriptThread::spawn_pipeline
+
+        /*self.start_new_pipeline(
             cx,
             load_data,
             PipelineType::InitialAboutBlank,
             NavigationHistoryBehavior::Push,
             ProcessingMode::FirstTime,
             snapshot_self(self),
-        );
+        );*/
         // > navigable target name
         // >     targetName
         if let Some(window) = self.GetContentWindow() &&

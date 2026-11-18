@@ -213,6 +213,7 @@ impl WindowProxy {
         parent: Option<&WindowProxy>,
         opener: Option<BrowsingContextId>,
         creator: CreatorBrowsingContextInfo,
+        pipeline_id: PipelineId,
     ) -> DomRoot<WindowProxy> {
         unsafe {
             let handler = window.windowproxy_handler();
@@ -233,11 +234,12 @@ impl WindowProxy {
 
             // Create a new browsing context.
 
-            let current = Some(window.upcast::<GlobalScope>().pipeline_id());
+            //let current = Some(window.upcast::<GlobalScope>().pipeline_id());
+            let current = pipeline_id;
             let window_proxy = Box::new(WindowProxy::new_inherited(
                 browsing_context_id,
                 webview_id,
-                current,
+                Some(current),
                 frame_element,
                 parent,
                 opener,

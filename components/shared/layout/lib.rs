@@ -284,6 +284,8 @@ pub trait LayoutFactory: Send + Sync {
 }
 
 pub trait Layout {
+    fn image_cache(&self) -> Arc<dyn ImageCache>;
+
     /// Get a reference to this Layout's Stylo `Device` used to handle media queries and
     /// resolve font metrics.
     fn device(&self) -> &Device;

@@ -3147,6 +3147,7 @@ impl ScriptThread {
             // is no need to pass along existing opener information that
             // will be discarded.
             None,
+            window.pipeline_id(),
         );
     }
 
@@ -3777,6 +3778,7 @@ impl ScriptThread {
             parent_info,
             iframe,
             incomplete.opener,
+            document.pipeline_id(),
         );
         if let Some(name) = incomplete.frame_name {
             window_proxy.set_name(DOMString::from(name));
@@ -4742,16 +4744,32 @@ impl ScriptThread {
         with_script_thread(|script_thread| script_thread.online.get())
     }
 
+    pub(crate) fn track_document(document: &Document) {
+        with_script_thread(|script_thread| {
+            script_thread
+                .documents
+                .borrow_mut()
+                .insert(document.pipeline_id(), document)
+        });
+    }
+
     pub(crate) fn create_realm(
         cx: &mut JSContext,
-        new_pipeline_info: NewPipelineInfo,
+        webview_state: &WebViewState,
+        new_pipeline_id: PipelineId,
+        parent_info: Option<PipelineId>,
+        viewport_details: ViewportDetails,
         origin: MutableOrigin,
         creation_url: ServoUrl,
         top_level_creation_url: ServoUrl,
+        inherited_secure_context: Option<bool>,
+        browsing_context_id: BrowsingContextId,
+        opener: Option<BrowsingContextId>,
+        frame_name: Option<String>,
     ) -> DomRoot<Window> {
         with_optional_script_thread(|script_thread| {
             let script_thread = script_thread.expect("script thread must exist");
-            let webview_state = script_thread.shared_webview_state(&new_pipeline_info.webview_state);
+            let webview_state = script_thread.shared_webview_state(webview_state);
 
             let font_context = Arc::new(FontContext::new(
                 script_thread.system_font_service.clone(),
@@ -4763,45 +4781,30 @@ impl ScriptThread {
 
             let image_cache = script_thread.image_cache_factory.create(
                 webview_state.id,
-                new_pipeline_info.new_pipeline_id,
+                new_pipeline_id,
                 &script_thread.paint_api,
                 font_resolver,
             );
 
-            let (user_scripts, user_stylesheets) = new_pipeline_info
-                .user_content_manager_id
-                .and_then(|user_content_manager_id| {
-                    script_thread.user_contents_for_manager_id
-                        .borrow()
-                        .get(&user_content_manager_id)
-                        .map(|script_thread_user_contents| {
-                            (
-                                script_thread_user_contents.user_scripts.clone(),
-                                script_thread_user_contents.user_stylesheets.clone(),
-                            )
-                        })
-                })
-                .unwrap_or_default();
-
             let layout_config = LayoutConfig {
-                id: new_pipeline_info.new_pipeline_id,
+                id: new_pipeline_id,
                 webview_id: webview_state.id,
                 url: creation_url.clone(),
-                is_iframe: new_pipeline_info.parent_info.is_some(),
+                is_iframe: parent_info.is_some(),
                 script_chan: script_thread.senders.constellation_sender.clone(),
                 image_cache: image_cache.clone(),
                 font_context,
                 time_profiler_chan: script_thread.senders.time_profiler_sender.clone(),
                 paint_api: script_thread.paint_api.clone(),
-                viewport_details: new_pipeline_info.viewport_details,
-                user_stylesheets,
+                viewport_details: viewport_details,
+                user_stylesheets: Rc::new(vec![]),
                 theme: webview_state.theme.get(),
                 embedder_chan: script_thread.senders.pipeline_to_embedder_sender.clone(),
             };
 
             let window = Window::new(
                 cx,
-                webview_state,
+                webview_state.clone(),
                 script_thread.js_runtime.clone(),
                 script_thread.senders.self_sender.clone(),
                 script_thread.layout_factory.create(layout_config),
@@ -4817,9 +4820,9 @@ impl ScriptThread {
                 script_thread.senders.pipeline_to_constellation_sender.clone(),
                 script_thread.senders.pipeline_to_embedder_sender.clone(),
                 script_thread.senders.constellation_sender.clone(),
-                new_pipeline_info.new_pipeline_id,
-                new_pipeline_info.parent_info,
-                new_pipeline_info.viewport_details,
+                new_pipeline_id,
+                parent_info,
+                viewport_details,
                 origin,
                 creation_url,
                 top_level_creation_url,
@@ -4832,11 +4835,11 @@ impl ScriptThread {
                 script_thread.unminify_js,
                 script_thread.unminify_css,
                 script_thread.local_script_source.clone(),
-                user_scripts,
+                Rc::new(vec![]),
                 script_thread.player_context.clone(),
                 #[cfg(feature = "webgpu")]
                 script_thread.gpu_id_hub.clone(),
-                new_pipeline_info.load_data.inherited_secure_context,
+                inherited_secure_context,
                 script_thread.this.clone(),
             );
 
@@ -4844,13 +4847,13 @@ impl ScriptThread {
             if script_thread.senders.devtools_server_sender.is_some() &&
                 let Some(debugger_global) = &script_thread.debugger_global
             {
-                debugger_global.fire_add_debuggee(cx, window.upcast(), new_pipeline_info.new_pipeline_id, None);
+                debugger_global.fire_add_debuggee(cx, window.upcast(), new_pipeline_id, None);
             }
 
-            let iframe = new_pipeline_info.parent_info.and_then(|parent_id| {
+            let iframe = parent_info.and_then(|parent_id| {
                 script_thread.documents
                     .borrow()
-                    .find_iframe(parent_id, new_pipeline_info.browsing_context_id)
+                    .find_iframe(parent_id, browsing_context_id)
             });
 
             // Initialize the browsing context for the window.
@@ -4858,13 +4861,14 @@ impl ScriptThread {
                 cx,
                 &script_thread.senders,
                 &window,
-                new_pipeline_info.browsing_context_id,
-                new_pipeline_info.webview_state.id,
-                new_pipeline_info.parent_info,
+                browsing_context_id,
+                webview_state.id,
+                parent_info,
                 iframe,
-                new_pipeline_info.opener,
+                opener,
+                new_pipeline_id,
             );
-            if let Some(name) = new_pipeline_info.frame_name {
+            if let Some(name) = frame_name {
                 window_proxy.set_name(DOMString::from(name));
             }
             window.init_window_proxy(&window_proxy);

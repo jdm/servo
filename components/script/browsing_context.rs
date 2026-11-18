@@ -1,7 +1,11 @@
+use std::rc::Rc;
+
+use embedder_traits::ViewportDetails;
 use js::context::JSContext;
 use script_bindings::inheritance::Castable;
 use script_bindings::root::DomRoot;
-use script_traits::{DocumentActivity, NewPipelineInfo};
+use script_traits::{DocumentActivity, NewPipelineInfo, WebViewState};
+use servo_base::id::{BrowsingContextId, PipelineId};
 use servo_url::ServoUrl;
 
 use crate::dom::bindings::reflector::DomGlobal;
@@ -13,12 +17,23 @@ use crate::event_loop::document_loader::DocumentLoader;
 use crate::event_loop::script_thread::ScriptThread;
 use crate::navigation::{determine_the_origin, determine_iframe_element_referrer_policy, determine_creation_sandboxing_flags};
 
+pub(crate) struct InitialBrowsingContextDetails {
+    pub(crate) webview_state: Rc<WebViewState>,
+    pub(crate) parent_info: Option<PipelineId>,
+    pub(crate) viewport_details: ViewportDetails,
+    pub(crate) opener: Option<BrowsingContextId>,
+    pub(crate) inherited_secure_context: Option<bool>,
+    pub(crate) frame_name: Option<String>,
+    pub(crate) new_pipeline_id: PipelineId,
+    pub(crate) browsing_context_id: BrowsingContextId,
+}
+
 /// <https://html.spec.whatwg.org/multipage/#creating-a-new-browsing-context>
 pub(crate) fn create_a_new_browsing_context_and_document(
     cx: &mut JSContext,
     creator: Option<&Document>,
     embedder: Option<&Element>,
-    new_pipeline_info: NewPipelineInfo,
+    details: InitialBrowsingContextDetails,
 ) -> DomRoot<Document> {
     // Step 1. Let browsingContext be a new browsing context.
     // TODO
@@ -72,13 +87,20 @@ pub(crate) fn create_a_new_browsing_context_and_document(
     // Step 12. Let topLevelOrigin be origin if embedder is null; otherwise embedder's relevant settings object's top-level origin.
     // TODO
     // Step 13. Set up a window environment settings object with about:blank, realm execution context, null, topLevelCreationURL, and topLevelOrigin.
-    let new_pipeline_id = new_pipeline_info.new_pipeline_id.clone();
+    //let new_pipeline_id = new_pipeline_info.new_pipeline_id.clone();
     let window = ScriptThread::create_realm(
         cx,
-        new_pipeline_info,
+        &*details.webview_state,
+        details.new_pipeline_id,
+        details.parent_info,
+        details.viewport_details,
         origin.clone(),
         about_blank.clone(),
         top_level_creation_url,
+        details.inherited_secure_context,
+        details.browsing_context_id,
+        details.opener,
+        details.frame_name,
     );
 
     // Step 14. Let loadTimingInfo be a new document load timing info with its navigation start time set to the result of calling coarsen time with unsafeContextCreationTime and the new environment settings object's cross-origin isolated capability.
@@ -109,18 +131,25 @@ pub(crate) fn create_a_new_browsing_context_and_document(
         false, /* has trustworthy ancestor origin */
         ScriptThread::custom_element_reaction_stack(),
         sandbox_flags,
-        new_pipeline_id,
-        window.image_cache(),
+        details.new_pipeline_id,
+        window.layout().image_cache(),
     );
+    window.init_document(&document);
+
+    ScriptThread::track_document(&document);
 
     // Step 16. Let iframeReferrerPolicy be the result of determining the iframe element referrer policy given embedder.
-    let _iframe_referrer_policy = determine_iframe_element_referrer_policy(embedder);
+    let iframe_referrer_policy = determine_iframe_element_referrer_policy(embedder);
 
     // Step 17. Set document's internal ancestor origin objects list to the result of running the internal ancestor origin objects list creation steps given document and iframeReferrerPolicy.
-    // TODO
+    document.set_internal_ancestor_origin_objects_list(
+        document.internal_ancestor_origin_objects_list_creation_steps(
+            &iframe_referrer_policy,
+        ),
+    );
 
     // Step 18. Set document's ancestor origins list to the result of running the ancestor origins list creation steps given document.
-    // TODO
+    document.set_ancestor_origins_list(&document.ancestor_origins_list_creation_steps(cx));
 
     // Step 19. If creator is non-null:
     // Step 19.1. Set document's referrer to the serialization of creator's URL.
@@ -143,6 +172,7 @@ pub(crate) fn create_a_new_browsing_context_and_document(
 
     // Step 23. Make active document.
     // Note: already occurred in ScriptThread::create_realm.
+    //ScriptThread::make_active(&document);
 
     // Step 24. Completely finish loading document.
     document.completely_finish_loading();

@@ -2444,7 +2444,7 @@ pub(crate) fn populate_about_blank(cx: &mut JSContext, document: &Document) {
 
 impl Document {
     /// <https://html.spec.whatwg.org/multipage/#internal-ancestor-origin-objects-list-creation-steps>
-    fn internal_ancestor_origin_objects_list_creation_steps(
+    pub(crate) fn internal_ancestor_origin_objects_list_creation_steps(
         &self,
         referrer_policy: &ReferrerPolicy,
     ) -> Vec<ImmutableOrigin> {
@@ -2491,7 +2491,7 @@ impl Document {
     }
 
     /// <https://html.spec.whatwg.org/multipage/#ancestor-origins-list-creation-steps>
-    fn ancestor_origins_list_creation_steps(&self, cx: &mut JSContext) -> DomRoot<DOMStringList> {
+    pub(crate) fn ancestor_origins_list_creation_steps(&self, cx: &mut JSContext) -> DomRoot<DOMStringList> {
         // Step 1. Let ancestorOrigins be document's internal ancestor origin objects list.
         // Step 2. Assert: ancestorOrigins is not null.
         let ancestor_origins = self.internal_ancestor_origin_objects_list();

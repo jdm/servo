@@ -275,6 +275,10 @@ impl Drop for LayoutThread {
 }
 
 impl Layout for LayoutThread {
+    fn image_cache(&self) -> Arc<dyn ImageCache> {
+        self.image_cache.clone()
+    }
+
     fn device(&self) -> &Device {
         self.stylist.device()
     }

@@ -111,6 +111,7 @@ impl ScriptWindowProxies {
         parent_info: Option<PipelineId>,
         iframe: Option<DomRoot<HTMLIFrameElement>>,
         opener: Option<BrowsingContextId>,
+        active_pipeline_id: PipelineId,
     ) -> DomRoot<WindowProxy> {
         if let Some(window_proxy) = self.find_window_proxy(browsing_context_id) {
             // Note: we do not set the window to be the currently-active one,
@@ -146,6 +147,7 @@ impl ScriptWindowProxies {
             parent_browsing_context.as_deref(),
             opener,
             creator,
+            active_pipeline_id,
         );
         self.insert(browsing_context_id, &window_proxy);
         window_proxy
