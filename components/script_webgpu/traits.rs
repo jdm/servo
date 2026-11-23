@@ -12,10 +12,9 @@ use pixels::Snapshot;
 use script_bindings::DomTypes;
 use script_bindings::callback::{CallbackContainer, HasCallbackHolder, RootedCallback};
 use script_bindings::error::{Error, Fallible};
+use script_bindings::interfaces::PromiseCallbackTrait;
 use script_bindings::reflector::{DomGlobalGeneric, DomObject};
 use script_bindings::tasks::TaskOnce;
-use serde_core::Serialize;
-use servo_base::generic_channel::GenericCallback;
 use servo_url::MutableOrigin;
 use webgpu_traits::{
     BufferAccessError, Mapping, ShaderCompilationInfo, WebGPUAdapterResponse,
@@ -125,20 +124,15 @@ pub trait Equivalence = DomTypes<
         EventTarget: EventTargetTrait<Self>>;
 
     pub trait WebGPUPromise<D: DomTypes> =
-        WebGPUPromiseCallbackTrait<D, GPU<D>, WebGPUAdapterResponse>
-        + WebGPUPromiseCallbackTrait<D, GPUAdapter<D>, WebGPUDeviceResponse>
-        + WebGPUPromiseCallbackTrait<D, GPUBuffer<D>, Result<Mapping, BufferAccessError>>
-        + WebGPUPromiseCallbackTrait<D, GPUDevice<D>, WebGPUPoppedErrorScopeResponse>
-        + WebGPUPromiseCallbackTrait<D, GPUDevice<D>, WebGPUComputePipelineResponse>
-        + WebGPUPromiseCallbackTrait<D, GPUDevice<D>, WebGPURenderPipelineResponse>
-        + WebGPUPromiseCallbackTrait<D, GPUQueue<D>, ()>
-        + WebGPUPromiseCallbackTrait<D, GPUShaderModule<D>, Option<ShaderCompilationInfo>>
+        PromiseCallbackTrait<D, GPU<D>, WebGPUAdapterResponse>
+        + PromiseCallbackTrait<D, GPUAdapter<D>, WebGPUDeviceResponse>
+        + PromiseCallbackTrait<D, GPUBuffer<D>, Result<Mapping, BufferAccessError>>
+        + PromiseCallbackTrait<D, GPUDevice<D>, WebGPUPoppedErrorScopeResponse>
+        + PromiseCallbackTrait<D, GPUDevice<D>, WebGPUComputePipelineResponse>
+        + PromiseCallbackTrait<D, GPUDevice<D>, WebGPURenderPipelineResponse>
+        + PromiseCallbackTrait<D, GPUQueue<D>, ()>
+        + PromiseCallbackTrait<D, GPUShaderModule<D>, Option<ShaderCompilationInfo>>
 ;
-}
-
-/// Trait for sending Promise callbacks
-pub trait WebGPUPromiseCallbackTrait<D: DomTypes, S, T: Serialize + 'static + Send> {
-    fn callback_promise_dom_manipulation_task_source(&self, d: &S) -> GenericCallback<T>;
 }
 
 pub trait WebGPUGlobalTrait<D: DomTypes>: Sized + DomObject {

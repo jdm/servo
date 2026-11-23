@@ -13,7 +13,7 @@ use script_bindings::codegen::GenericBindings::WebGPUBinding::{
     GPUShaderModuleDescriptor, GPUShaderModuleMethods, GPUShaderModuleWrap,
 };
 use script_bindings::interfaces::{
-    HeapTracedPromiseHelpers, PromiseHelpers, StackRootPromiseHelpers,
+    PromiseCallbackTrait, HeapTracedPromiseHelpers, PromiseHelpers, StackRootPromiseHelpers,
 };
 use script_bindings::reflector::{DomGlobalGeneric, Reflector, reflect_dom_object_with_wrap};
 use script_bindings::routed_promise::RoutedPromiseListener;
@@ -23,7 +23,7 @@ use crate::JSTraceable;
 use crate::dom::bindings::root::DomRoot;
 use crate::dom::bindings::str::USVString;
 use crate::gpucompilationinfo::GPUCompilationInfo;
-use crate::traits::{Equivalence, WebGPUGlobalTrait, WebGPUPromise, WebGPUPromiseCallbackTrait};
+use crate::traits::{Equivalence, WebGPUGlobalTrait, WebGPUPromise};
 
 #[derive(JSTraceable, MallocSizeOf)]
 struct DroppableGPUShaderModule {

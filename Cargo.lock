@@ -9550,6 +9550,10 @@ version = "0.8.0"
 dependencies = [
  "malloc_size_of_derive",
  "mozjs",
+ "serde",
+ "serde_json",
+ "servo-base",
+ "servo-constellation-traits",
  "servo-deny-public-fields",
  "servo-dom-struct",
  "servo-jstraceable-derive",

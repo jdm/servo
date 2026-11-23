@@ -15,6 +15,10 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(crown)'] }
 [dependencies]
 js = { package = "mozjs", version = "=0.26.14", default-features = false, features = ["intl", "libz-sys"] }
 malloc_size_of_derive = "0.1"
+serde = "1"
+serde_json = "1"
+servo-base = { path = "../components/shared/base" }
+servo-constellation-traits = { path = "../components/shared/constellation" }
 servo-deny-public-fields = { path = "../components/deny_public_fields" }
 servo-dom-struct = { path = "../components/dom_struct" }
 servo-jstraceable-derive = { path = "../components/jstraceable_derive" }

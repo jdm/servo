@@ -18,7 +18,7 @@ use script_bindings::codegen::GenericBindings::WebGPUBinding::{
     GPUMapModeConstants, GPUMapModeFlags, GPUSize64,
 };
 use script_bindings::error::{Error, Fallible};
-use script_bindings::interfaces::{PromiseHelpers, StackRootPromiseHelpers};
+use script_bindings::interfaces::{PromiseCallbackTrait, PromiseHelpers, StackRootPromiseHelpers};
 use script_bindings::reflector::{DomGlobalGeneric, Reflector, reflect_dom_object_with_wrap};
 use script_bindings::routed_promise::RoutedPromiseListener;
 use script_bindings::trace::RootedTraceableBox;
@@ -32,7 +32,7 @@ use crate::datablock::DataBlock;
 use crate::dom::bindings::root::{Dom, DomRoot};
 use crate::dom::bindings::str::USVString;
 use crate::gpuconvert::WebGPUConvert;
-use crate::traits::{Equivalence, WebGPUGlobalTrait, WebGPUPromise, WebGPUPromiseCallbackTrait};
+use crate::traits::{Equivalence, WebGPUGlobalTrait, WebGPUPromise};
 
 #[derive(JSTraceable, MallocSizeOf)]
 #[cfg_attr(crown, crown::unrooted_must_root_lint::must_root)]

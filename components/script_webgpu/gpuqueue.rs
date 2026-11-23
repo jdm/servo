@@ -27,7 +27,7 @@ use script_bindings::codegen::GenericUnionTypes::{
 };
 use script_bindings::dom::MutNullableDom;
 use script_bindings::error::{Error, Fallible};
-use script_bindings::interfaces::{GlobalScopeHelpers, PromiseHelpers};
+use script_bindings::interfaces::{GlobalScopeHelpers, PromiseCallbackTrait, PromiseHelpers};
 use script_bindings::reflector::{DomGlobalGeneric, Reflector, reflect_dom_object_with_wrap};
 use script_bindings::root::DomRoot;
 use script_bindings::routed_promise::RoutedPromiseListener;
@@ -43,7 +43,6 @@ use crate::gpudevice::GPUDevice;
 use crate::traits::{
     Equivalence, HtmlCanvasElementTrait, HtmlImageElementTrait, ImageBitmapTrait, ImageDataTrait,
     OffscreenCanvasTrait, OriginIsCleanTrait, WebGPUHTMLVideoTrait, WebGPUPromise,
-    WebGPUPromiseCallbackTrait,
 };
 
 #[dom_struct]

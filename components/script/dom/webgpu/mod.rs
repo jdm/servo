@@ -12,11 +12,12 @@ use pixels::Snapshot;
 use script_bindings::DomTypes;
 use script_bindings::callback::{CallbackContainer, HasCallbackHolder, RootedCallback};
 use script_bindings::error::{Error, Fallible};
+use script_bindings::interfaces::PromiseCallbackTrait;
 use script_bindings::reflector::{DomGlobalGeneric, DomObject};
 use script_webgpu::traits::{
     EventTargetTrait, HtmlCanvasElementTrait, HtmlImageElementTrait, ImageBitmapTrait,
     ImageDataTrait, OffscreenCanvasTrait, OriginIsCleanTrait, WebGPUGlobalTrait,
-    WebGPUHTMLVideoTrait, WebGPUPromiseCallbackTrait,
+    WebGPUHTMLVideoTrait,
 };
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -190,7 +191,7 @@ pub(crate) mod wgsllanguagefeatures {
         script_webgpu::wgsllanguagefeatures::WGSLLanguageFeatures<crate::DomTypeHolder>;
 }
 
-impl<S, T> WebGPUPromiseCallbackTrait<crate::DomTypeHolder, S, T> for RootedPromise
+impl<S, T> PromiseCallbackTrait<crate::DomTypeHolder, S, T> for RootedPromise
 where
     S: DomObject
         + DomGlobalGeneric<crate::DomTypeHolder>

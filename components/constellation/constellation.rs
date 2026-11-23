@@ -2108,6 +2108,11 @@ where
                     }
                 },
             },
+            ScriptToConstellationMessage::Embedder(serialized) => {
+                self.constellation_to_embedder_proxy.send(
+                    ConstellationToEmbedderMsg::Custom(serialized),
+                );
+            }
         }
     }
 

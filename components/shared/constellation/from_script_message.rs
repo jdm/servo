@@ -877,6 +877,7 @@ pub enum ScriptToConstellationMessage {
     /// aggregate lock count and notify the provider only when the count transitions from N to 0.
     /// <https://w3c.github.io/screen-wake-lock/#dfn-release-wake-lock>
     ReleaseWakeLock(WakeLockType),
+    Embedder(Vec<u8>),
 }
 
 impl fmt::Debug for ScriptToConstellationMessage {

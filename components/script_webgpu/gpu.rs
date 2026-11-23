@@ -16,7 +16,7 @@ use script_bindings::codegen::GenericBindings::WebGPUBinding::{
     GPUMethods, GPUPowerPreference, GPURequestAdapterOptions, GPUTextureFormat, GPUWrap,
 };
 use script_bindings::dom::MutNullableDom;
-use script_bindings::interfaces::{GlobalScopeHelpers, PromiseHelpers};
+use script_bindings::interfaces::{GlobalScopeHelpers, PromiseCallbackTrait, PromiseHelpers};
 use script_bindings::reflector::{DomGlobalGeneric, Reflector, reflect_dom_object_with_wrap};
 use script_bindings::root::DomRoot;
 use script_bindings::routed_promise::RoutedPromiseListener;
@@ -27,7 +27,7 @@ use webgpu_traits::{PowerPreference, RequestAdapterOptions, WebGPUAdapterRespons
 use super::wgsllanguagefeatures::WGSLLanguageFeatures;
 use crate::dom::bindings::error::Error;
 use crate::gpuadapter::GPUAdapter;
-use crate::traits::{Equivalence, WebGPUGlobalTrait, WebGPUPromise, WebGPUPromiseCallbackTrait};
+use crate::traits::{Equivalence, WebGPUGlobalTrait, WebGPUPromise};
 
 #[dom_struct]
 pub struct GPU<D: DomTypes> {

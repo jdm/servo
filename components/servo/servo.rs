@@ -951,6 +951,9 @@ impl ServoInner {
                         .notify_media_session_event(webview, media_session_event);
                 }
             },
+            ConstellationToEmbedderMsg::Custom(serialized) => {
+                todo!()
+            }
         }
     }
 }

@@ -31,7 +31,7 @@ use script_bindings::conversions::DerivedFrom;
 use script_bindings::error::Error;
 use script_bindings::inheritance::Castable;
 use script_bindings::interfaces::{
-    HeapTracedPromiseHelpers, PromiseHelpers, StackRootPromiseHelpers,
+    HeapTracedPromiseHelpers, PromiseCallbackTrait, PromiseHelpers, StackRootPromiseHelpers,
 };
 use script_bindings::reflector::{
     DomGlobalGeneric, reflect_weak_referenceable_dom_object_with_wrap,
@@ -78,7 +78,7 @@ use crate::gpusupportedlimits::GPUSupportedLimits;
 use crate::gputexture::GPUTexture;
 use crate::gpuuncapturederrorevent::GPUUncapturedErrorEvent;
 use crate::traits::{
-    Equivalence, EventTargetTrait, WebGPUGlobalTrait, WebGPUPromise, WebGPUPromiseCallbackTrait,
+    Equivalence, EventTargetTrait, WebGPUGlobalTrait, WebGPUPromise,
 };
 
 macro_rules! event_handler(

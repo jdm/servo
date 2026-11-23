@@ -14,7 +14,7 @@ use script_bindings::codegen::GenericBindings::WebGPUBinding::{
     GPUAdapterMethods, GPUAdapterWrap, GPUDeviceDescriptor, GPUDeviceLostReason,
 };
 use script_bindings::domstring::TracedDOMString;
-use script_bindings::interfaces::{GlobalScopeHelpers, PromiseHelpers};
+use script_bindings::interfaces::{GlobalScopeHelpers, PromiseCallbackTrait, PromiseHelpers};
 use script_bindings::like::Setlike;
 use script_bindings::reflector::{DomGlobalGeneric, Reflector, reflect_dom_object_with_wrap};
 use script_bindings::routed_promise::RoutedPromiseListener;
@@ -31,7 +31,7 @@ use crate::gpuadapterinfo::GPUAdapterInfo;
 use crate::gpudevice::GPUDevice;
 use crate::gpusupportedfeatures::{GPUSupportedFeatures, gpu_to_wgt_feature};
 use crate::gpusupportedlimits::{GPUSupportedLimits, set_limit};
-use crate::traits::{Equivalence, WebGPUGlobalTrait, WebGPUPromise, WebGPUPromiseCallbackTrait};
+use crate::traits::{Equivalence, WebGPUGlobalTrait, WebGPUPromise};
 
 #[derive(JSTraceable, MallocSizeOf)]
 struct DroppableGPUAdapter {

@@ -42,4 +42,5 @@ pub enum ConstellationToEmbedderMsg {
     HistoryChanged(WebViewId, Vec<ServoUrl>, usize),
     /// A pipeline exited, whether cleanly or because its content process died.
     PipelineExited(PipelineId),
+    Custom(Vec<u8>),
 }

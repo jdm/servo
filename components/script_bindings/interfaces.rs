@@ -14,7 +14,9 @@ use js::jsapi::{CallArgs, JSObject};
 use js::realm::CurrentRealm;
 use js::rust::{HandleObject, MutableHandleObject};
 use malloc_size_of::MallocSizeOf;
+use serde::Serialize;
 use servo_base::id::PipelineId;
+use servo_base::generic_channel::GenericCallback;
 use servo_constellation_traits::ScriptToConstellationChan;
 use servo_url::{MutableOrigin, ServoUrl};
 
@@ -157,4 +159,9 @@ pub trait WindowHelpers {
 
 pub trait HasOrigin {
     fn origin(&self) -> MutableOrigin;
+}
+
+/// Trait for sending Promise callbacks
+pub trait PromiseCallbackTrait<D: DomTypes, S, T: Serialize + 'static + Send> {
+    fn callback_promise_dom_manipulation_task_source(&self, d: &S) -> GenericCallback<T>;
 }
