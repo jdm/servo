@@ -13,7 +13,7 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(crown)'] }
 #workspace = true
 
 [dependencies]
-js = { package = "mozjs", version = "=0.26.7", default-features = false, features = ["intl", "libz-sys"] }
+js = { package = "mozjs", version = "=0.26.14", default-features = false, features = ["intl", "libz-sys"] }
 malloc_size_of_derive = "0.1"
 servo-deny-public-fields = { path = "../components/deny_public_fields" }
 servo-dom-struct = { path = "../components/dom_struct" }

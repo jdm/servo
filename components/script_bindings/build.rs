@@ -29,6 +29,7 @@ fn main() {
     println!("cargo::rerun-if-changed={}", css_properties_json.display());
     println!("cargo::rerun-if-changed=third_party/WebIDL/parser/WebIDL.py");
     println!("cargo::rerun-if-changed=third_party/ply");
+    println!("cargo::rerun-if-env-changed=SERVO_EXTRA_WEBIDLS");
 
     let status = find_python()
         .arg("codegen/run.py")
