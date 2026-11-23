@@ -92,11 +92,33 @@ impl App {
             protocols::resource::ResourceProtocolHandler::default(),
         );
 
+        let (sender, receiver) = ipc_channel::ipc::channel().unwrap();
+        std::thread::spawn(move || {
+            while let Ok(message) = receiver.recv() {
+                match message {
+                    script_embedder::Message::Foopy(sender) => {
+                        let _ = sender.send("hello".to_string());
+                    },
+                    script_embedder::Message::Ping(callback) => {
+                        let _ = callback.send(());
+                    }
+                }
+            }
+        });
+
         let servo_builder = ServoBuilder::default()
             .opts(self.opts.clone())
             .preferences(self.preferences.clone())
             .protocol_registry(protocol_registry)
-            .event_loop_waker(self.waker.clone());
+            .event_loop_waker(self.waker.clone())
+            .event_handler(Box::new(move |serialized| {
+                let msg: script_embedder::EmbedderMessage = serde_json::from_str(str::from_utf8(&serialized).unwrap()).unwrap();
+                match msg {
+                    script_embedder::EmbedderMessage::BootstrapChannel(reply) => {
+                        let _ = reply.send(sender.clone());
+                    }
+                }
+            }));
 
         let url = self.initial_url.as_url().clone();
 

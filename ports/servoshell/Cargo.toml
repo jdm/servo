@@ -90,13 +90,18 @@ euclid = { workspace = true }
 flate2 = { workspace = true }
 hitrace = { workspace = true, optional = true }
 image = { workspace = true }
+ipc-channel = { workspace = true }
 keyboard-types = { workspace = true }
 libc = { workspace = true }
 log = { workspace = true }
 mime_guess = { workspace = true }
 raw-window-handle = { workspace = true }
 rustls = { workspace = true, features = ["aws-lc-rs"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
 servo = { workspace = true, features = ["background_hang_monitor", "bluetooth", "testbinding"], default-features = false }
+script_embedder = { workspace = true }
+servo-base = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true, optional = true }
 tracing-perfetto = { workspace = true, optional = true }

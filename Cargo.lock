@@ -9548,6 +9548,7 @@ dependencies = [
 name = "servo-script-embedder"
 version = "0.8.0"
 dependencies = [
+ "ipc-channel",
  "malloc_size_of_derive",
  "mozjs",
  "serde",
@@ -9964,10 +9965,12 @@ dependencies = [
  "raw-window-handle",
  "rfd",
  "rustls",
+ "serde",
  "serde_json",
  "servo",
  "servo-allocator",
  "servo-base",
+ "servo-script-embedder",
  "servo-webdriver-server",
  "signal-hook-registry",
  "surfman",

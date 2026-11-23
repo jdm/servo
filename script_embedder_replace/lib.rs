@@ -25,7 +25,7 @@ pub enum Message {
 
 #[derive(Serialize, Deserialize)]
 pub enum EmbedderMessage {
-    BootstrapChannel(GenericSender<GenericSender<Message>>),
+    BootstrapChannel(GenericSender<ipc_channel::ipc::IpcSender<Message>>),
 }
 
 #[expect(non_snake_case)]
@@ -72,7 +72,7 @@ pub mod foopy {
 
     use js::context::JSContext;
     use js::rust::HandleObject;
-    use servo_base::generic_channel::{self, GenericSender};
+    use servo_base::generic_channel;
     use servo_deny_public_fields as deny_public_fields;
     //use script_bindings::inheritance::HasParent;
     //use servo_malloc_size_of::MallocSizeOf;
@@ -97,7 +97,7 @@ pub mod foopy {
         #[no_trace = "PhantomData does not exist"]
         marker: PhantomData<D>,
         #[no_trace = ""]
-        channel: GenericSender<Message>,
+        channel: ipc_channel::ipc::IpcSender<Message>,
     }
 
     impl<D> FoopyMethods<D> for Foopy<D>

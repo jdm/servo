@@ -13,6 +13,7 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(crown)'] }
 #workspace = true
 
 [dependencies]
+ipc-channel = "0.23"
 js = { package = "mozjs", version = "=0.26.14", default-features = false, features = ["intl", "libz-sys"] }
 malloc_size_of_derive = "0.1"
 serde = "1"

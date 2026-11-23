@@ -286,6 +286,7 @@ struct ServoInner {
     /// Geolocation watches that have been handed to a GeolocationDelegate grouped by the pipeline
     /// that asked for them.
     geolocation_watches: RefCell<FxHashMap<PipelineId, Vec<GeolocationWatchId>>>,
+    event_handler: Option<Box<dyn Fn(Vec<u8>)>>,
 }
 
 impl ServoInner {
@@ -952,7 +953,9 @@ impl ServoInner {
                 }
             },
             ConstellationToEmbedderMsg::Custom(serialized) => {
-                todo!()
+                if let Some(ref event_handler) = self.event_handler {
+                    (event_handler)(serialized);
+                }
             }
         }
     }
@@ -1143,6 +1146,7 @@ impl Servo {
             pending_handled_input_events: Default::default(),
             event_loop_waker,
             geolocation_watches: Default::default(),
+            event_handler: builder.event_handler,
         }))
     }
 
@@ -1544,6 +1548,7 @@ pub struct ServoBuilder {
     preferences: Option<Box<Preferences>>,
     event_loop_waker: Box<dyn EventLoopWaker>,
     protocol_registry: ProtocolRegistry,
+    event_handler: Option<Box<dyn Fn(Vec<u8>)>>,
 }
 
 impl Default for ServoBuilder {
@@ -1553,6 +1558,7 @@ impl Default for ServoBuilder {
             preferences: Default::default(),
             event_loop_waker: Box::new(DefaultEventLoopWaker),
             protocol_registry: Default::default(),
+            event_handler: Default::default(),
         }
     }
 }
@@ -1560,6 +1566,11 @@ impl Default for ServoBuilder {
 impl ServoBuilder {
     pub fn build(self) -> Servo {
         Servo::new(self)
+    }
+
+    pub fn event_handler(mut self, handler: Box<dyn Fn(Vec<u8>)>) -> Self {
+        self.event_handler = Some(handler);
+        self
     }
 
     pub fn opts(mut self, opts: Opts) -> Self {
