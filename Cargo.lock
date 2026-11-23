@@ -9546,17 +9546,7 @@ dependencies = [
 
 [[package]]
 name = "servo-script-embedder"
-version = "0.7.0"
-dependencies = [
- "malloc_size_of_derive",
- "mozjs",
- "servo-deny-public-fields",
- "servo-dom-struct",
- "servo-jstraceable-derive",
- "servo-malloc-size-of",
- "servo-script-bindings",
- "trait-set",
-]
+version = "0.8.0"
 
 [[package]]
 name = "servo-script-traits"

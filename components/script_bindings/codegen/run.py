@@ -127,7 +127,7 @@ def main() -> None:
 
     with open(os.path.join(out_dir, f"typealiases.rs"), "w") as f:
         for (crate, items) in config.sub_crates.items():
-            if crate == "script_webgpu":
+            if crate == "script_webgpu" or crate == "script_webcrypto":
                 continue
             for item in items:
                 lowered = item.lower()
