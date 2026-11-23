@@ -4449,6 +4449,7 @@ impl Window {
     ) {
         let this = Trusted::new(self);
         let source = Trusted::new(source);
+        debug!("posting to {}", self.pipeline_id());
         let task = task!(post_serialised_message: move |cx| {
             let this = this.root();
             let source = source.root();

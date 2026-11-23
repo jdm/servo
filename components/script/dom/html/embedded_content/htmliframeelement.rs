@@ -622,7 +622,6 @@ impl HTMLIFrameElement {
         let browsing_context_id = BrowsingContextId::new();
         let webview_id = window.window_proxy().webview_id();
         self.pipeline_id.set(None);
-        self.pending_pipeline_id.set(None);
         self.webview_id.set(Some(webview_id));
         self.browsing_context_id.set(Some(browsing_context_id));
 
@@ -642,6 +641,7 @@ impl HTMLIFrameElement {
             .map(|name| name.to_string());
 
         let new_pipeline_id = PipelineId::new();
+        self.pending_pipeline_id.set(Some(new_pipeline_id));
 
         let mut load_data = LoadData::new(
             // > initiator origin

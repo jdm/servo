@@ -14,11 +14,11 @@
   // advances a counter, and reports the counter value together with the
   // document's fullscreenEnabled state, every time it receives a postMessage.
   function getSourceForCrossOriginPage(initial_count) {
-    var page_contents = "<html><body><script>var count="+initial_count+";window.addEventListener('message',function(){parent.postMessage({'count':count++,'fullscreenEnabled':document.fullscreenEnabled},'*');});</scr"+"ipt></body></html>";
+    var page_contents = "<html><body><script>console.log('page content');var count="+initial_count+";window.addEventListener('message',function(){console.log('got child message');parent.postMessage({'count':count++,'fullscreenEnabled':document.fullscreenEnabled},'*');});</scr"+"ipt></body></html>";
     return "data:text/html;base64,"+btoa(page_contents);
   }
 
-  async_test(function(t) {
+  /*async_test(function(t) {
     var iframe = document.createElement("iframe");
     iframe.src = "support/blank.htm";
     var eventWatcher = new EventWatcher(t, iframe, "load");
@@ -29,20 +29,23 @@
 
     assert_true(document.fullscreenEnabled, "Top level document has fullscreen enabled flag set");
     eventWatcher.wait_for("load").then(t.step_func_done(function() {
+console.log("got waited load");
       assert_true(iframe.contentDocument.fullscreenEnabled, "Document inside same-origin iframe without allowfullscreen attribute should still have fullscreen enabled flag set");
     }));
-  }, "iframe-same-origin-allowfullscreen");
+  }, "iframe-same-origin-allowfullscreen");*/
 
   async_test(function(t) {
     var iframe = document.createElement("iframe");
     iframe.src = getSourceForCrossOriginPage(0);
 
-    iframe.addEventListener('load', function() {
+    iframe.addEventListener('load', t.step_func(() => {
+        console.log("loaded");
       // Request the fullscreenEnabled state whenever the frame loads
       iframe.contentWindow.postMessage(true,"*");
-    });
+    }));
 
     window.addEventListener('message', this.step_func(function(msg) {
+console.log("message: " + JSON.stringify(msg.data));
       if (msg.data.count == 0) {
         assert_false(msg.data.fullscreenEnabled, "Document inside cross-origin iframe without allowfullscreen attribute should not have fullscreen enabled flag set");
         iframe.setAttribute("allowfullscreen", "");

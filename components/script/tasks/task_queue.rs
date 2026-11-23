@@ -99,10 +99,16 @@ impl<T: QueuedTaskConversion> TaskQueue<T> {
         if !self.is_pipeline_closed(pipeline_id) {
             let mut inactive = self.inactive.borrow_mut();
             let inactive_queue = inactive.entry(*pipeline_id).or_default();
+            let task = msg.into_queued_task().unwrap();
+            debug!("stashing {} for {}", task.task.name(), pipeline_id);
             inactive_queue.push_back(
-                msg.into_queued_task()
-                    .expect("Incoming messages should always be convertible into queued tasks"),
+                task,
+                /*msg.into_queued_task()
+                    .expect("Incoming messages should always be convertible into queued tasks"),*/
             );
+        } else {
+            let task = msg.into_queued_task().unwrap();
+            debug!("ignoring {} for {} (closed)", task.task.name(), pipeline_id);
         }
 
         let mut msg_queue = self.msg_queue.borrow_mut();
