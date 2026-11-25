@@ -15,7 +15,10 @@ use crate::dom::globalscope::GlobalScope;
 use crate::dom::servoparser::populate_about_blank;
 use crate::event_loop::document_loader::DocumentLoader;
 use crate::event_loop::script_thread::ScriptThread;
-use crate::navigation::{determine_the_origin, determine_iframe_element_referrer_policy, determine_creation_sandboxing_flags};
+use crate::navigation::{
+    determine_creation_sandboxing_flags, determine_iframe_element_referrer_policy,
+    determine_the_origin,
+};
 
 pub(crate) struct InitialBrowsingContextDetails {
     pub(crate) webview_state: Rc<WebViewState>,
@@ -80,7 +83,8 @@ pub(crate) fn create_a_new_browsing_context_and_document(
     // Step 11.1. If embedder is non-null, then return embedder's relevant settings object's top-level creation URL.
     // Step 11.2. If creator is non-null, then return creator's relevant settings object's top-level creation URL.
     // Step 11.3. Return about:blank.
-    let top_level_creation_url = embedder.and_then(|embedder| embedder.global().top_level_creation_url())
+    let top_level_creation_url = embedder
+        .and_then(|embedder| embedder.global().top_level_creation_url())
         .or_else(|| creator.and_then(|creator| creator.global().top_level_creation_url()))
         .unwrap_or_else(|| about_blank.clone());
 
@@ -120,14 +124,14 @@ pub(crate) fn create_a_new_browsing_context_and_document(
         origin,
         IsHTMLDocument::HTMLDocument,
         "text/html".parse().ok(),
-        None, // last modified
+        None,                          // last modified
         DocumentActivity::FullyActive, //XXXjdm
         loader,
         creator.map(|creator| creator.url().as_str().to_owned()),
-        None, /* status code */
-        true, /* is about blank */
-        true, /* allow declarative shadow roots */
-        None, /* inherited insecure requests policy */
+        None,  /* status code */
+        true,  /* is about blank */
+        true,  /* allow declarative shadow roots */
+        None,  /* inherited insecure requests policy */
         false, /* has trustworthy ancestor origin */
         ScriptThread::custom_element_reaction_stack(),
         sandbox_flags,
@@ -143,9 +147,7 @@ pub(crate) fn create_a_new_browsing_context_and_document(
 
     // Step 17. Set document's internal ancestor origin objects list to the result of running the internal ancestor origin objects list creation steps given document and iframeReferrerPolicy.
     document.set_internal_ancestor_origin_objects_list(
-        document.internal_ancestor_origin_objects_list_creation_steps(
-            &iframe_referrer_policy,
-        ),
+        document.internal_ancestor_origin_objects_list_creation_steps(&iframe_referrer_policy),
     );
 
     // Step 18. Set document's ancestor origins list to the result of running the ancestor origins list creation steps given document.

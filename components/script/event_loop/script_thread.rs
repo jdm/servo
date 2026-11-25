@@ -4786,6 +4786,15 @@ impl ScriptThread {
                 font_resolver,
             );
 
+            let mut random_bytes = [0u8; 16];
+            SysRng
+                .try_fill_bytes(&mut random_bytes)
+                .expect("Failed to generate random hasher key");
+            let document_random_hasher_key = (
+                u64::from_ne_bytes(random_bytes[..8].try_into().unwrap()),
+                u64::from_ne_bytes(random_bytes[8..].try_into().unwrap()),
+            );
+
             let layout_config = LayoutConfig {
                 id: new_pipeline_id,
                 webview_id: webview_state.id,
@@ -4800,6 +4809,7 @@ impl ScriptThread {
                 user_stylesheets: Rc::new(vec![]),
                 theme: webview_state.theme.get(),
                 embedder_chan: script_thread.senders.pipeline_to_embedder_sender.clone(),
+                document_random_hasher_key,
             };
 
             let window = Window::new(
@@ -4817,7 +4827,10 @@ impl ScriptThread {
                 script_thread.senders.time_profiler_sender.clone(),
                 #[cfg(feature = "devtools")]
                 script_thread.senders.devtools_server_sender.clone(),
-                script_thread.senders.pipeline_to_constellation_sender.clone(),
+                script_thread
+                    .senders
+                    .pipeline_to_constellation_sender
+                    .clone(),
                 script_thread.senders.pipeline_to_embedder_sender.clone(),
                 script_thread.senders.constellation_sender.clone(),
                 new_pipeline_id,
@@ -4840,6 +4853,7 @@ impl ScriptThread {
                 #[cfg(feature = "webgpu")]
                 script_thread.gpu_id_hub.clone(),
                 inherited_secure_context,
+                Default::default(), //XXXjdm
                 script_thread.this.clone(),
             );
 
@@ -4851,7 +4865,8 @@ impl ScriptThread {
             }
 
             let iframe = parent_info.and_then(|parent_id| {
-                script_thread.documents
+                script_thread
+                    .documents
                     .borrow()
                     .find_iframe(parent_id, browsing_context_id)
             });

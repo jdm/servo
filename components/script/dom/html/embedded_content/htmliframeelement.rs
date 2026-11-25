@@ -27,7 +27,9 @@ use servo_url::ServoUrl;
 use style::attr::{AttrValue, LengthOrPercentageOrAuto};
 use stylo_atoms::Atom;
 
-use crate::browsing_context::{InitialBrowsingContextDetails, create_a_new_browsing_context_and_document};
+use crate::browsing_context::{
+    InitialBrowsingContextDetails, create_a_new_browsing_context_and_document,
+};
 use crate::dom::bindings::codegen::Bindings::HTMLIFrameElementBinding::HTMLIFrameElementMethods;
 use crate::dom::bindings::codegen::Bindings::WindowBinding::Window_Binding::WindowMethods;
 use crate::dom::bindings::codegen::UnionTypes::TrustedHTMLOrString;
@@ -353,9 +355,8 @@ impl HTMLIFrameElement {
 
                 self.pipeline_id.set(Some(new_pipeline_id));
                 /*with_script_thread(|script_thread| {
-                    script_thread.spawn_pipeline(cx, new_pipeline_info);
-            });*/
-                
+                        script_thread.spawn_pipeline(cx, new_pipeline_info);
+                });*/
             },
             PipelineType::Navigation => {
                 let load_info = IFrameLoadInfoWithData {
@@ -721,7 +722,6 @@ impl HTMLIFrameElement {
         self.about_blank_pipeline_id.set(Some(new_pipeline_id));
         self.pipeline_id.set(Some(new_pipeline_id));
 
-
         // TODO: notify devtools like ScriptThread::spawn_pipeline
 
         /*self.start_new_pipeline(
@@ -908,11 +908,7 @@ impl HTMLIFrameElement {
         //
         // TODO: run these step synchronously as part of processing the iframe attributes.
         let should_fire_event = if self.is_initial_blank_document() {
-            // If this is the initial blank doc:
-            // do not fire if there is a pending navigation,
-            // or if the iframe has an src.
-            !self.pending_navigation.get() &&
-                !self.upcast::<Element>().has_attribute(&local_name!("src"))
+            false
         } else {
             // If this is not the initial blank doc:
             // do not fire if there is a pending navigation.

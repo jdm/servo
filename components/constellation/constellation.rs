@@ -3795,14 +3795,19 @@ where
         assert!(!self.pipelines.contains_key(&new_pipeline_id));
         self.pipelines.insert(new_pipeline_id, pipeline);
 
-        if let Some(webview) = self.webviews.get_mut(&webview_id) {
-            // Per <https://html.spec.whatwg.org/multipage/#initialize-the-navigable>
-            // we want to set the session history entry directly instead of adding
-            // a pending operation.
-            self.new_browsing_context(browsing_context_id, webview_id, new_pipeline_id, Some(parent_pipeline_id), load_info.viewport_details, is_private, is_parent_secure, parent_upgrade_insecure_navigations_set);
-        } else {
-            warn!("Could not find WebView for new iframe: ({webview_id:?})");
-        }
+        // Per <https://html.spec.whatwg.org/multipage/#initialize-the-navigable>
+        // we want to set the session history entry directly instead of adding
+        // a pending operation.
+        self.new_browsing_context(
+            browsing_context_id,
+            webview_id,
+            new_pipeline_id,
+            Some(parent_pipeline_id),
+            load_info.viewport_details,
+            is_private,
+            is_parent_secure,
+            parent_upgrade_insecure_navigations_set,
+        );
     }
 
     #[servo_tracing::instrument(skip_all)]

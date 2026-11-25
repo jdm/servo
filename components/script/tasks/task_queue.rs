@@ -104,7 +104,7 @@ impl<T: QueuedTaskConversion> TaskQueue<T> {
             inactive_queue.push_back(
                 task,
                 /*msg.into_queued_task()
-                    .expect("Incoming messages should always be convertible into queued tasks"),*/
+                .expect("Incoming messages should always be convertible into queued tasks"),*/
             );
         } else {
             let task = msg.into_queued_task().unwrap();
