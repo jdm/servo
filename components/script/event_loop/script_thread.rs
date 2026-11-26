@@ -3783,7 +3783,7 @@ impl ScriptThread {
             document.pipeline_id(),
         );
         if let Some(name) = incomplete.frame_name {
-            window_proxy.set_name(DOMString::from(name));
+            window_proxy.set_name(&DOMString::from(name));
         }
         if window_proxy.parent().is_some() {
             // https://html.spec.whatwg.org/multipage/#navigating-across-documents:delaying-load-events-mode-2
@@ -4767,7 +4767,7 @@ impl ScriptThread {
         inherited_secure_context: Option<bool>,
         browsing_context_id: BrowsingContextId,
         opener: Option<BrowsingContextId>,
-        frame_name: Option<String>,
+        frame_name: Option<DOMString>,
     ) -> DomRoot<Window> {
         with_optional_script_thread(|script_thread| {
             let script_thread = script_thread.expect("script thread must exist");
@@ -4886,7 +4886,7 @@ impl ScriptThread {
                 new_pipeline_id,
             );
             if let Some(name) = frame_name {
-                window_proxy.set_name(DOMString::from(name));
+                window_proxy.set_name(&*name);
             }
             window.init_window_proxy(&window_proxy);
 

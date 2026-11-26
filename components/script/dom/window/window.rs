@@ -2365,7 +2365,7 @@ impl WindowMethods<crate::DomTypeHolder> for Window {
     /// <https://html.spec.whatwg.org/multipage/#dom-name>
     fn SetName(&self, name: DOMString) {
         if let Some(proxy) = self.undiscarded_window_proxy() {
-            proxy.set_name(name);
+            proxy.set_name(&name);
         }
     }
 

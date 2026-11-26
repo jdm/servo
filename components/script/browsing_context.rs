@@ -4,6 +4,7 @@ use embedder_traits::ViewportDetails;
 use js::context::JSContext;
 use script_bindings::inheritance::Castable;
 use script_bindings::root::DomRoot;
+use script_bindings::str::DOMString;
 use script_traits::{DocumentActivity, WebViewState};
 use servo_base::id::{BrowsingContextId, PipelineId};
 use servo_url::ServoUrl;
@@ -26,7 +27,7 @@ pub(crate) struct InitialBrowsingContextDetails {
     pub(crate) viewport_details: ViewportDetails,
     pub(crate) opener: Option<BrowsingContextId>,
     pub(crate) inherited_secure_context: Option<bool>,
-    pub(crate) frame_name: Option<String>,
+    pub(crate) frame_name: Option<DOMString>,
     pub(crate) new_pipeline_id: PipelineId,
     pub(crate) browsing_context_id: BrowsingContextId,
 }
@@ -180,5 +181,56 @@ pub(crate) fn create_a_new_browsing_context_and_document(
     document.completely_finish_loading();
 
     // Step 25. Return browsingContext and document.
+    document
+}
+
+/// <https://html.spec.whatwg.org/multipage/#creating-a-new-auxiliary-browsing-context>
+pub(crate) fn create_a_new_auxiliary_browsing_context_and_document(
+    cx: &mut JSContext,
+    opener: &Document,
+    details: InitialBrowsingContextDetails,
+) -> DomRoot<Document> {
+    // Step 1. Let openerTopLevelBrowsingContext be opener's top-level traversable's active browsing context.
+    // Step 2. Let group be openerTopLevelBrowsingContext's group.
+    // Step 3. Assert: group is non-null, as navigating invokes this directly.
+    // TODO
+
+    // Step 4. Let browsingContext and document be the result of creating a new browsing context and document with opener's active document, null, and group.
+    let document = create_a_new_browsing_context_and_document(
+        cx,
+        Some(opener),
+        None,
+        details,
+    );
+
+    // Step 5. Set browsingContext's is auxiliary to true.
+    // Step 6. Append browsingContext to group.
+    // TODO
+
+    // Step 7. Set browsingContext's opener browsing context to opener.
+    // Note: Already performed as part of create_a_new_browsing_context_and_document.
+
+    // Step 8. Set browsingContext's virtual browsing context group ID to openerTopLevelBrowsingContext's virtual browsing context group ID.
+    // Step 9. Set browsingContext's opener origin at creation to opener's active document's origin.
+    // TODO
+
+    // Step 10. Return browsingContext and document.
+    document
+}
+
+/// <https://html.spec.whatwg.org/multipage/#creating-a-new-top-level-browsing-context>
+pub(crate) fn create_a_new_top_level_browsing_context_and_document(
+    cx: &mut JSContext,
+    details: InitialBrowsingContextDetails,
+) -> DomRoot<Document> {
+    // Step 1. Let group and document be the result of creating a new browsing context group and document.
+    let document = create_a_new_browsing_context_and_document(
+        cx,
+        None,
+        None,
+        details,
+    );
+
+    // Step 2. Return group's browsing context set[0] and document.
     document
 }

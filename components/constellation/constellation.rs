@@ -3912,21 +3912,20 @@ where
             .map_or(Theme::Light, |webview| webview.theme());
         new_webview.set_theme(opener_theme);
 
-        new_webview.add_pending_change(SessionHistoryChange {
-            webview_id: new_webview_id,
-            browsing_context_id: new_browsing_context_id,
-            new_pipeline_id,
-            replace: None,
-            new_browsing_context_info: Some(NewBrowsingContextInfo {
-                // Auxiliary browsing contexts are always top-level.
-                parent_pipeline_id: None,
-                is_private: is_opener_private,
-                inherited_secure_context: is_opener_secure,
-                upgrade_insecure_navigations_set: opener_upgrade_insecure_navigations_set,
-            }),
-            viewport_details,
-        });
+        // Per <https://html.spec.whatwg.org/multipage/#initialize-the-navigable>
+        // we want to set the session history entry directly instead of adding
+        // a pending operation.
         self.webviews.insert(new_webview_id, new_webview);
+        self.new_browsing_context(
+            new_browsing_context_id,
+            new_webview_id,
+            new_pipeline_id,
+            None,
+            viewport_details,
+            is_opener_private,
+            is_opener_secure,
+            opener_upgrade_insecure_navigations_set,
+        );
     }
 
     #[servo_tracing::instrument(skip_all)]

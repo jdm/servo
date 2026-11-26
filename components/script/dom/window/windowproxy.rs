@@ -59,20 +59,21 @@ use script_bindings::proxyhandler::{
     set_property_descriptor,
 };
 use script_bindings::reflector::{DomObject, MutDomObject, Reflector};
-use script_traits::{NewPipelineInfo, WebViewState};
+use script_traits::WebViewState;
 use serde::{Deserialize, Serialize};
 use servo_base::generic_channel;
 use servo_base::generic_channel::GenericSend;
 use servo_base::id::{BrowsingContextId, PipelineId, WebViewId};
 use servo_constellation_traits::{
     AuxiliaryWebViewCreationRequest, LoadData, LoadOrigin, NavigationHistoryBehavior,
-    ScriptToConstellationMessage, TargetSnapshotParams,
+    ScriptToConstellationMessage,
 };
 use servo_url::{ImmutableOrigin, OriginSnapshot, ServoUrl};
 use storage_traits::webstorage_thread::WebStorageThreadMsg;
 use style::attr::parse_integer;
 
 use crate::DomTypeHolder;
+use crate::browsing_context::{InitialBrowsingContextDetails, create_a_new_auxiliary_browsing_context_and_document, create_a_new_top_level_browsing_context_and_document};
 use crate::dom::bindings::conversions::{ToJSValConvertible, root_from_handleobject};
 use crate::dom::bindings::error::{Error, Fallible};
 use crate::dom::bindings::inheritance::Castable;
@@ -88,7 +89,7 @@ use crate::dom::element::Element;
 use crate::dom::globalscope::GlobalScope;
 use crate::dom::node::node::NodeTraits;
 use crate::dom::window::Window;
-use crate::event_loop::script_thread::{ScriptThread, with_script_thread};
+use crate::event_loop::script_thread::ScriptThread;
 use crate::event_loop::script_window_proxies::ScriptWindowProxies;
 use crate::navigation::navigate;
 
@@ -373,7 +374,8 @@ impl WindowProxy {
 
         let response = response_receiver.recv().unwrap()?;
         let new_browsing_context_id = BrowsingContextId::from(response.new_webview_id);
-        let new_pipeline_info = NewPipelineInfo {
+
+        let details = InitialBrowsingContextDetails {
             webview_state: WebViewState {
                 id: response.new_webview_id,
                 // Use the current `WebView`'s theme initially, but the embedder may change
@@ -381,39 +383,36 @@ impl WindowProxy {
                 theme: Cell::new(window.webview_theme()),
                 // WebViews start focused by default for now.
                 has_system_focus: Cell::new(true),
-            },
+            }.into(),
             parent_info: None,
+            viewport_details: window.viewport_details(),
+            opener: (!noopener).then_some(self.browsing_context_id),
+            inherited_secure_context: Some(window.as_global_scope().is_secure_context()),
+            frame_name: (!name.eq_ignore_ascii_case("_blank")).then_some(name),
             new_pipeline_id: response.new_pipeline_id,
             browsing_context_id: new_browsing_context_id,
-            opener: Some(self.browsing_context_id),
-            load_data,
-            viewport_details: window.viewport_details(),
-            user_content_manager_id: response.user_content_manager_id,
-            target_snapshot_params: TargetSnapshotParams {
-                sandboxing_flags: sandboxing_flag_set,
-                iframe_element_referrer_policy: ReferrerPolicy::EmptyString,
-            },
-            frame_name: None,
+            //TODO: user_content_manager_id, sandbox flags?
         };
 
-        with_script_thread(|script_thread| {
-            script_thread.spawn_pipeline(cx, new_pipeline_info);
-        });
-
-        let new_window_proxy = ScriptThread::find_document(response.new_pipeline_id)
-            .and_then(|doc| doc.browsing_context())?;
-        if !name.eq_ignore_ascii_case("_blank") {
-            new_window_proxy.set_name(name);
-        }
         // Step 2. If opener is null, then set document to the second return value
         // of creating a new top-level browsing context and document.
-        if noopener {
-            new_window_proxy.disown();
+        // Step 3. Otherwise, set document to the second return value of creating a new auxiliary browsing context and document given opener.
+        let document = if noopener {
+            create_a_new_top_level_browsing_context_and_document(cx, details)
         } else {
-            // After creating a new auxiliary browsing context and document,
-            // the session storage is copied over.
-            // See https://html.spec.whatwg.org/multipage/#the-sessionstorage-attribute
+            create_a_new_auxiliary_browsing_context_and_document(cx, document, details)
+        };
 
+        // Step 4. Let documentState be a new document state, with...
+        // Step 5. Let traversable be a new traversable navigable.
+        // Step 6. Initialize the navigable traversable given documentState.
+        // Step 7. Let initialHistoryEntry be traversable's active session history entry.
+        // Step 8. Set initialHistoryEntry's step to 0.
+        // Step 9. Append initialHistoryEntry to traversable's session history entries.
+        // Note: Handled by the earlier CreateAuxiliaryWebView message.
+
+        // Step 10. If opener is non-null, then legacy-clone a traversable storage shed given opener's top-level traversable and traversable.
+        if !noopener {
             let (sender, receiver) = generic_channel::channel().unwrap();
 
             let msg = WebStorageThreadMsg::Clone {
@@ -425,8 +424,15 @@ impl WindowProxy {
             GenericSend::send(document.global().storage_threads(), msg).unwrap();
             receiver.recv().unwrap();
         }
+
+        // Step 11. Append traversable to the user agent's top-level traversable set.
+        // Note: Handled by the earlier CreateAuxiliaryWebView message.
+
+        // Step 12. Invoke WebDriver BiDi navigable created with traversable and openerNavigableForWebDriver.
+        // TODO
+
         // Step 13. Return traversable.
-        Some(new_window_proxy)
+        document.browsing_context()
     }
 
     /// <https://html.spec.whatwg.org/multipage/#delaying-load-events-mode>
@@ -1137,8 +1143,8 @@ impl WindowProxy {
         self.name.borrow().clone().root()
     }
 
-    pub(crate) fn set_name(&self, name: DOMString) {
-        *self.name.borrow_mut() = name.traced();
+    pub(crate) fn set_name(&self, name: &TracedDOMString) {
+        *self.name.borrow_mut() = name.clone();
     }
 }
 

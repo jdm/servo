@@ -17,6 +17,7 @@ use net_traits::ReferrerPolicy;
 use net_traits::request::Destination;
 use profile_traits::generic_channel::channel;
 use script_bindings::cell::DomRefCell;
+use script_bindings::domstring::TracedDOMString;
 use script_traits::UpdatePipelineIdReason;
 use servo_base::id::{BrowsingContextId, PipelineId, WebViewId};
 use servo_constellation_traits::{
@@ -107,7 +108,7 @@ pub(crate) struct HTMLIFrameElement {
     /// iframe. This is frozen in time, since it is only processed once
     /// on the initial creation of the iframe contents. If the iframe
     /// itself changes the `window.name`, that takes precedence.
-    frozen_name: DomRefCell<Option<String>>,
+    frozen_name: DomRefCell<Option<TracedDOMString>>,
     /// <https://fullscreen.spec.whatwg.org/#iframe-fullscreen-flag>
     iframe_fullscreen_flag: Cell<bool>,
 }
@@ -304,7 +305,7 @@ impl HTMLIFrameElement {
             inherited_secure_context: load_data.inherited_secure_context,
             history_handling,
             target_snapshot_params,
-            name: self.frozen_name.borrow().clone(),
+            name: self.frozen_name.borrow().as_ref().map(TracedDOMString::str).as_deref().map(ToString::to_string),
         };
 
         let viewport_details = window
@@ -592,7 +593,7 @@ impl HTMLIFrameElement {
         *self.frozen_name.safe_borrow_mut(cx.no_gc()) = self
             .upcast::<Element>()
             .get_name()
-            .map(|name| name.to_string());
+            .map(TracedDOMString::from);
 
         let new_pipeline_id = PipelineId::new();
         self.pending_pipeline_id.set(Some(new_pipeline_id));
@@ -630,7 +631,7 @@ impl HTMLIFrameElement {
             inherited_secure_context: load_data.inherited_secure_context,
             history_handling: NavigationHistoryBehavior::Push,
             target_snapshot_params: snapshot_self(self),
-            name: self.frozen_name.borrow().clone(),
+            name: self.frozen_name.borrow().as_ref().map(TracedDOMString::str).as_deref().map(ToString::to_string),
         };
 
         let load_info = IFrameLoadInfoWithData {
@@ -652,7 +653,7 @@ impl HTMLIFrameElement {
             viewport_details,
             opener: None,
             inherited_secure_context: Some(window.as_global_scope().is_secure_context()),
-            frame_name: self.frozen_name.borrow().clone(),
+            frame_name: self.frozen_name.borrow().clone().map(TracedDOMString::root),
             new_pipeline_id,
             browsing_context_id,
         };
@@ -682,7 +683,7 @@ impl HTMLIFrameElement {
         if let Some(window) = self.GetContentWindow() &&
             let Some(window_name) = &*self.frozen_name.borrow()
         {
-            window.set_name(window_name.as_str().into());
+            window.set_name(window_name);
         }
     }
 
