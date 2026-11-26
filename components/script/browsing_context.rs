@@ -58,9 +58,9 @@ pub(crate) fn create_a_new_browsing_context_and_document(
 
     // Step 6. Let sandboxFlags be the result of determining the creation
     //   sandboxing flags given browsingContext and embedder.
-    // Note: browsingContext's sandboxing flags are always empty in step 1,
-    //   so we simplify by not providing one here.
-    let sandbox_flags = determine_creation_sandboxing_flags(None, embedder);
+    // <https://github.com/whatwg/html/issues/13334>
+    let creator_browsing_context = creator.and_then(|document| document.browsing_context());
+    let sandbox_flags = determine_creation_sandboxing_flags(creator_browsing_context.as_deref(), embedder);
 
     // Step 7. Let origin be the result of determining the origin given
     //   about:blank, sandboxFlags, and creatorOrigin.
