@@ -14,7 +14,7 @@ use crate::dom::document::{Document, HasBrowsingContext, IsHTMLDocument};
 use crate::dom::element::Element;
 use crate::dom::globalscope::GlobalScope;
 use crate::dom::servoparser::populate_about_blank;
-use crate::event_loop::document_loader::{DocumentLoader, LoadType};
+use crate::event_loop::document_loader::{DocumentLoader};
 use crate::event_loop::script_thread::ScriptThread;
 use crate::navigation::{
     determine_creation_sandboxing_flags, determine_iframe_element_referrer_policy,
