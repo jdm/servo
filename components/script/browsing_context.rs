@@ -140,6 +140,7 @@ pub(crate) fn create_a_new_browsing_context_and_document(
         window.layout().image_cache(),
     );
     window.init_document(&document);
+    window.allow_layout_if_necessary(cx);
 
     ScriptThread::track_document(&document);
 
