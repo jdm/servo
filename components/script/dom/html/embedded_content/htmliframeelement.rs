@@ -17,7 +17,7 @@ use net_traits::ReferrerPolicy;
 use net_traits::request::Destination;
 use profile_traits::generic_channel::channel;
 use script_bindings::cell::DomRefCell;
-use script_traits::{NewPipelineInfo, UpdatePipelineIdReason};
+use script_traits::UpdatePipelineIdReason;
 use servo_base::id::{BrowsingContextId, PipelineId, WebViewId};
 use servo_constellation_traits::{
     IFrameLoadInfo, IFrameLoadInfoWithData, LoadData, LoadOrigin, NavigationHistoryBehavior,
@@ -51,18 +51,12 @@ use crate::dom::performance::performanceresourcetiming::InitiatorType;
 use crate::dom::trustedtypes::trustedhtml::TrustedHTML;
 use crate::dom::windowproxy::WindowProxy;
 use crate::event_loop::document_loader::{LoadBlocker, LoadType};
-use crate::event_loop::script_thread::{ScriptThread, with_script_thread};
+use crate::event_loop::script_thread::ScriptThread;
 use crate::event_loop::script_window_proxies::ScriptWindowProxies;
 use crate::fetch::network_listener::ResourceTimingListener;
 use crate::navigation::{
     determine_creation_sandboxing_flags, determine_iframe_element_referrer_policy,
 };
-
-#[derive(PartialEq)]
-enum PipelineType {
-    InitialAboutBlank,
-    Navigation,
-}
 
 #[derive(Clone, Copy, PartialEq)]
 pub(crate) enum ProcessingMode {
@@ -209,7 +203,6 @@ impl HTMLIFrameElement {
         self.start_new_pipeline(
             cx,
             load_data,
-            PipelineType::Navigation,
             history_handling,
             mode,
             target_snapshot_params,
@@ -220,7 +213,6 @@ impl HTMLIFrameElement {
         &self,
         cx: &mut JSContext,
         mut load_data: LoadData,
-        pipeline_type: PipelineType,
         history_handling: NavigationHistoryBehavior,
         mode: ProcessingMode,
         target_snapshot_params: TargetSnapshotParams,
@@ -243,7 +235,6 @@ impl HTMLIFrameElement {
             self.continue_navigation(
                 cx,
                 load_data,
-                pipeline_type,
                 history_handling,
                 target_snapshot_params,
             );
@@ -278,7 +269,7 @@ impl HTMLIFrameElement {
                     }
                     load_data.about_base_url = doc.root().about_base_url();
                 }
-                this.continue_navigation(cx, load_data, pipeline_type, history_handling, target_snapshot_params);
+                this.continue_navigation(cx, load_data, history_handling, target_snapshot_params);
             }));
     }
 
@@ -286,7 +277,6 @@ impl HTMLIFrameElement {
         &self,
         cx: &mut JSContext,
         load_data: LoadData,
-        pipeline_type: PipelineType,
         history_handling: NavigationHistoryBehavior,
         target_snapshot_params: TargetSnapshotParams,
     ) {
@@ -324,56 +314,19 @@ impl HTMLIFrameElement {
                 ..Default::default()
             });
 
-        match pipeline_type {
-            PipelineType::InitialAboutBlank => {
-                self.about_blank_pipeline_id.set(Some(new_pipeline_id));
-
-                let load_info = IFrameLoadInfoWithData {
-                    info: load_info,
-                    load_data: load_data.clone(),
-                    old_pipeline_id,
-                    viewport_details,
-                };
-                window
-                    .as_global_scope()
-                    .script_to_constellation_chan()
-                    .send(ScriptToConstellationMessage::ScriptNewIFrame(load_info))
-                    .unwrap();
-
-                let new_pipeline_info = NewPipelineInfo {
-                    webview_state: (*window.webview_state()).clone(),
-                    parent_info: Some(window.pipeline_id()),
-                    new_pipeline_id,
-                    browsing_context_id,
-                    opener: None,
-                    load_data,
-                    viewport_details,
-                    user_content_manager_id: None,
-                    target_snapshot_params,
-                    frame_name: self.frozen_name.borrow().clone(),
-                };
-
-                self.pipeline_id.set(Some(new_pipeline_id));
-                /*with_script_thread(|script_thread| {
-                        script_thread.spawn_pipeline(cx, new_pipeline_info);
-                });*/
-            },
-            PipelineType::Navigation => {
-                let load_info = IFrameLoadInfoWithData {
-                    info: load_info,
-                    load_data,
-                    old_pipeline_id,
-                    viewport_details,
-                };
-                window
-                    .as_global_scope()
-                    .script_to_constellation_chan()
-                    .send(ScriptToConstellationMessage::ScriptLoadedURLInIFrame(
-                        load_info,
-                    ))
-                    .unwrap();
-            },
-        }
+        let load_info = IFrameLoadInfoWithData {
+            info: load_info,
+            load_data,
+            old_pipeline_id,
+            viewport_details,
+        };
+        window
+            .as_global_scope()
+            .script_to_constellation_chan()
+            .send(ScriptToConstellationMessage::ScriptLoadedURLInIFrame(
+                load_info,
+            ))
+            .unwrap();
     }
 
     /// When an iframe is first inserted into the document,
@@ -703,7 +656,7 @@ impl HTMLIFrameElement {
             new_pipeline_id,
             browsing_context_id,
         };
-        let document = create_a_new_browsing_context_and_document(
+        let _document = create_a_new_browsing_context_and_document(
             cx,
             Some(&creator_document),
             Some(self.upcast()),
@@ -724,14 +677,6 @@ impl HTMLIFrameElement {
 
         // TODO: notify devtools like ScriptThread::spawn_pipeline
 
-        /*self.start_new_pipeline(
-            cx,
-            load_data,
-            PipelineType::InitialAboutBlank,
-            NavigationHistoryBehavior::Push,
-            ProcessingMode::FirstTime,
-            snapshot_self(self),
-        );*/
         // > navigable target name
         // >     targetName
         if let Some(window) = self.GetContentWindow() &&

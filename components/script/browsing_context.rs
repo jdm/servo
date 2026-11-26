@@ -4,7 +4,7 @@ use embedder_traits::ViewportDetails;
 use js::context::JSContext;
 use script_bindings::inheritance::Castable;
 use script_bindings::root::DomRoot;
-use script_traits::{DocumentActivity, NewPipelineInfo, WebViewState};
+use script_traits::{DocumentActivity, WebViewState};
 use servo_base::id::{BrowsingContextId, PipelineId};
 use servo_url::ServoUrl;
 
