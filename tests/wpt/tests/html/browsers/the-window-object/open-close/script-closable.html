@@ -35,6 +35,8 @@ const Actions = {
             form.target = '_blank';
             if (noopener) {
                 form.rel = "noopener";
+            } else {
+                form.rel = "opener";
             }
             // ?navs=1
             const inp1 = document.createElement("input");
@@ -59,6 +61,8 @@ const Actions = {
             anchor.target = '_blank';
             if (noopener) {
                 anchor.rel = "noopener";
+            } else {
+                anchor.rel = "opener";
             }
             document.body.appendChild(anchor);
 
