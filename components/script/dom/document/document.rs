@@ -3133,7 +3133,14 @@ impl Document {
                 }));
         }
 
-        self.window().allow_layout_if_necessary(cx);
+        if !self.is_safe_to_run_script_or_layout() {
+            let doc = DomRoot::from_ref(self);
+            self.add_delayed_task(task!(allow_layout: |cx, doc: DomRoot<Document>| {
+                doc.window().allow_layout_if_necessary(cx);
+            }));
+        } else {
+            self.window().allow_layout_if_necessary(cx);
+        }
     }
 
     /// <https://html.spec.whatwg.org/multipage/#abort-a-document-and-its-descendants>

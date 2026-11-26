@@ -3178,8 +3178,10 @@ impl ScriptThread {
 
     /// Window was resized, but this script was not active, so don't reflow yet
     fn handle_resize_inactive_msg(&self, id: PipelineId, new_viewport_details: ViewportDetails) {
-        let window = self.documents.borrow().find_window(id)
-            .expect("ScriptThread: received a resize msg for a pipeline not in this script thread. This is a bug.");
+        let Some(window) = self.documents.borrow().find_window(id) else {
+            warn!("ScriptThread: received a resize msg for a pipeline {id:?} not active in this script thread.");
+            return;
+        };
         window.set_viewport_details(new_viewport_details);
     }
 
