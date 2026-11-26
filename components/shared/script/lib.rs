@@ -287,6 +287,8 @@ pub enum ScriptThreadMessage {
         child: PipelineId,
         /// Whether or not the load was finished by aborting.
         aborted: bool,
+        /// Whether the document that loaded was the initial about:blank.
+        initial_about_blank: bool,
     },
     /// Cause a `storage` event to be dispatched at the appropriate window.
     /// The strings are key, old value and new value.

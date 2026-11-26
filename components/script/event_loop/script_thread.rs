@@ -1886,12 +1886,14 @@ impl ScriptThread {
                 parent: parent_id,
                 child: child_id,
                 aborted,
+                initial_about_blank,
             } => self.handle_iframe_finished_loading(
                 cx,
                 parent_id,
                 browsing_context_id,
                 child_id,
                 aborted,
+                initial_about_blank,
             ),
             ScriptThreadMessage::DispatchStorageEvent(
                 pipeline_id,
@@ -3179,7 +3181,9 @@ impl ScriptThread {
     /// Window was resized, but this script was not active, so don't reflow yet
     fn handle_resize_inactive_msg(&self, id: PipelineId, new_viewport_details: ViewportDetails) {
         let Some(window) = self.documents.borrow().find_window(id) else {
-            warn!("ScriptThread: received a resize msg for a pipeline {id:?} not active in this script thread.");
+            warn!(
+                "ScriptThread: received a resize msg for a pipeline {id:?} not active in this script thread."
+            );
             return;
         };
         window.set_viewport_details(new_viewport_details);
@@ -3449,13 +3453,14 @@ impl ScriptThread {
         browsing_context_id: BrowsingContextId,
         child_id: PipelineId,
         aborted: bool,
+        initial_about_blank: bool,
     ) {
         let iframe = self
             .documents
             .borrow()
             .find_iframe(parent_id, browsing_context_id);
         match iframe {
-            Some(iframe) => iframe.load_finished(cx, child_id, aborted),
+            Some(iframe) => iframe.load_finished(cx, child_id, aborted, initial_about_blank),
             None => warn!("Message sent to closed pipeline {}.", parent_id),
         }
     }

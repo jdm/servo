@@ -73,7 +73,10 @@ use storage_traits::webstorage_thread::WebStorageThreadMsg;
 use style::attr::parse_integer;
 
 use crate::DomTypeHolder;
-use crate::browsing_context::{InitialBrowsingContextDetails, create_a_new_auxiliary_browsing_context_and_document, create_a_new_top_level_browsing_context_and_document};
+use crate::browsing_context::{
+    InitialBrowsingContextDetails, create_a_new_auxiliary_browsing_context_and_document,
+    create_a_new_top_level_browsing_context_and_document,
+};
 use crate::dom::bindings::conversions::{ToJSValConvertible, root_from_handleobject};
 use crate::dom::bindings::error::{Error, Fallible};
 use crate::dom::bindings::inheritance::Castable;
@@ -383,7 +386,8 @@ impl WindowProxy {
                 theme: Cell::new(window.webview_theme()),
                 // WebViews start focused by default for now.
                 has_system_focus: Cell::new(true),
-            }.into(),
+            }
+            .into(),
             parent_info: None,
             viewport_details: window.viewport_details(),
             opener: (!noopener).then_some(self.browsing_context_id),

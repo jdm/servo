@@ -233,12 +233,7 @@ impl HTMLIFrameElement {
         }
 
         if load_data.url.scheme() != "javascript" {
-            self.continue_navigation(
-                cx,
-                load_data,
-                history_handling,
-                target_snapshot_params,
-            );
+            self.continue_navigation(cx, load_data, history_handling, target_snapshot_params);
             return;
         }
 
@@ -305,7 +300,13 @@ impl HTMLIFrameElement {
             inherited_secure_context: load_data.inherited_secure_context,
             history_handling,
             target_snapshot_params,
-            name: self.frozen_name.borrow().as_ref().map(TracedDOMString::str).as_deref().map(ToString::to_string),
+            name: self
+                .frozen_name
+                .borrow()
+                .as_ref()
+                .map(TracedDOMString::str)
+                .as_deref()
+                .map(ToString::to_string),
         };
 
         let viewport_details = window
@@ -631,7 +632,13 @@ impl HTMLIFrameElement {
             inherited_secure_context: load_data.inherited_secure_context,
             history_handling: NavigationHistoryBehavior::Push,
             target_snapshot_params: snapshot_self(self),
-            name: self.frozen_name.borrow().as_ref().map(TracedDOMString::str).as_deref().map(ToString::to_string),
+            name: self
+                .frozen_name
+                .borrow()
+                .as_ref()
+                .map(TracedDOMString::str)
+                .as_deref()
+                .map(ToString::to_string),
         };
 
         let load_info = IFrameLoadInfoWithData {
@@ -810,6 +817,7 @@ impl HTMLIFrameElement {
         cx: &mut JSContext,
         loaded_pipeline: PipelineId,
         aborted: bool,
+        initial_about_blank: bool,
     ) {
         // TODO(#9592): assert that the load blocker is present at all times when we
         //              can guarantee that it's created for the case of iframe.reload().
@@ -853,13 +861,7 @@ impl HTMLIFrameElement {
         // See #40348
         //
         // TODO: run these step synchronously as part of processing the iframe attributes.
-        let should_fire_event = if self.is_initial_blank_document() {
-            false
-        } else {
-            // If this is not the initial blank doc:
-            // do not fire if there is a pending navigation.
-            !self.pending_navigation.get()
-        };
+        let should_fire_event = !initial_about_blank && !self.pending_navigation.get();
 
         if should_fire_event {
             self.run_iframe_load_event_steps(cx);

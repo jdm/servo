@@ -14,7 +14,7 @@ use crate::dom::document::{Document, HasBrowsingContext, IsHTMLDocument};
 use crate::dom::element::Element;
 use crate::dom::globalscope::GlobalScope;
 use crate::dom::servoparser::populate_about_blank;
-use crate::event_loop::document_loader::DocumentLoader;
+use crate::event_loop::document_loader::{DocumentLoader, LoadType};
 use crate::event_loop::script_thread::ScriptThread;
 use crate::navigation::{
     determine_creation_sandboxing_flags, determine_iframe_element_referrer_policy,
@@ -114,7 +114,7 @@ pub(crate) fn create_a_new_browsing_context_and_document(
     // Step 15. Let document be a new Document, with:
     let loader = DocumentLoader::new_with_threads(
         window.upcast::<GlobalScope>().resource_threads().clone(),
-        Some(about_blank.clone()),
+        None,
     );
     let document = Document::new(
         cx,
@@ -196,12 +196,7 @@ pub(crate) fn create_a_new_auxiliary_browsing_context_and_document(
     // TODO
 
     // Step 4. Let browsingContext and document be the result of creating a new browsing context and document with opener's active document, null, and group.
-    let document = create_a_new_browsing_context_and_document(
-        cx,
-        Some(opener),
-        None,
-        details,
-    );
+    let document = create_a_new_browsing_context_and_document(cx, Some(opener), None, details);
 
     // Step 5. Set browsingContext's is auxiliary to true.
     // Step 6. Append browsingContext to group.
@@ -224,12 +219,7 @@ pub(crate) fn create_a_new_top_level_browsing_context_and_document(
     details: InitialBrowsingContextDetails,
 ) -> DomRoot<Document> {
     // Step 1. Let group and document be the result of creating a new browsing context group and document.
-    let document = create_a_new_browsing_context_and_document(
-        cx,
-        None,
-        None,
-        details,
-    );
+    let document = create_a_new_browsing_context_and_document(cx, None, None, details);
 
     // Step 2. Return group's browsing context set[0] and document.
     document

@@ -1814,9 +1814,15 @@ where
             ScriptToConstellationMessage::AbortLoadUrl => {
                 self.handle_abort_load_url_msg(webview_id, source_pipeline_id);
             },
-            ScriptToConstellationMessage::LoadFinished { aborted } => {
-                self.handle_load_finished_message(webview_id, source_pipeline_id, aborted)
-            },
+            ScriptToConstellationMessage::LoadFinished {
+                aborted,
+                initial_about_blank,
+            } => self.handle_load_finished_message(
+                webview_id,
+                source_pipeline_id,
+                aborted,
+                initial_about_blank,
+            ),
             // Handle navigating to a fragment
             ScriptToConstellationMessage::NavigatedToFragment(new_url, replacement_enabled) => {
                 self.handle_navigated_to_fragment(source_pipeline_id, new_url, replacement_enabled);
@@ -3587,7 +3593,12 @@ where
     }
 
     #[servo_tracing::instrument(skip_all)]
-    fn handle_subframe_load_finished(&mut self, pipeline_id: PipelineId, aborted: bool) {
+    fn handle_subframe_load_finished(
+        &mut self,
+        pipeline_id: PipelineId,
+        aborted: bool,
+        initial_about_blank: bool,
+    ) {
         let browsing_context_id = match self.pipelines.get(&pipeline_id) {
             Some(pipeline) => pipeline.browsing_context_id,
             None => return warn!("Subframe ({pipeline_id:?}) load finished after closure"),
@@ -3609,6 +3620,7 @@ where
             parent: parent_pipeline_id,
             child: pipeline_id,
             aborted,
+            initial_about_blank,
         };
 
         let result = match self.pipelines.get(&parent_pipeline_id) {
@@ -4508,6 +4520,7 @@ where
         webview_id: WebViewId,
         pipeline_id: PipelineId,
         aborted: bool,
+        initial_about_blank: bool,
     ) {
         debug!("Load finished in {pipeline_id:?} aborted={aborted}");
 
@@ -4536,7 +4549,7 @@ where
                 );
             }
         } else {
-            self.handle_subframe_load_finished(pipeline_id, aborted);
+            self.handle_subframe_load_finished(pipeline_id, aborted, initial_about_blank);
         }
     }
 

@@ -795,6 +795,7 @@ pub enum ScriptToConstellationMessage {
     /// aborted this indicates that the pipeline's `load` event has already been dispatched.
     LoadFinished {
         aborted: bool,
+        initial_about_blank: bool,
     },
     /// A new load has been requested, with an option to replace the current entry once loaded
     /// instead of adding a new entry.

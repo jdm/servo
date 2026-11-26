@@ -3182,7 +3182,10 @@ impl Document {
 
     pub(crate) fn notify_constellation_that_load_finished(&self, aborted: bool) {
         self.window()
-            .send_to_constellation(ScriptToConstellationMessage::LoadFinished { aborted });
+            .send_to_constellation(ScriptToConstellationMessage::LoadFinished {
+                aborted,
+                initial_about_blank: self.is_initial_about_blank.get(),
+            });
     }
 
     pub(crate) fn set_current_parser(&self, script: Option<&ServoParser>, reason: SetParserReason) {
