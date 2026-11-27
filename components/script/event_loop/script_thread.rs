@@ -4813,7 +4813,7 @@ impl ScriptThread {
                 time_profiler_chan: script_thread.senders.time_profiler_sender.clone(),
                 paint_api: script_thread.paint_api.clone(),
                 viewport_details: viewport_details,
-                user_stylesheets: Rc::new(vec![]),
+                user_stylesheets: Rc::new(vec![]), //XXXjdm
                 theme: webview_state.theme.get(),
                 embedder_chan: script_thread.senders.pipeline_to_embedder_sender.clone(),
                 document_random_hasher_key,
@@ -4855,7 +4855,7 @@ impl ScriptThread {
                 script_thread.unminify_js,
                 script_thread.unminify_css,
                 script_thread.local_script_source.clone(),
-                Rc::new(vec![]),
+                Rc::new(vec![]), //XXXjdm
                 script_thread.player_context.clone(),
                 #[cfg(feature = "webgpu")]
                 script_thread.gpu_id_hub.clone(),

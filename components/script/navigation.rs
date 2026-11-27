@@ -573,9 +573,14 @@ pub(crate) fn navigate(
     ));
 }
 
+pub(crate) enum CreatorSandboxProvider<'a> {
+    BrowsingContext(Option<&'a WindowProxy>),
+    FlagSet(SandboxingFlagSet),
+}
+
 /// <https://html.spec.whatwg.org/multipage/#determining-the-creation-sandboxing-flags>
 pub(crate) fn determine_creation_sandboxing_flags(
-    browsing_context: Option<&WindowProxy>,
+    creator_sandbox: CreatorSandboxProvider<'_>,
     element: Option<&Element>,
 ) -> SandboxingFlagSet {
     // To determine the creation sandboxing flags for a browsing context
@@ -584,10 +589,13 @@ pub(crate) fn determine_creation_sandboxing_flags(
     match element {
         // If embedder is null, then: the flags set on browsing context's
         // popup sandboxing flag set.
-        None => browsing_context
-            .and_then(|browsing_context| browsing_context.document())
-            .map(|document| document.active_sandboxing_flag_set())
-            .unwrap_or(SandboxingFlagSet::empty()),
+        None => match creator_sandbox {
+            CreatorSandboxProvider::BrowsingContext(browsing_context) => browsing_context
+                .and_then(|browsing_context| browsing_context.document())
+                .map(|document| document.active_sandboxing_flag_set())
+                .unwrap_or(SandboxingFlagSet::empty()),
+            CreatorSandboxProvider::FlagSet(sandbox_flags) => sandbox_flags,
+        },
         Some(element) => {
             // If embedder is an element, then: the flags set on embedder's
             // iframe sandboxing flag set.
@@ -624,7 +632,10 @@ pub(crate) fn snapshot_target_snapshot_params(navigable: &WindowProxy) -> Target
     let container = navigable.frame_element();
     // the result of determining the creation sandboxing flags given targetNavigable's
     // active browsing context and targetNavigable's container
-    let sandboxing_flags = determine_creation_sandboxing_flags(Some(navigable), container);
+    let sandboxing_flags = determine_creation_sandboxing_flags(
+        CreatorSandboxProvider::BrowsingContext(Some(navigable)),
+        container,
+    );
     // the result of determining the iframe element referrer policy given
     // targetNavigable's container
     let iframe_element_referrer_policy = determine_iframe_element_referrer_policy(container);

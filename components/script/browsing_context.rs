@@ -1,5 +1,6 @@
 use std::rc::Rc;
 
+use content_security_policy::sandboxing_directive::SandboxingFlagSet;
 use embedder_traits::ViewportDetails;
 use js::context::JSContext;
 use script_bindings::inheritance::Castable;
@@ -14,11 +15,11 @@ use crate::dom::document::{Document, HasBrowsingContext, IsHTMLDocument};
 use crate::dom::element::Element;
 use crate::dom::globalscope::GlobalScope;
 use crate::dom::servoparser::populate_about_blank;
-use crate::event_loop::document_loader::{DocumentLoader};
+use crate::event_loop::document_loader::DocumentLoader;
 use crate::event_loop::script_thread::ScriptThread;
 use crate::navigation::{
-    determine_creation_sandboxing_flags, determine_iframe_element_referrer_policy,
-    determine_the_origin,
+    CreatorSandboxProvider, determine_creation_sandboxing_flags,
+    determine_iframe_element_referrer_policy, determine_the_origin,
 };
 
 pub(crate) struct InitialBrowsingContextDetails {
@@ -30,6 +31,7 @@ pub(crate) struct InitialBrowsingContextDetails {
     pub(crate) frame_name: Option<DOMString>,
     pub(crate) new_pipeline_id: PipelineId,
     pub(crate) browsing_context_id: BrowsingContextId,
+    pub(crate) sandboxing_flag_set: Option<SandboxingFlagSet>,
 }
 
 /// <https://html.spec.whatwg.org/multipage/#creating-a-new-browsing-context>
@@ -60,7 +62,11 @@ pub(crate) fn create_a_new_browsing_context_and_document(
     //   sandboxing flags given browsingContext and embedder.
     // <https://github.com/whatwg/html/issues/13334>
     let creator_browsing_context = creator.and_then(|document| document.browsing_context());
-    let sandbox_flags = determine_creation_sandboxing_flags(creator_browsing_context.as_deref(), embedder);
+    let sandbox_provider = details.sandboxing_flag_set.map_or(
+        CreatorSandboxProvider::BrowsingContext(creator_browsing_context.as_deref()),
+        |sandboxing_flags| CreatorSandboxProvider::FlagSet(sandboxing_flags),
+    );
+    let sandbox_flags = determine_creation_sandboxing_flags(sandbox_provider, embedder);
 
     // Step 7. Let origin be the result of determining the origin given
     //   about:blank, sandboxFlags, and creatorOrigin.

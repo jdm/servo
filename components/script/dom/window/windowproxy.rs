@@ -395,7 +395,8 @@ impl WindowProxy {
             frame_name: (!name.eq_ignore_ascii_case("_blank")).then_some(name),
             new_pipeline_id: response.new_pipeline_id,
             browsing_context_id: new_browsing_context_id,
-            //TODO: user_content_manager_id, sandbox flags?
+            sandboxing_flag_set: Some(sandboxing_flag_set),
+            //TODO: user_content_manager_id
         };
 
         // Step 2. If opener is null, then set document to the second return value

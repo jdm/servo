@@ -56,7 +56,8 @@ use crate::event_loop::script_thread::ScriptThread;
 use crate::event_loop::script_window_proxies::ScriptWindowProxies;
 use crate::fetch::network_listener::ResourceTimingListener;
 use crate::navigation::{
-    determine_creation_sandboxing_flags, determine_iframe_element_referrer_policy,
+    CreatorSandboxProvider, determine_creation_sandboxing_flags,
+    determine_iframe_element_referrer_policy,
 };
 
 #[derive(Clone, Copy, PartialEq)]
@@ -577,7 +578,10 @@ impl HTMLIFrameElement {
         // Step 3. Let browsingContext and document be the result of creating a new browsing context and document given element's node document, element, and group.
         let browsing_context_id = BrowsingContextId::new();
         let webview_id = window.window_proxy().webview_id();
-        self.pipeline_id.set(None);
+        let new_pipeline_id = PipelineId::new();
+        self.pending_pipeline_id.set(Some(new_pipeline_id));
+        self.pipeline_id.set(Some(new_pipeline_id));
+        self.about_blank_pipeline_id.set(Some(new_pipeline_id));
         self.webview_id.set(Some(webview_id));
         self.browsing_context_id.set(Some(browsing_context_id));
 
@@ -595,9 +599,6 @@ impl HTMLIFrameElement {
             .upcast::<Element>()
             .get_name()
             .map(TracedDOMString::from);
-
-        let new_pipeline_id = PipelineId::new();
-        self.pending_pipeline_id.set(Some(new_pipeline_id));
 
         let mut load_data = LoadData::new(
             // > initiator origin
@@ -663,6 +664,7 @@ impl HTMLIFrameElement {
             frame_name: self.frozen_name.borrow().clone().map(TracedDOMString::root),
             new_pipeline_id,
             browsing_context_id,
+            sandboxing_flag_set: None,
         };
         let _document = create_a_new_browsing_context_and_document(
             cx,
@@ -670,28 +672,12 @@ impl HTMLIFrameElement {
             Some(self.upcast()),
             details,
         );
-        // Step 6. Let documentState be a new document state, with
-
+        // Step 6. Let documentState be a new document state, with...
         // Step 7. Let navigable be a new navigable.
-        //let browsing_context_id = BrowsingContextId::new();
-        /*let webview_id = window.window_proxy().webview_id();
-        self.pipeline_id.set(None);
-        self.pending_pipeline_id.set(None);
-        self.webview_id.set(Some(webview_id));
-        self.browsing_context_id.set(Some(browsing_context_id));*/
         // Step 8. Initialize the navigable navigable given documentState and parentNavigable.
-        self.about_blank_pipeline_id.set(Some(new_pipeline_id));
-        self.pipeline_id.set(Some(new_pipeline_id));
+        // TODO
 
         // TODO: notify devtools like ScriptThread::spawn_pipeline
-
-        // > navigable target name
-        // >     targetName
-        if let Some(window) = self.GetContentWindow() &&
-            let Some(window_name) = &*self.frozen_name.borrow()
-        {
-            window.set_name(window_name);
-        }
     }
 
     fn destroy_nested_browsing_context(&self) {
@@ -1357,7 +1343,7 @@ fn snapshot_self(iframe: &HTMLIFrameElement) -> TargetSnapshotParams {
     let child_navigable = iframe.GetContentWindow();
     TargetSnapshotParams {
         sandboxing_flags: determine_creation_sandboxing_flags(
-            child_navigable.as_deref(),
+            CreatorSandboxProvider::BrowsingContext(child_navigable.as_deref()),
             Some(iframe.upcast()),
         ),
         iframe_element_referrer_policy: determine_iframe_element_referrer_policy(Some(
